@@ -9,6 +9,7 @@ import {
   FolderPlus, Download, RefreshCw, Sliders, Sun, Moon,
   PanelLeftOpen, PanelRightOpen, SlidersHorizontal
 } from "lucide-react";
+import { useUsers } from "./hooks/useUsers";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -802,6 +803,8 @@ export default function App() {
     ...BASE_LIBRARY,
     ...plugins.filter(p => p.status === "installed").flatMap(p => p.steps.map(s => ({ ...s, pluginId: p.id }))),
   ];
+   const { data, isLoading, error } = useUsers();
+
 
   const selectedStep = selectedId ? flatAll(plan).find(s => s.id === selectedId) : null;
   const toggleExpand = (id: string) => setExpanded(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
@@ -810,6 +813,8 @@ export default function App() {
     const all = flatAll(plan).filter(s => !s.children);
     return { total: all.length, passed: all.filter(s => s.status === "passed").length, failed: all.filter(s => s.status === "failed").length, enabled: all.filter(s => s.enabled).length };
   })();
+
+
 
   // ── Plan actions ──
 
