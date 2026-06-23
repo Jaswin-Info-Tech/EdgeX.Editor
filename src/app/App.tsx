@@ -9,7 +9,7 @@ import {
   FolderPlus, Download, RefreshCw, Sliders, Sun, Moon,
   PanelLeftOpen, PanelRightOpen, SlidersHorizontal
 } from "lucide-react";
-import { useUsers } from "./hooks/useUsers";
+import { usePlugins } from "./hooks/usePlugin";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -803,7 +803,7 @@ export default function App() {
     ...BASE_LIBRARY,
     ...plugins.filter(p => p.status === "installed").flatMap(p => p.steps.map(s => ({ ...s, pluginId: p.id }))),
   ];
-   const { data, isLoading, error } = useUsers();
+   const { data, isLoading, error } = usePlugins();
 
 
   const selectedStep = selectedId ? flatAll(plan).find(s => s.id === selectedId) : null;
@@ -1626,7 +1626,7 @@ export default function App() {
               </div>
             )}
             <div className="flex-1 overflow-y-auto">
-              {filteredLib.map(item => (
+              {data?.map(item => (
                 <div key={item.id} draggable
                   onDragStart={() => setDragLibItem(item)}
                   onDragEnd={() => { setDragLibItem(null); setDropIdx(null); }}
@@ -1644,9 +1644,11 @@ export default function App() {
                       <span className="text-[12px] font-mono text-foreground group-hover:text-primary transition-colors">{item.name}</span>
                       {item.pluginId && <span className="text-[9px] font-mono text-primary border border-primary/30 px-1 shrink-0">plugin</span>}
                     </div>
-                    <div className="text-[11px] text-muted-foreground mt-0.5 leading-tight">{item.description}</div>
+                    <div className="text-[11px] text-muted-foreground mt-0.5 leading-tight">Base Type: {item.baseType}</div>
+
+                    <div className="text-[11px] text-muted-foreground mt-0.5 leading-tight">Assembly: {item.assembly}</div>
                   </div>
-                  <span className="text-[10px] font-mono text-muted-foreground border border-border px-1 shrink-0 mt-0.5">{TYPE_LABEL[item.type]}</span>
+                  {/* <span className="text-[10px] font-mono text-muted-foreground border border-border px-1 shrink-0 mt-0.5">{TYPE_LABEL[item.type]}</span> */}
                 </div>
               ))}
             </div>
