@@ -30,7 +30,7 @@ export function PropertiesPanel({
       </div>
     );
 
-    const groups: string[] = Array.from(new Set(selectedStep.properties.map((p: any) => p.group as string)));
+    const groups: string[] = Array.from(new Set((selectedStep.properties || []).map((p: any) => p.group as string)));
     const stripe = TYPE_STRIPE[selectedStep.type] || "#64748b";
 
     return (
@@ -44,7 +44,7 @@ export function PropertiesPanel({
             </div>
             <div className="flex items-center gap-2">
               <StatusPill status={selectedStep.status} />
-              <span className="text-[11px] font-mono text-muted-foreground">{selectedStep.type.toUpperCase()}</span>
+              <span className="text-[11px] font-mono text-muted-foreground">{(selectedStep.type || "unknown").toUpperCase()}</span>
               {selectedStep.description && <span className="text-[11px] text-muted-foreground">· {selectedStep.description}</span>}
             </div>
           </div>
@@ -69,7 +69,7 @@ export function PropertiesPanel({
               <div className="w-[3px] h-3" style={{ background: stripe }} />
               <span className="text-[10px] font-mono font-bold text-muted-foreground uppercase tracking-widest">{group}</span>
             </div>
-            {selectedStep.properties.filter((p: any) => p.group === group).map((prop: any) => (
+            {(selectedStep.properties || []).filter((p: any) => p.group === group).map((prop: any) => (
               <div key={prop.key} className="px-3 py-2.5 border-b border-border/40">
                 <label className="block text-[11px] font-mono text-muted-foreground mb-1.5 uppercase tracking-wide">{prop.label}</label>
                 {prop.type === "boolean" ? (
@@ -98,7 +98,7 @@ export function PropertiesPanel({
           </div>
         ))}
 
-        {selectedStep.properties.length === 0 && <div className="px-3 py-4 text-[12px] text-muted-foreground font-mono">No configurable properties.</div>}
+        {selectedStep.properties && selectedStep.properties.length === 0 && <div className="px-3 py-4 text-[12px] text-muted-foreground font-mono">No configurable properties.</div>}
 
         <div className="px-3 py-3 border-t border-border flex gap-2 mt-1">
           <button onClick={() => { setAddStepParentId(null); setShowAddStep(true); }}

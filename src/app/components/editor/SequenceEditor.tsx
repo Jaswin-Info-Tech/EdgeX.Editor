@@ -75,7 +75,10 @@ export function SequenceEditor({
           <div
             className="flex flex-col items-center justify-center h-full gap-4 p-8"
             onDragOver={e => { if (dragLibItem) e.preventDefault(); }}
-            onDrop={e => { if (dragLibItem) handleSeqDrop(e, null, 0); }}
+            onDrop={e => { 
+              e.stopPropagation();
+              if (dragLibItem) handleSeqDrop(e, null, 0); 
+            }}
           >
             <div className="border-2 border-dashed border-border p-10 text-center w-full max-w-md">
               <Layers size={32} className="mx-auto text-muted-foreground/20 mb-4" />
