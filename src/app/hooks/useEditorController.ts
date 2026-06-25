@@ -1,17 +1,19 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { DragEvent } from "react";
 import { useDragResize } from "../components/editor/resizable";
-import { BASE_LIBRARY, PRESET_PLUGINS } from "../data/library";
+import { BASE_LIBRARY } from "../data/library";
 import type { CtxMenu, LibraryItem, LogEntry, PlanMeta, Plugin, RunState, StepStatus, TestStep } from "../types/editor";
 import { addToParent, deleteIn, flatAll, makeSequence, makeStep, moveIn, nowTs, parseFreq, resetAll, setStatusIn, uid, updateIn } from "../utils/editor";
 import { usePlugins } from "./usePlugin";
+import { usePackages } from "./usePackage";
 import { useWindowWidth } from "./useWindowWidth";
+
 
 export function useEditorController() {
   const winW = useWindowWidth();
   const isDesktop = winW >= 1280;
   const isTablet = winW >= 768 && winW < 1024;
-
+  const { data: packagesData } = usePackages();
   const [plan, setPlan] = useState<TestStep[]>([]);
   const [planMeta, setPlanMeta] = useState<PlanMeta>({ name: "Untitled Test Plan", description: "", author: "", version: "1.0.0", dutName: "", dutSerial: "", dutModel: "", dutFirmware: "" });
   const [hasPlan, setHasPlan] = useState(false);
@@ -25,7 +27,7 @@ export function useEditorController() {
   const [libSearch, setLibSearch] = useState("");
   const [libFilterOpen, setLibFilterOpen] = useState(false);
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
-  const [plugins, setPlugins] = useState<Plugin[]>(PRESET_PLUGINS);
+  const [plugins, setPlugins] = useState<Plugin[]>([]);
   const [renaming, setRenaming] = useState<string | null>(null);
   const [renameVal, setRenameVal] = useState("");
   const [contextMenu, setContextMenu] = useState<CtxMenu | null>(null);
@@ -59,6 +61,11 @@ export function useEditorController() {
   useEffect(() => { document.documentElement.classList.toggle("dark", isDark); }, [isDark]);
   useEffect(() => { logEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [logs]);
   useEffect(() => { renameRef.current?.focus(); }, [renaming]);
+  useEffect(() => {
+    if (packagesData) {
+      setPlugins(Array.isArray(packagesData) ? packagesData : []);
+    }
+  }, [packagesData]);
 
   const addLog = useCallback((level: LogEntry["level"], source: string, message: string) => {
     setLogs(prev => [...prev, { id: logId.current++, timestamp: nowTs(), level, source, message }]);
@@ -66,7 +73,9 @@ export function useEditorController() {
 
   const library: LibraryItem[] = [
     ...BASE_LIBRARY,
-    ...plugins.filter(plugin => plugin.status === "installed").flatMap(plugin => plugin.steps.map(step => ({ ...step, pluginId: plugin.id }))),
+    ...plugins
+      .filter(plugin => plugin.state === "installed")
+      .flatMap(plugin => (plugin.steps ?? []).map(step => ({ ...step, pluginId: plugin.id }))),
   ];
   const { data } = usePlugins();
 
@@ -232,9 +241,9 @@ export function useEditorController() {
   };
 
   const handleInstallPlugin = (id: string) => {
-    setPlugins(prev => prev.map(plugin => plugin.id === id ? { ...plugin, status: "installing" } : plugin));
+    setPlugins(prev => prev.map(plugin => plugin.id === id ? { ...plugin, state: "installing" } : plugin));
     setTimeout(() => {
-      setPlugins(prev => prev.map(plugin => plugin.id === id ? { ...plugin, status: "installed" } : plugin));
+      setPlugins(prev => prev.map(plugin => plugin.id === id ? { ...plugin, state: "installed" } : plugin));
       const plugin = plugins.find(item => item.id === id);
       if (plugin) addLog("INFO", "Plugins", `Installed: ${plugin.name} v${plugin.version}`);
     }, 1500);
@@ -246,7 +255,7 @@ export function useEditorController() {
       name: filename.replace(/\.(tappackage|dll)$/, ""),
       version: "1.0.0",
       author: "Custom",
-      status: "installed",
+      state: "installed",
       description: `Custom plugin from ${filename}`,
       steps: [{ id: `lup-${uid()}`, name: "Custom Step", category: "Custom", type: "flow", description: "Step from uploaded plugin", defaultProps: [{ key: "param1", label: "Parameter 1", type: "string", value: "", group: "Parameters" }] }],
     };
