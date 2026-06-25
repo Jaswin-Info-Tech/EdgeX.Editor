@@ -3,7 +3,7 @@ import { Moon, PanelLeftOpen, PanelRightOpen, Sun } from "lucide-react";
 const MENU_ITEMS: Record<string, string[]> = {
   File: ["New Test Plan", "Open...", "-", "Save", "Save As...", "Export Report...", "-", "Exit"],
   Edit: ["Undo", "Redo", "-", "Cut", "Copy", "Paste", "-", "Select All"],
-  View: ["Test Plan Tree", "Step Library", "Properties", "Console", "-", "Reset Layout"],
+  View: ["Step Library", "Properties", "Console", "-", "Reset Layout"],
   Run: ["Run All", "Run Selected", "-", "Pause", "Stop", "-", "Reset Plan"],
   Plugins: ["Plugin Manager", "-", "Reload Plugins"],
   Help: ["Documentation", "About EdgeX", "-", "Check for Updates"],
@@ -20,6 +20,7 @@ interface MenuBarProps {
   setLeftOpen: (updater: any) => void;
   rightOpen: boolean;
   setRightOpen: (updater: any) => void;
+  setShowConsole: (updater: any) => void;
   isDark: boolean;
   setIsDark: (updater: any) => void;
   setShowNewPlan: (value: boolean) => void;
@@ -42,6 +43,7 @@ export function MenuBar({
   setLeftOpen,
   rightOpen,
   setRightOpen,
+  setShowConsole,
   isDark,
   setIsDark,
   setShowNewPlan,
@@ -66,6 +68,14 @@ export function MenuBar({
     if (item === "Stop") handleStop();
     if (item === "Pause") handlePause();
     if (item === "Reset Plan") handleReset();
+    if (item === "Step Library") setLeftOpen((value: boolean) => !value);
+    if (item === "Properties") setRightOpen((value: boolean) => !value);
+    if (item === "Console") setShowConsole((value: boolean) => !value);
+    if (item === "Reset Layout") {
+      setLeftOpen(true);
+      setRightOpen(true);
+      setShowConsole(true);
+    }
   };
 
   return (
