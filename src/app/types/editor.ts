@@ -26,6 +26,14 @@ export interface LibraryItem {
   defaultProps: Property[];
 }
 
+export interface InstrumentItem {
+  name: string;
+  assembly: string;
+  baseType: string;
+  canCreateInstance: boolean;
+  isBrowsable: boolean;
+}
+
 export interface Plugin {
   id: string; name: string; version: string; author: string; description: string;
   state: "installed" | "installing" | "available"; steps?: LibraryItem[];
