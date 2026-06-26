@@ -21,6 +21,8 @@ export interface LogEntry {
 
 export interface LibraryItem {
   id: string; name: string; category: string; description: string; type: string; pluginId?: string;
+  baseType?: string;
+  assembly?: string;
   defaultProps: Property[];
 }
 

@@ -81,7 +81,7 @@ export function LeftPanel({
       <div className="flex border-b border-border shrink-0">
         {([
           ["plan", "Plan", <List size={12} />],
-          ["library", "Library", <Database size={12} />],
+          ["library", "Steps", <Database size={12} />],
           ["plugins", "Plugins", <Package size={12} />],
         ] as const).map(([tab, label, icon]) => (
           <button
@@ -140,7 +140,7 @@ export function LeftPanel({
           <div className="flex items-center gap-2 px-2 py-2 border-b border-border shrink-0">
             <div className="flex items-center gap-2 border border-border px-2.5 py-1.5 bg-background flex-1">
               <Search size={11} className="text-muted-foreground shrink-0" />
-              <input value={libSearch} onChange={e => setLibSearch(e.target.value)} placeholder="Search library..." className="flex-1 bg-transparent text-[12px] font-mono text-foreground placeholder:text-muted-foreground outline-none" />
+              <input value={libSearch} onChange={e => setLibSearch(e.target.value)} placeholder="Search steps..." className="flex-1 bg-transparent text-[12px] font-mono text-foreground placeholder:text-muted-foreground outline-none" />
               {libSearch && <button onClick={() => setLibSearch("")} className="text-muted-foreground hover:text-foreground shrink-0"><X size={10} /></button>}
             </div>
             <div className="relative shrink-0">

@@ -68,7 +68,7 @@ export function resetAll(steps: TestStep[]): TestStep[] {
 }
 
 export function makeStep(lib: LibraryItem): TestStep {
-  return { id: uid(), name: lib.name, type: lib.type, status: "pending", enabled: true, description: lib.description, properties: lib.defaultProps.map(p => ({ ...p })) };
+  return { id: uid(), name: lib.name, type: lib.type, status: "pending", enabled: true, description: lib.description, properties: (lib.defaultProps || []).map(p => ({ ...p })) };
 }
 
 export function makeSequence(name = "New Sequence"): TestStep {
