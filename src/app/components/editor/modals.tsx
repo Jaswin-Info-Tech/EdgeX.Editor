@@ -168,8 +168,8 @@ export function PluginManager({ plugins, onInstall, onUpload, onClose }: {
   const [tab, setTab] = useState<"installed" | "browse" | "upload">("installed");
   const [uploadFile, setUploadFile] = useState("");
   const [uploading, setUploading] = useState(false);
-  const installed = plugins.filter(p => p.status === "installed");
-  const available = plugins.filter(p => p.status === "available");
+  const installed = plugins.filter(p => p.state === "installed");
+  const available = plugins.filter(p => p.state === "available");
 
   const handleUpload = () => {
     if (!uploadFile) return;
@@ -206,13 +206,13 @@ export function PluginManager({ plugins, onInstall, onUpload, onClose }: {
                         <span className="text-[11px] font-mono text-emerald-500 border border-emerald-500/30 bg-emerald-500/10 px-2">v{p.version}</span>
                         <span className="text-[11px] font-mono text-emerald-500">● installed</span>
                       </div>
-                      <div className="text-[12px] text-muted-foreground mb-1">{p.description}</div>
-                      <div className="text-[11px] text-muted-foreground/60 font-mono">by {p.author} · {p.steps.length} steps</div>
+                      {/* <div className="text-[12px] text-muted-foreground mb-1">{p.description}</div> */}
+                      {/* <div className="text-[11px] text-muted-foreground/60 font-mono">by {p.author} · {p.steps.length} steps</div> */}
                     </div>
                     <button className="text-[11px] font-mono text-muted-foreground hover:text-red-500 border border-border hover:border-red-500/30 px-2.5 py-1 transition-colors">Uninstall</button>
                   </div>
                   <div className="mt-3 flex flex-wrap gap-1.5">
-                    {p.steps.map(s => (
+                    {(p.steps ?? []).map(s => (
                       <span key={s.id} className="text-[11px] font-mono border border-border px-2 py-0.5 text-muted-foreground">{s.name}</span>
                     ))}
                   </div>
@@ -231,7 +231,7 @@ export function PluginManager({ plugins, onInstall, onUpload, onClose }: {
                         <span className="text-[11px] font-mono text-muted-foreground border border-border px-2">v{p.version}</span>
                       </div>
                       <div className="text-[12px] text-muted-foreground mb-1">{p.description}</div>
-                      <div className="text-[11px] text-muted-foreground/60 font-mono">by {p.author} · {p.steps.length} steps</div>
+                      <div className="text-[11px] text-muted-foreground/60 font-mono">by {p.author} · {p.steps?.length ?? 0} steps</div>
                     </div>
                     <button onClick={() => onInstall(p.id)}
                       className="text-[11px] font-mono text-primary border border-primary/40 bg-primary/10 hover:bg-primary/20 px-3 py-1 flex items-center gap-1.5 transition-colors">
@@ -239,7 +239,7 @@ export function PluginManager({ plugins, onInstall, onUpload, onClose }: {
                     </button>
                   </div>
                   <div className="mt-3 flex flex-wrap gap-1.5">
-                    {p.steps.map(s => <span key={s.id} className="text-[11px] font-mono border border-border px-2 py-0.5 text-muted-foreground">{s.name}</span>)}
+                    {(p.steps ?? []).map(s => <span key={s.id} className="text-[11px] font-mono border border-border px-2 py-0.5 text-muted-foreground">{s.name}</span>)}
                   </div>
                 </div>
               ))}

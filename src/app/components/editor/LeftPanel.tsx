@@ -231,12 +231,12 @@ export function LeftPanel({
               <div key={plugin.id} className="px-3 py-3">
                 <div className="flex items-center justify-between mb-1">
                   <span className="text-[12px] font-mono text-foreground font-medium">{plugin.name}</span>
-                  <span className={`text-[10px] font-mono font-semibold ${plugin.status === "installed" ? "text-emerald-500" : plugin.status === "installing" ? "text-yellow-500 animate-pulse" : "text-muted-foreground"}`}>
-                    {plugin.status === "installed" ? "ACTIVE" : plugin.status === "installing" ? "INSTALLING" : "AVAILABLE"}
+                  <span className={`text-[10px] font-mono font-semibold ${plugin.state === "installed" ? "text-emerald-500" : plugin.state === "installing" ? "text-yellow-500 animate-pulse" : "text-muted-foreground"}`}>
+                    {plugin.state === "installed" ? "ACTIVE" : plugin.state === "installing" ? "INSTALLING" : "AVAILABLE"}
                   </span>
                 </div>
-                <div className="text-[11px] text-muted-foreground font-mono">v{plugin.version} - {plugin.steps.length} steps</div>
-                {plugin.status === "available" && (
+                <div className="text-[11px] text-muted-foreground font-mono">v{plugin.version} - {plugin.steps?.length ?? 0} steps</div>
+                {plugin.state === "available" && (
                   <button onClick={() => handleInstallPlugin(plugin.id)} className="mt-1.5 text-[11px] font-mono text-primary border border-primary/30 px-2 py-0.5 hover:bg-primary/10 flex items-center gap-1">
                     <Download size={10} /> Install
                   </button>

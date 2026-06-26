@@ -98,7 +98,7 @@ export const PRESET_PLUGINS: Plugin[] = [
   {
     id: "p1", name: "Keysight RF Suite", version: "3.2.1", author: "Keysight Technologies",
     description: "RF measurement steps for Keysight signal analyzers and generators (N9030, E4438C)",
-    status: "installed",
+    state: "installed",
     steps: [
       { id: "lp1a", name: "EVM Measurement", category: "Keysight RF", type: "measure", description: "Error Vector Magnitude measurement",
         defaultProps: [
@@ -115,7 +115,7 @@ export const PRESET_PLUGINS: Plugin[] = [
   {
     id: "p2", name: "NI-DAQmx I/O", version: "1.5.0", author: "National Instruments",
     description: "Digital and analog I/O for NI DAQ hardware (USB-6001, PCIe-6321)",
-    status: "available",
+    state: "available",
     steps: [
       { id: "lp2a", name: "Analog Input Read", category: "NI DAQmx", type: "hw", description: "Read analog voltage from DAQ channel",
         defaultProps: [
@@ -128,7 +128,7 @@ export const PRESET_PLUGINS: Plugin[] = [
   {
     id: "p3", name: "Serial Protocol Tester", version: "2.0.3", author: "OpenTAP Community",
     description: "UART/SPI/I2C protocol verification steps",
-    status: "available",
+    state: "available",
     steps: [
       { id: "lp3a", name: "UART Send", category: "Serial", type: "hw", description: "Send bytes over UART serial port",
         defaultProps: [

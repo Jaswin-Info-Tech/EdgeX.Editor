@@ -26,7 +26,7 @@ export interface LibraryItem {
 
 export interface Plugin {
   id: string; name: string; version: string; author: string; description: string;
-  status: "installed" | "installing" | "available"; steps: LibraryItem[];
+  state: "installed" | "installing" | "available"; steps?: LibraryItem[];
 }
 
 export interface PlanMeta {
