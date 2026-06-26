@@ -35,8 +35,8 @@ export function useEditorController() {
   const [addStepIdx, setAddStepIdx] = useState<number | undefined>(undefined);
   const [isDark, setIsDark] = useState(false);
 
-  const [leftOpen, setLeftOpen] = useState(false);
-  const [rightOpen, setRightOpen] = useState(false);
+  const [leftOpen, setLeftOpen] = useState(true);
+  const [rightOpen, setRightOpen] = useState(true);
 
   const [leftW, setLeftW] = useState(isDesktop ? 232 : 200);
   const [rightW, setRightW] = useState(isDesktop ? 280 : 248);

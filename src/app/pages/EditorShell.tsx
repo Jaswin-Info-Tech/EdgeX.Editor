@@ -295,6 +295,7 @@ export function EditorShell(props: EditorShellProps) {
         setLeftOpen={setLeftOpen}
         rightOpen={rightOpen}
         setRightOpen={setRightOpen}
+        setShowConsole={setShowConsole}
         isDark={isDark}
         setIsDark={setIsDark}
         setShowNewPlan={setShowNewPlan}
@@ -334,7 +335,7 @@ export function EditorShell(props: EditorShellProps) {
           </div>
         )}
 
-        {!isTablet && (
+        {!isTablet && leftOpen && (
           <>
             <div className="shrink-0 flex flex-col border-r border-border bg-card overflow-hidden" style={{ width: leftW }}>
               {leftPanel}
@@ -360,32 +361,36 @@ export function EditorShell(props: EditorShellProps) {
           sequenceStepProps={sequenceStepProps}
         />
 
-        <PropertiesDock
-          isTablet={isTablet}
-          rightOpen={rightOpen}
-          setRightOpen={setRightOpen}
-          selectedStep={selectedStep}
-          selectedId={selectedId}
-          setPlan={setPlan}
-          rightW={rightW}
-          dragRight={dragRight}
-        >
-          {propertiesPanel}
-        </PropertiesDock>
+        {rightOpen && (
+          <PropertiesDock
+            isTablet={isTablet}
+            rightOpen={rightOpen}
+            setRightOpen={setRightOpen}
+            selectedStep={selectedStep}
+            selectedId={selectedId}
+            setPlan={setPlan}
+            rightW={rightW}
+            dragRight={dragRight}
+          >
+            {propertiesPanel}
+          </PropertiesDock>
+        )}
       </div>
 
-      <ConsolePanel
-        showConsole={showConsole}
-        dragConsole={dragConsole}
-        consoleH={consoleH}
-        logs={logs}
-        filteredLogs={filteredLogs}
-        consoleFilter={consoleFilter}
-        setConsoleFilter={setConsoleFilter}
-        setLogs={setLogs}
-        setShowConsole={setShowConsole}
-        logEndRef={logEndRef}
-      />
+      {showConsole && (
+        <ConsolePanel
+          showConsole={showConsole}
+          dragConsole={dragConsole}
+          consoleH={consoleH}
+          logs={logs}
+          filteredLogs={filteredLogs}
+          consoleFilter={consoleFilter}
+          setConsoleFilter={setConsoleFilter}
+          setLogs={setLogs}
+          setShowConsole={setShowConsole}
+          logEndRef={logEndRef}
+        />
+      )}
 
       <ModalsHost
         showNewPlan={showNewPlan}
