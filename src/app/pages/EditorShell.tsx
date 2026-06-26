@@ -171,7 +171,6 @@ export function EditorShell(props: EditorShellProps) {
     libFilterOpen,
     setDragLibItem,
   } = props;
-
   const [libCat, setLibCat] = useState("All");
   const displayLibrary = data?.length ? data : library;
 

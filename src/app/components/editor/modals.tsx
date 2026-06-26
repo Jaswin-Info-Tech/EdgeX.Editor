@@ -163,18 +163,29 @@ export function AddStepModal({ library, onAdd, onClose }: { library: LibraryItem
 // ─── Plugin Manager ───────────────────────────────────────────────────────────
 
 export function PluginManager({ plugins, onInstall, onUpload, onClose }: {
-  plugins: Plugin[]; onInstall: (id: string) => void; onUpload: (f: string) => void; onClose: () => void;
+  plugins: Plugin[]; onInstall: (id: string) => void; onUpload: (file: File) => Promise<void> | void; onClose: () => void;
 }) {
   const [tab, setTab] = useState<"installed" | "browse" | "upload">("installed");
-  const [uploadFile, setUploadFile] = useState("");
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState("");
   const installed = plugins.filter(p => p.state === "installed");
   const available = plugins.filter(p => p.state === "available");
 
-  const handleUpload = () => {
+console.log(plugins,"llllqqq")
+
+  const handleUpload = async () => {
     if (!uploadFile) return;
     setUploading(true);
-    setTimeout(() => { setUploading(false); onUpload(uploadFile); setUploadFile(""); }, 1800);
+    setUploadError("");
+    try {
+      await onUpload(uploadFile);
+      setUploadFile(null);
+    } catch (error) {
+      setUploadError(error instanceof Error ? error.message : "Upload failed");
+    } finally {
+      setUploading(false);
+    }
   };
 
   return (
@@ -247,19 +258,25 @@ export function PluginManager({ plugins, onInstall, onUpload, onClose }: {
           )}
           {tab === "upload" && (
             <div className="px-6 py-6 space-y-4">
-              <div className="text-[12px] text-muted-foreground font-mono">Upload a <span className="text-primary">.tappackage</span> or <span className="text-primary">.dll</span> file to install a custom plugin.</div>
+              <div className="text-[12px] text-muted-foreground font-mono">Upload a  <span className="text-primary">zip</span> or <span className="text-primary">.tappackage</span> or <span className="text-primary">.dll</span> file to install a custom plugin.</div>
               <label className="block border-2 border-dashed border-border hover:border-primary/60 p-10 text-center cursor-pointer transition-colors group">
                 <Upload size={28} className="mx-auto text-muted-foreground group-hover:text-primary transition-colors mb-3" />
                 <div className="text-[12px] font-mono text-muted-foreground">
-                  {uploadFile ? <span className="text-primary">{uploadFile}</span> : <>Drop file or <span className="text-primary underline">browse</span></>}
+                  {uploadFile ? <span className="text-primary">{uploadFile.name}</span> : <>Drop file or <span className="text-primary underline">browse</span></>}
                 </div>
-                <div className="text-[11px] text-muted-foreground/60 mt-1">.tappackage, .dll supported</div>
-                <input type="file" className="hidden" accept=".tappackage,.dll" onChange={e => { if (e.target.files?.[0]) setUploadFile(e.target.files[0].name); }} />
+                <div className="text-[11px] text-muted-foreground/60 mt-1">zip, .tappackage, .dll supported</div>
+                <input type="file" className="hidden" accept=".zip,.tappackage,.dll" onChange={e => {
+                  if (e.target.files?.[0]) {
+                    setUploadFile(e.target.files[0]);
+                    setUploadError("");
+                  }
+                }} />
               </label>
+              {uploadError && <div className="text-[12px] text-red-500 font-mono">{uploadError}</div>}
               {uploadFile && (
                 <button onClick={handleUpload} disabled={uploading}
                   className="w-full h-9 bg-primary text-primary-foreground text-[12px] font-mono font-semibold hover:bg-primary/90 disabled:opacity-60 flex items-center justify-center gap-2 transition-colors">
-                  {uploading ? <><RefreshCw size={12} className="animate-spin" /> Installing...</> : <><Upload size={12} /> Install Package</>}
+                  {uploading ? <><RefreshCw size={12} className="animate-spin" /> Uploading...</> : <><Upload size={12} /> Upload Package</>}
                 </button>
               )}
             </div>
