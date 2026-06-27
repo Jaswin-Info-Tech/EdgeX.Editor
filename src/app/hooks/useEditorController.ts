@@ -4,8 +4,9 @@ import { useDragResize } from "../components/editor/resizable";
 import { BASE_LIBRARY } from "../data/library";
 import type { CtxMenu, LibraryItem, LogEntry, PlanMeta, Plugin, RunState, StepStatus, TestStep } from "../types/editor";
 import { addToParent, deleteIn, flatAll, makeSequence, makeStep, moveIn, nowTs, parseFreq, resetAll, setStatusIn, uid, updateIn } from "../utils/editor";
-import { usePlugins } from "./usePlugin";
+// import { usePlugins } from "./usePlugin";
 import { usePackages } from "./usePackage";
+import { usePlugins, useInstruments } from "./usePlugin";
 import { useWindowWidth } from "./useWindowWidth";
 
 
@@ -19,7 +20,7 @@ export function useEditorController() {
   const [hasPlan, setHasPlan] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
-  const [leftTab, setLeftTab] = useState<"plan" | "library" | "plugins">("library");
+  const [leftTab, setLeftTab] = useState<"plan" | "library" | "plugins" | "instruments">("library");
   const [runState, setRunState] = useState<RunState>("idle");
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [showConsole, setShowConsole] = useState(true);
@@ -76,8 +77,10 @@ export function useEditorController() {
     ...plugins
       .filter(plugin => plugin.state === "installed")
       .flatMap(plugin => (plugin.steps ?? []).map(step => ({ ...step, pluginId: plugin.id }))),
+    // ...plugins.filter(plugin => plugin.status === "installed").flatMap(plugin => plugin.steps.map(step => ({ ...step, pluginId: plugin.id })) ),
   ];
   const { data } = usePlugins();
+  const { data: instruments, isLoading: isInstrumentsLoading, isError: isInstrumentsError } = useInstruments();
 
   const selectedStep = selectedId ? flatAll(plan).find(step => step.id === selectedId) : null;
   const toggleExpand = (id: string) => setExpanded(prev => {
@@ -322,6 +325,9 @@ export function useEditorController() {
     plugins,
     handleInstallPlugin,
     setShowPluginMgr,
+    instruments: instruments ?? [],
+    isInstrumentsLoading,
+    isInstrumentsError,
     plan,
     planMeta,
     stats,
