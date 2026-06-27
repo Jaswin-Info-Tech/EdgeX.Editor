@@ -184,7 +184,6 @@ export function EditorShell(props: EditorShellProps) {
     libFilterOpen,
     setDragLibItem,
   } = props;
-
   const [libCat, setLibCat] = useState("All");
   const [instrumentSearch, setInstrumentSearch] = useState("");
   const [showInstrumentsPanel, setShowInstrumentsPanel] = useState(false);

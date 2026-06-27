@@ -7,6 +7,7 @@ import { addToParent, deleteIn, flatAll, makeSequence, makeStep, moveIn, nowTs, 
 // import { usePlugins } from "./usePlugin";
 import { usePackages } from "./usePackage";
 import { useDuts, usePlugins, useInstruments } from "./usePlugin";
+import { usePackageUpload } from "./usePackageUpload";
 import { useWindowWidth } from "./useWindowWidth";
 
 
@@ -15,6 +16,7 @@ export function useEditorController() {
   const isDesktop = winW >= 1280;
   const isTablet = winW >= 768 && winW < 1024;
   const { data: packagesData } = usePackages();
+  const uploadPackage = usePackageUpload();
   const [plan, setPlan] = useState<TestStep[]>([]);
   const [planMeta, setPlanMeta] = useState<PlanMeta>({ name: "Untitled Test Plan", description: "", author: "", version: "1.0.0", dutName: "", dutSerial: "", dutModel: "", dutFirmware: "" });
   const [hasPlan, setHasPlan] = useState(false);
@@ -255,19 +257,41 @@ export function useEditorController() {
     }, 1500);
   };
 
-  const handleUploadPlugin = (filename: string) => {
+  const handleUploadPlugin = async (file: File) => {
+    const uploadedPackage = await uploadPackage.mutateAsync(file);
+
+    if (Array.isArray(uploadedPackage)) {
+      setPlugins(uploadedPackage);
+      addLog("INFO", "Plugins", `Installed: ${file.name}`);
+      // setShowPluginMgr(false);
+      return;
+    }
+
+    const pluginFromApi = uploadedPackage?.package ?? uploadedPackage?.plugin ?? uploadedPackage;
+    if (pluginFromApi?.id && pluginFromApi?.name) {
+      setPlugins(prev => {
+        const nextPlugin = { ...pluginFromApi, state: "installed" as const };
+        return prev.some(plugin => plugin.id === nextPlugin.id)
+          ? prev.map(plugin => plugin.id === nextPlugin.id ? nextPlugin : plugin)
+          : [...prev, nextPlugin];
+      });
+      addLog("INFO", "Plugins", `Installed: ${file.name}`);
+      // setShowPluginMgr(false);
+      return;
+    }
+
     const plugin: Plugin = {
       id: `up-${uid()}`,
-      name: filename.replace(/\.(tappackage|dll)$/, ""),
+      name: file.name.replace(/\.(zip|tappackage|dll)$/i, ""),
       version: "1.0.0",
       author: "Custom",
       state: "installed",
-      description: `Custom plugin from ${filename}`,
+      description: `Custom plugin from ${file.name}`,
       steps: [{ id: `lup-${uid()}`, name: "Custom Step", category: "Custom", type: "flow", description: "Step from uploaded plugin", defaultProps: [{ key: "param1", label: "Parameter 1", type: "string", value: "", group: "Parameters" }] }],
     };
     setPlugins(prev => [...prev, plugin]);
-    addLog("INFO", "Plugins", `Installed: ${filename}`);
-    setShowPluginMgr(false);
+    addLog("INFO", "Plugins", `Installed: ${file.name}`);
+    // setShowPluginMgr(false);
   };
 
   const handleSave = () => {
