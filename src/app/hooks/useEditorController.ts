@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { DragEvent } from "react";
 import { useDragResize } from "../components/editor/resizable";
 import { BASE_LIBRARY } from "../data/library";
@@ -72,14 +72,16 @@ export function useEditorController() {
     setLogs(prev => [...prev, { id: logId.current++, timestamp: nowTs(), level, source, message }]);
   }, []);
 
-  const library: LibraryItem[] = [
-    ...BASE_LIBRARY,
-    ...plugins
-      .filter(plugin => plugin.state === "installed")
-      .flatMap(plugin => (plugin.steps ?? []).map(step => ({ ...step, pluginId: plugin.id }))),
-    // ...plugins.filter(plugin => plugin.status === "installed").flatMap(plugin => plugin.steps.map(step => ({ ...step, pluginId: plugin.id })) ),
-  ];
   const { data } = usePlugins();
+  const library: LibraryItem[] = useMemo(() => {
+    const apiSteps = Array.isArray(data) ? data : [];
+    const pluginSteps = plugins
+      .filter(plugin => plugin.state === "installed")
+      .flatMap(plugin => (plugin.steps ?? []).map(step => ({ ...step, pluginId: plugin.id })));
+
+    const baseCatalog = apiSteps.length > 0 ? apiSteps : BASE_LIBRARY;
+    return [...baseCatalog, ...pluginSteps];
+  }, [data, plugins]);
   const { data: instruments, isLoading: isInstrumentsLoading, isError: isInstrumentsError } = useInstruments();
 
   const selectedStep = selectedId ? flatAll(plan).find(step => step.id === selectedId) : null;

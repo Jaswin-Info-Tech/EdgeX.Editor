@@ -10,6 +10,7 @@ interface EditorToolbarProps {
   setShowNewPlan: (value: boolean) => void;
   setLeftTab: (value: "plan" | "library" | "plugins" | "instruments") => void;
   setShowPluginMgr: (value: boolean) => void;
+  setShowInstrumentsPanel: (value: boolean) => void;
   setAddStepParentId: (value: string | null) => void;
   setAddStepIdx: (value: number | undefined) => void;
   setShowAddStep: (value: boolean) => void;
@@ -30,6 +31,7 @@ export function EditorToolbar({
   setShowNewPlan,
   setLeftTab,
   setShowPluginMgr,
+  setShowInstrumentsPanel,
   setAddStepParentId,
   setAddStepIdx,
   setShowAddStep,
@@ -87,7 +89,7 @@ export function EditorToolbar({
       <ToolBtn onClick={() => setShowPluginMgr(true)} title="Plugin Manager">
         <Package size={14} />{!isTablet && "Plugins"}
       </ToolBtn>
-      <ToolBtn onClick={() => setLeftTab("instruments")} title="Instruments">
+      <ToolBtn onClick={() => setShowInstrumentsPanel(true)} title="Instruments">
         <Package size={14} />{!isTablet && "Instruments"}
       </ToolBtn>
 
