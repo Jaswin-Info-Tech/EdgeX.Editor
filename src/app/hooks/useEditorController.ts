@@ -6,7 +6,7 @@ import type { CtxMenu, LibraryItem, LogEntry, PlanMeta, Plugin, RunState, StepSt
 import { addToParent, deleteIn, flatAll, makeSequence, makeStep, moveIn, nowTs, parseFreq, resetAll, setStatusIn, uid, updateIn } from "../utils/editor";
 // import { usePlugins } from "./usePlugin";
 import { usePackages } from "./usePackage";
-import { usePlugins, useInstruments } from "./usePlugin";
+import { useDuts, usePlugins, useInstruments } from "./usePlugin";
 import { useWindowWidth } from "./useWindowWidth";
 
 
@@ -83,6 +83,7 @@ export function useEditorController() {
     return [...baseCatalog, ...pluginSteps];
   }, [data, plugins]);
   const { data: instruments, isLoading: isInstrumentsLoading, isError: isInstrumentsError } = useInstruments();
+  const { data: duts, isLoading: isDutsLoading, isError: isDutsError } = useDuts();
 
   const selectedStep = selectedId ? flatAll(plan).find(step => step.id === selectedId) : null;
   const toggleExpand = (id: string) => setExpanded(prev => {
@@ -330,6 +331,9 @@ export function useEditorController() {
     instruments: instruments ?? [],
     isInstrumentsLoading,
     isInstrumentsError,
+    duts: duts ?? [],
+    isDutsLoading,
+    isDutsError,
     plan,
     planMeta,
     stats,
