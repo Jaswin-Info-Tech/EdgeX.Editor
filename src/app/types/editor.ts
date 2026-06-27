@@ -37,6 +37,9 @@ export interface InstrumentItem {
 export interface Plugin {
   id: string; name: string; version: string; author: string; description: string;
   state: "installed" | "installing" | "available"; steps?: LibraryItem[];
+  isInstalled?: boolean;
+  updateAvailable?: boolean;
+  status?: string;
 }
 
 export interface PlanMeta {

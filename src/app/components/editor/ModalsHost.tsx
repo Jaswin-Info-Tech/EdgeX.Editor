@@ -13,7 +13,8 @@ interface ModalsHostProps {
   showPluginMgr: boolean;
   setShowPluginMgr: (value: boolean) => void;
   plugins: any[];
-  handleInstallPlugin: (id: string) => void;
+  handleInstallPlugin: (id: string) => Promise<void>;
+  handleUninstallPlugin: (id: string) => Promise<void>;
   handleUploadPlugin: (filename: string) => void;
   contextMenu: any;
   setContextMenu: (value: any) => void;
@@ -34,6 +35,7 @@ export function ModalsHost({
   setShowPluginMgr,
   plugins,
   handleInstallPlugin,
+  handleUninstallPlugin,
   handleUploadPlugin,
   contextMenu,
   setContextMenu,
@@ -58,6 +60,7 @@ export function ModalsHost({
         <PluginManager
           plugins={plugins}
           onInstall={handleInstallPlugin}
+          onUninstall={handleUninstallPlugin}
           onUpload={handleUploadPlugin}
           onClose={() => setShowPluginMgr(false)}
         />

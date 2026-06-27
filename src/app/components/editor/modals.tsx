@@ -61,7 +61,7 @@ export function NewPlanModal({ onClose, onCreate }: { onClose: () => void; onCre
           {step === 2 && (
             <div className="space-y-0">
               {[["Plan Name", meta.name], ["Author", meta.author || "—"], ["Version", meta.version],
-                ["DUT Name", meta.dutName || "—"], ["DUT Serial", meta.dutSerial || "—"], ["DUT Model", meta.dutModel || "—"]
+              ["DUT Name", meta.dutName || "—"], ["DUT Serial", meta.dutSerial || "—"], ["DUT Model", meta.dutModel || "—"]
               ].map(([k, v]) => (
                 <div key={k} className="flex items-center justify-between py-2 border-b border-border/50">
                   <span className="text-[12px] font-mono text-muted-foreground">{k}</span>
@@ -162,19 +162,41 @@ export function AddStepModal({ library, onAdd, onClose }: { library: LibraryItem
 
 // ─── Plugin Manager ───────────────────────────────────────────────────────────
 
-export function PluginManager({ plugins, onInstall, onUpload, onClose }: {
-  plugins: Plugin[]; onInstall: (id: string) => void; onUpload: (f: string) => void; onClose: () => void;
+export function PluginManager({ plugins, onInstall, onUninstall, onUpload, onClose }: {
+  plugins: Plugin[]; onInstall: (id: string) => Promise<void>; onUninstall: (id: string) => Promise<void>; onUpload: (f: string) => void; onClose: () => void;
 }) {
   const [tab, setTab] = useState<"installed" | "browse" | "upload">("installed");
   const [uploadFile, setUploadFile] = useState("");
   const [uploading, setUploading] = useState(false);
+  const [installingId, setInstallingId] = useState<string | null>(null);
+  const [uninstallingId, setUninstallingId] = useState<string | null>(null);
   const installed = plugins.filter(p => p.state === "installed");
-  const available = plugins.filter(p => p.state === "available");
+  const available = plugins;
 
   const handleUpload = () => {
     if (!uploadFile) return;
     setUploading(true);
     setTimeout(() => { setUploading(false); onUpload(uploadFile); setUploadFile(""); }, 1800);
+  };
+
+  const handleUninstall = async (id: string) => {
+    if (uninstallingId) return;
+    setUninstallingId(id);
+    try {
+      await onUninstall(id);
+    } finally {
+      setUninstallingId(null);
+    }
+  };
+
+  const handleInstall = async (id: string) => {
+    if (installingId) return;
+    setInstallingId(id);
+    try {
+      await onInstall(id);
+    } finally {
+      setInstallingId(null);
+    }
   };
 
   return (
@@ -209,7 +231,13 @@ export function PluginManager({ plugins, onInstall, onUpload, onClose }: {
                       {/* <div className="text-[12px] text-muted-foreground mb-1">{p.description}</div> */}
                       {/* <div className="text-[11px] text-muted-foreground/60 font-mono">by {p.author} · {p.steps.length} steps</div> */}
                     </div>
-                    <button className="text-[11px] font-mono text-muted-foreground hover:text-red-500 border border-border hover:border-red-500/30 px-2.5 py-1 transition-colors">Uninstall</button>
+                    <button
+                      onClick={() => handleUninstall(p.id)}
+                      disabled={uninstallingId === p.id}
+                      className="text-[11px] font-mono text-muted-foreground hover:text-red-500 border border-border hover:border-red-500/30 px-2.5 py-1 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {uninstallingId === p.id ? "Removing..." : "Remove"}
+                    </button>
                   </div>
                   <div className="mt-3 flex flex-wrap gap-1.5">
                     {(p.steps ?? []).map(s => (
@@ -233,10 +261,32 @@ export function PluginManager({ plugins, onInstall, onUpload, onClose }: {
                       <div className="text-[12px] text-muted-foreground mb-1">{p.description}</div>
                       <div className="text-[11px] text-muted-foreground/60 font-mono">by {p.author} · {p.steps?.length ?? 0} steps</div>
                     </div>
-                    <button onClick={() => onInstall(p.id)}
-                      className="text-[11px] font-mono text-primary border border-primary/40 bg-primary/10 hover:bg-primary/20 px-3 py-1 flex items-center gap-1.5 transition-colors">
-                      <Download size={11} /> Install
-                    </button>
+                    <div className="flex items-center gap-2 shrink-0">
+                      {p.isInstalled ? (
+                        <button
+                          onClick={() => handleInstall(p.id)}
+                          disabled={installingId === p.id}
+                          className="text-[11px] font-mono text-primary border border-primary/40 bg-primary/10 hover:bg-primary/20 px-3 py-1 flex items-center gap-1.5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          <Download size={11} /> {installingId === p.id ? "Updating..." : "Update"}
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => handleInstall(p.id)}
+                          disabled={installingId === p.id}
+                          className="text-[11px] font-mono text-primary border border-primary/40 bg-primary/10 hover:bg-primary/20 px-3 py-1 flex items-center gap-1.5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          <Download size={11} /> {installingId === p.id ? "Installing..." : "Install"}
+                        </button>
+                      )}
+                      <button
+                        onClick={() => handleUninstall(p.id)}
+                        disabled={!p.isInstalled || uninstallingId === p.id}
+                        className="text-[11px] font-mono text-muted-foreground hover:text-red-500 border border-border hover:border-red-500/30 px-2.5 py-1 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                      >
+                        {uninstallingId === p.id ? "Uninstalling..." : "Uninstall"}
+                      </button>
+                    </div>
                   </div>
                   <div className="mt-3 flex flex-wrap gap-1.5">
                     {(p.steps ?? []).map(s => <span key={s.id} className="text-[11px] font-mono border border-border px-2 py-0.5 text-muted-foreground">{s.name}</span>)}

@@ -1,6 +1,6 @@
 // hooks/usePackages.js
 import { useQuery } from "@tanstack/react-query";
-import { getInstalledPackages } from "../api/package";
+import { getAvailablePackages, getInstalledPackages } from "../api/package";
 
 export const usePackages = () => {
   return useQuery({
@@ -8,3 +8,11 @@ export const usePackages = () => {
     queryFn: getInstalledPackages,
   });
 };
+
+export const useAvailablePackages = () => {
+  return useQuery({
+    queryKey: ["available-packages"],
+    queryFn: getAvailablePackages,
+  });
+};
+

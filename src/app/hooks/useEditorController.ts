@@ -1,11 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { DragEvent } from "react";
+import { toast } from "react-toastify";
 import { useDragResize } from "../components/editor/resizable";
 import { BASE_LIBRARY } from "../data/library";
 import type { CtxMenu, LibraryItem, LogEntry, PlanMeta, Plugin, RunState, StepStatus, TestStep } from "../types/editor";
-import { addToParent, deleteIn, flatAll, makeSequence, makeStep, moveIn, nowTs, parseFreq, resetAll, setStatusIn, uid, updateIn } from "../utils/editor";
+import { addToParent, deleteIn, flatAll, makeSequence, makeStep, moveIn, nowTs, parseFreq, resetAll, setStatusIn, uid, updateIn, toArray } from "../utils/editor";
+import { removePlugin } from "../api/plugin";
+import { installPackage } from "../api/package";
 // import { usePlugins } from "./usePlugin";
-import { usePackages } from "./usePackage";
+import { useAvailablePackages, usePackages } from "./usePackage";
 import { usePlugins, useInstruments } from "./usePlugin";
 import { useWindowWidth } from "./useWindowWidth";
 
@@ -14,7 +17,8 @@ export function useEditorController() {
   const winW = useWindowWidth();
   const isDesktop = winW >= 1280;
   const isTablet = winW >= 768 && winW < 1024;
-  const { data: packagesData } = usePackages();
+  const { data: packagesData, refetch: refetchPackages } = usePackages();
+  const { data: availablePackagesData, refetch: refetchAvailablePackages } = useAvailablePackages();
   const [plan, setPlan] = useState<TestStep[]>([]);
   const [planMeta, setPlanMeta] = useState<PlanMeta>({ name: "Untitled Test Plan", description: "", author: "", version: "1.0.0", dutName: "", dutSerial: "", dutModel: "", dutFirmware: "" });
   const [hasPlan, setHasPlan] = useState(false);
@@ -63,10 +67,48 @@ export function useEditorController() {
   useEffect(() => { logEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [logs]);
   useEffect(() => { renameRef.current?.focus(); }, [renaming]);
   useEffect(() => {
-    if (packagesData) {
-      setPlugins(Array.isArray(packagesData) ? packagesData : []);
-    }
-  }, [packagesData]);
+    const asBool = (value: unknown, fallback = false) => {
+      if (typeof value === "boolean") return value;
+      if (typeof value === "string") {
+        const normalized = value.trim().toLowerCase();
+        if (normalized === "true") return true;
+        if (normalized === "false") return false;
+      }
+      if (typeof value === "number") return value !== 0;
+      return fallback;
+    };
+
+    const normalizePlugin = (item: any, fallbackInstalled: boolean): Plugin => {
+      const statusInstalled = String(item.status ?? "").trim().toLowerCase() === "installed";
+      const isInstalled = item.isInstalled === undefined
+        ? fallbackInstalled || statusInstalled
+        : asBool(item.isInstalled, fallbackInstalled || statusInstalled);
+      return {
+        ...item,
+        id: String(item.id ?? item.name ?? item.packageName ?? item.pluginName ?? ""),
+        name: String(item.name ?? item.packageName ?? item.pluginName ?? "Untitled Plugin"),
+        version: String(item.version ?? ""),
+        author: String(item.author ?? item.publisher ?? ""),
+        description: String(item.description ?? ""),
+        state: isInstalled ? "installed" : "available",
+        isInstalled,
+        updateAvailable: asBool(item.updateAvailable),
+        status: String(item.status ?? (isInstalled ? "Installed" : "Available")),
+        steps: Array.isArray(item.steps) ? item.steps : [],
+      };
+    };
+
+    const availableCatalog = toArray(availablePackagesData).map((item: any) => normalizePlugin(item, false));
+    const installedPackages = toArray(packagesData).map((item: any) => normalizePlugin(item, true));
+
+    const byKey = new Map<string, Plugin>();
+    availableCatalog.forEach(plugin => byKey.set(plugin.id || plugin.name, plugin));
+    installedPackages.forEach(plugin => {
+      const key = plugin.id || plugin.name;
+      byKey.set(key, { ...byKey.get(key), ...plugin, state: "installed", isInstalled: true, status: "Installed" });
+    });
+    setPlugins(Array.from(byKey.values()));
+  }, [packagesData, availablePackagesData]);
 
   const addLog = useCallback((level: LogEntry["level"], source: string, message: string) => {
     setLogs(prev => [...prev, { id: logId.current++, timestamp: nowTs(), level, source, message }]);
@@ -243,13 +285,46 @@ export function useEditorController() {
     setLogs([{ id: logId.current++, timestamp: nowTs(), level: "INFO", source: "EdgeX", message: "Plan reset. Ready." }]);
   };
 
-  const handleInstallPlugin = (id: string) => {
-    setPlugins(prev => prev.map(plugin => plugin.id === id ? { ...plugin, state: "installing" } : plugin));
-    setTimeout(() => {
-      setPlugins(prev => prev.map(plugin => plugin.id === id ? { ...plugin, state: "installed" } : plugin));
-      const plugin = plugins.find(item => item.id === id);
-      if (plugin) addLog("INFO", "Plugins", `Installed: ${plugin.name} v${plugin.version}`);
-    }, 1500);
+  const handleInstallPlugin = async (id: string) => {
+    const plugin = plugins.find(item => item.id === id);
+    const pluginName = plugin?.name ?? "Plugin";
+    const action = plugin?.isInstalled ? "updated" : "installed";
+
+    try {
+      setPlugins(prev => prev.map(item => item.id === id ? { ...item, state: "installing" } : item));
+      await installPackage(pluginName);
+      setPlugins(prev => prev.map(item => item.id === id
+        ? { ...item, state: "installed", isInstalled: true, status: "Installed", updateAvailable: false }
+        : item
+      ));
+      addLog("INFO", "Plugins", `${action === "updated" ? "Updated" : "Installed"}: ${pluginName}`);
+      toast.success(`${pluginName} ${action} successfully`);
+      refetchPackages();
+      refetchAvailablePackages();
+    } catch {
+      setPlugins(prev => prev.map(item => item.id === id
+        ? { ...item, state: item.isInstalled ? "installed" : "available" }
+        : item
+      ));
+      addLog("ERROR", "Plugins", `Unable to ${action === "updated" ? "update" : "install"}: ${pluginName}`);
+      toast.error(`Failed to ${action === "updated" ? "update" : "install"} ${pluginName}`);
+    }
+  };
+
+  const handleUninstallPlugin = async (id: string) => {
+    const plugin = plugins.find(item => item.id === id);
+    const pluginName = plugin?.name ?? "Plugin";
+    try {
+      await removePlugin(pluginName);
+      setPlugins(prev => prev.map(item => item.id === id ? { ...item, state: "available", isInstalled: false, status: "Available", updateAvailable: false } : item));
+      addLog("INFO", "Plugins", `Uninstalled: ${pluginName}`);
+      toast.success(`${pluginName} uninstalled successfully`);
+      refetchPackages();
+      refetchAvailablePackages();
+    } catch {
+      addLog("ERROR", "Plugins", `Unable to uninstall: ${pluginName}`);
+      toast.error(`Failed to uninstall ${pluginName}`);
+    }
   };
 
   const handleUploadPlugin = (filename: string) => {
@@ -324,6 +399,7 @@ export function useEditorController() {
     handleAddStep,
     plugins,
     handleInstallPlugin,
+    handleUninstallPlugin,
     setShowPluginMgr,
     instruments: instruments ?? [],
     isInstrumentsLoading,
