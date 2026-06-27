@@ -1,4 +1,4 @@
-import { Moon, PanelLeftOpen, PanelRightOpen, Sun } from "lucide-react";
+import { Moon, PanelLeftOpen, PanelRightOpen, Sun, Check } from "lucide-react";
 
 const MENU_ITEMS: Record<string, string[]> = {
   File: ["New Test Plan", "Open...", "-", "Save", "Save As...", "Export Report...", "-", "Exit"],
@@ -20,6 +20,7 @@ interface MenuBarProps {
   setLeftOpen: (updater: any) => void;
   rightOpen: boolean;
   setRightOpen: (updater: any) => void;
+  showConsole: boolean;
   setShowConsole: (updater: any) => void;
   isDark: boolean;
   setIsDark: (updater: any) => void;
@@ -43,6 +44,7 @@ export function MenuBar({
   setLeftOpen,
   rightOpen,
   setRightOpen,
+  showConsole,
   setShowConsole,
   isDark,
   setIsDark,
@@ -107,9 +109,18 @@ export function MenuBar({
                   <button
                     key={item}
                     onClick={() => runMenuAction(item)}
-                    className="w-full text-left px-4 py-2 text-[12px] font-mono text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+                    className="w-full text-left px-4 py-2 text-[12px] font-mono text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors flex items-center justify-between"
                   >
-                    {item}
+                    <span>{item}</span>
+                    {menu === "View" && item !== "Reset Layout" && (
+                      <div className="w-4 h-4 border border-border rounded flex items-center justify-center">
+                        {((item === "Step Library" && leftOpen) ||
+                          (item === "Properties" && rightOpen) ||
+                          (item === "Console" && showConsole)) && (
+                          <Check size={12} className="text-foreground" />
+                        )}
+                      </div>
+                    )}
                   </button>
                 )
               )}

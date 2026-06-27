@@ -317,6 +317,7 @@ export function EditorShell(props: EditorShellProps) {
         setLeftOpen={setLeftOpen}
         rightOpen={rightOpen}
         setRightOpen={setRightOpen}
+        showConsole={showConsole}
         setShowConsole={setShowConsole}
         isDark={isDark}
         setIsDark={setIsDark}
