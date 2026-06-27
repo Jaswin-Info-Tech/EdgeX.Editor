@@ -50,6 +50,9 @@ interface EditorShellProps {
   plugins: any;
   handleInstallPlugin: any;
   setShowPluginMgr: any;
+  instruments: any[];
+  isInstrumentsLoading: boolean;
+  isInstrumentsError: boolean;
   plan: any;
   planMeta: any;
   stats: any;
@@ -132,6 +135,9 @@ export function EditorShell(props: EditorShellProps) {
     plugins,
     handleInstallPlugin,
     setShowPluginMgr,
+    instruments,
+    isInstrumentsLoading,
+    isInstrumentsError,
     plan,
     planMeta,
     stats,
@@ -172,6 +178,7 @@ export function EditorShell(props: EditorShellProps) {
     setDragLibItem,
   } = props;
   const [libCat, setLibCat] = useState("All");
+  const [instrumentSearch, setInstrumentSearch] = useState("");
   const displayLibrary = data?.length ? data : library;
 
   const libCats = useMemo<string[]>(
@@ -192,6 +199,16 @@ export function EditorShell(props: EditorShellProps) {
       (libSearch === "" || item.name.toLowerCase().includes(libSearch.toLowerCase()))
     ),
     [displayLibrary, libCat, libSearch]
+  );
+
+  const filteredInstruments = useMemo(
+    () => instruments.filter((instrument: any) => {
+      const search = instrumentSearch.trim().toLowerCase();
+      if (!search) return true;
+      return [instrument.name, instrument.baseType, instrument.assembly]
+        .some(value => String(value ?? "").toLowerCase().includes(search));
+    }),
+    [instruments, instrumentSearch]
   );
 
   const filteredLogs = useMemo(
@@ -230,6 +247,11 @@ export function EditorShell(props: EditorShellProps) {
       setLibFilterOpen={setLibFilterOpen}
       filteredLib={filteredLib}
       data={displayLibrary}
+      instruments={filteredInstruments}
+      instrumentSearch={instrumentSearch}
+      setInstrumentSearch={setInstrumentSearch}
+      isInstrumentsLoading={isInstrumentsLoading}
+      isInstrumentsError={isInstrumentsError}
       setDragLibItem={setDragLibItem}
       setDropIdx={setDropIdx}
       handleAddStep={handleAddStep}
@@ -294,6 +316,7 @@ export function EditorShell(props: EditorShellProps) {
         setLeftOpen={setLeftOpen}
         rightOpen={rightOpen}
         setRightOpen={setRightOpen}
+        showConsole={showConsole}
         setShowConsole={setShowConsole}
         isDark={isDark}
         setIsDark={setIsDark}
@@ -313,6 +336,7 @@ export function EditorShell(props: EditorShellProps) {
         stats={stats}
         runState={runState}
         setShowNewPlan={setShowNewPlan}
+        setLeftTab={setLeftTab}
         setShowPluginMgr={setShowPluginMgr}
         setAddStepParentId={setAddStepParentId}
         setAddStepIdx={setAddStepIdx}

@@ -8,6 +8,7 @@ interface EditorToolbarProps {
   stats: any;
   runState: string;
   setShowNewPlan: (value: boolean) => void;
+  setLeftTab: (value: "plan" | "library" | "plugins" | "instruments") => void;
   setShowPluginMgr: (value: boolean) => void;
   setAddStepParentId: (value: string | null) => void;
   setAddStepIdx: (value: number | undefined) => void;
@@ -27,6 +28,7 @@ export function EditorToolbar({
   stats,
   runState,
   setShowNewPlan,
+  setLeftTab,
   setShowPluginMgr,
   setAddStepParentId,
   setAddStepIdx,
@@ -84,6 +86,9 @@ export function EditorToolbar({
 
       <ToolBtn onClick={() => setShowPluginMgr(true)} title="Plugin Manager">
         <Package size={14} />{!isTablet && "Plugins"}
+      </ToolBtn>
+      <ToolBtn onClick={() => setLeftTab("instruments")} title="Instruments">
+        <Package size={14} />{!isTablet && "Instruments"}
       </ToolBtn>
 
       <div className="ml-auto flex items-center gap-3 font-mono text-[12px] text-muted-foreground shrink-0">
