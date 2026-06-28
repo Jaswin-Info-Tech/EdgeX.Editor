@@ -319,93 +319,90 @@ export function useEditorController() {
   };
 
   const refreshPluginData = useCallback(() => {
-  refetchInstalledPlugins();
-  refetchAvailablePackages();
-}, [refetchInstalledPlugins, refetchAvailablePackages]);
+    refetchInstalledPlugins();
+    refetchAvailablePackages();
+  }, [refetchInstalledPlugins, refetchAvailablePackages]);
 
-const handleInstallPlugin = async (id: string) => {
-  const plugin = plugins.find(item => item.id === id);
-  const pluginName = plugin?.name ?? "Plugin";
-  const action = plugin?.isInstalled ? "updated" : "installed";
+  const handleInstallPlugin = async (id: string) => {
+    const plugin = plugins.find(item => item.id === id);
+    const pluginName = plugin?.name ?? "Plugin";
+    const action = plugin?.isInstalled ? "updated" : "installed";
 
-  try {
-    setPlugins(prev => prev.map(item => item.id === id ? { ...item, state: "installing" } : item));
-    await installPackage(pluginName);
-    setPlugins(prev => prev.map(item => item.id === id
-      ? { ...item, state: "installed", isInstalled: true, status: "Installed", updateAvailable: false }
-      : item
-    ));
-    addLog("INFO", "Plugins", `${action === "updated" ? "Updated" : "Installed"}: ${pluginName}`);
-    toast.success(`${pluginName} ${action} successfully`);
-    refreshPluginData();
-    setTimeout(refreshPluginData, 1500); // safety net in case backend hasn't registered the install yet
-  } catch {
-    setPlugins(prev => prev.map(item => item.id === id
-      ? { ...item, state: item.isInstalled ? "installed" : "available" }
-      : item
-    ));
-    addLog("ERROR", "Plugins", `Unable to ${action === "updated" ? "update" : "install"}: ${pluginName}`);
-    toast.error(`Failed to ${action === "updated" ? "update" : "install"} ${pluginName}`);
-  }
-};
+    try {
+      setPlugins(prev => prev.map(item => item.id === id ? { ...item, state: "installing" } : item));
+      await installPackage(pluginName);
+      setPlugins(prev => prev.map(item => item.id === id
+        ? { ...item, state: "installed", isInstalled: true, status: "Installed", updateAvailable: false }
+        : item
+      ));
+      addLog("INFO", "Plugins", `${action === "updated" ? "Updated" : "Installed"}: ${pluginName}`);
+      toast.success(`${pluginName} ${action} successfully`);
+      refreshPluginData();
+      setTimeout(refreshPluginData, 1500); // safety net in case backend hasn't registered the install yet
+    } catch {
+      setPlugins(prev => prev.map(item => item.id === id
+        ? { ...item, state: item.isInstalled ? "installed" : "available" }
+        : item
+      ));
+      addLog("ERROR", "Plugins", `Unable to ${action === "updated" ? "update" : "install"}: ${pluginName}`);
+      toast.error(`Failed to ${action === "updated" ? "update" : "install"} ${pluginName}`);
+    }
+  };
 
   const handleUninstallPlugin = async (id: string) => {
-  const plugin = installedPlugins.find(item => item.id === id);
-  const pluginName = plugin?.name ?? "Plugin";
-  const uninstallName = plugin?.uninstallName ?? pluginName;
-  try {
-    await removePlugin(uninstallName);
-    setInstalledPlugins(prev => prev.filter(item => item.id !== id));
-    addLog("INFO", "Plugins", `Uninstalled: ${pluginName}`);
-    toast.success(`${pluginName} uninstalled successfully`);
-    refreshPluginData();
-    setTimeout(refreshPluginData, 1500);
-  } catch {
-    addLog("ERROR", "Plugins", `Unable to uninstall: ${pluginName}`);
-    toast.error(`Failed to uninstall ${pluginName}`);
-  }
-};
+    const plugin = installedPlugins.find(item => item.id === id);
+    const pluginName = plugin?.name ?? "Plugin";
+    const uninstallName = plugin?.uninstallName ?? pluginName;
+    console.log("Uninstalling:", { id, pluginName, uninstallName, plugin });
+    try {
+      const result = await removePlugin(uninstallName);
+      console.log("Uninstall API response:", result);
+      toast.success(`${pluginName} uninstalled successfully`);
+      setTimeout(() => window.location.reload(), 800);
+    } catch (err) {
+      console.error("Uninstall API error:", err);
+      addLog("ERROR", "Plugins", `Unable to uninstall: ${pluginName}`);
+      toast.error(`Failed to uninstall ${pluginName}`);
+    }
+  };
+  const handleUninstallPackage = async (id: string) => {
+    const plugin = plugins.find(item => item.id === id);
+    const pluginName = plugin?.name ?? "Plugin";
+    const uninstallName = plugin?.uninstallName ?? pluginName;
 
-const handleUninstallPackage = async (id: string) => {
-  const plugin = plugins.find(item => item.id === id);
-  const pluginName = plugin?.name ?? "Plugin";
-  const uninstallName = plugin?.uninstallName ?? pluginName;
+    try {
+      setPlugins(prev => prev.map(item => item.id === id ? { ...item, state: "uninstalling" } : item));
+      await uninstallPackage(uninstallName);
 
-  try {
-    setPlugins(prev => prev.map(item => item.id === id ? { ...item, state: "uninstalling" } : item));
-    await uninstallPackage(uninstallName);
+      // Keep it in the list, just flip it back to "available"
+      setPlugins(prev => prev.map(item => item.id === id
+        ? { ...item, state: "available", isInstalled: false, status: "Available", updateAvailable: false }
+        : item
+      ));
+      // Drop the matching entry from Installed tab too
+      setInstalledPlugins(prev => prev.filter(item => item.uninstallName !== uninstallName && item.name !== pluginName));
 
-    // Keep it in the list, just flip it back to "available"
-    setPlugins(prev => prev.map(item => item.id === id
-      ? { ...item, state: "available", isInstalled: false, status: "Available", updateAvailable: false }
-      : item
-    ));
-    // Drop the matching entry from Installed tab too
-    setInstalledPlugins(prev => prev.filter(item => item.uninstallName !== uninstallName && item.name !== pluginName));
+      addLog("INFO", "Plugins", `Uninstalled: ${pluginName}`);
+      toast.success(`${pluginName} uninstalled successfully`);
+      refreshPluginData();
+      setTimeout(refreshPluginData, 1500);
+    } catch {
+      setPlugins(prev => prev.map(item => item.id === id ? { ...item, state: "installed", isInstalled: true } : item));
+      addLog("ERROR", "Plugins", `Unable to uninstall: ${pluginName}`);
+      toast.error(`Failed to uninstall ${pluginName}`);
+    }
+  };
 
-    addLog("INFO", "Plugins", `Uninstalled: ${pluginName}`);
-    toast.success(`${pluginName} uninstalled successfully`);
-    refreshPluginData();
-    setTimeout(refreshPluginData, 1500);
-  } catch {
-    setPlugins(prev => prev.map(item => item.id === id ? { ...item, state: "installed", isInstalled: true } : item));
-    addLog("ERROR", "Plugins", `Unable to uninstall: ${pluginName}`);
-    toast.error(`Failed to uninstall ${pluginName}`);
-  }
-};
-const handleUploadPlugin = async (file: File) => {
-  try {
-    await uploadPlugin(file);
-    addLog("INFO", "Plugins", `Installed: ${file.name}`);
-    toast.success(`${file.name} installed successfully`);
-    refreshPluginData();
-    setTimeout(refreshPluginData, 1500);
-    setShowPluginMgr(false);
-  } catch {
-    addLog("ERROR", "Plugins", `Unable to install: ${file.name}`);
-    toast.error(`Failed to install ${file.name}`);
-  }
-};
+  const handleUploadPlugin = async (file: File) => {
+    try {
+      await uploadPlugin(file);
+      toast.success(`${file.name} installed successfully`);
+      window.location.reload();
+    } catch {
+      addLog("ERROR", "Plugins", `Unable to install: ${file.name}`);
+      toast.error(`Failed to install ${file.name}`);
+    }
+  };
 
   const handleSave = () => {
     const blob = new Blob([JSON.stringify({ meta: planMeta, plan }, null, 2)], { type: "application/json" });

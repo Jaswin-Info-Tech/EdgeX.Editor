@@ -3,13 +3,6 @@ import { useQuery } from "@tanstack/react-query";
 import { getInstalledPlugins, getInstruments, getSteps } from "../api/plugin";
 import type { InstrumentItem, LibraryItem } from "../types/editor";
 
-export const useInstalledPlugins = () => {
-  return useQuery({
-    queryKey: ["installed-plugins"],
-    queryFn: getInstalledPlugins,
-  });
-};
-
 export const usePlugins = () => {
   return useQuery({
     queryKey: ["steps"],
@@ -45,3 +38,10 @@ export const useInstruments = () => {
     },
   });
 };
+
+export function useInstalledPlugins() {
+  return useQuery({
+    queryKey: ["installedPlugins"],
+    queryFn: getInstalledPlugins,
+  });
+}

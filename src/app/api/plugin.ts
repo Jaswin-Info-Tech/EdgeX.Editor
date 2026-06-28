@@ -18,10 +18,9 @@ export const getInstruments = async () => {
 };
 
 export const removePlugin = async (pluginName: string) => {
-  console.log("Removing plugin (exact value):", JSON.stringify(pluginName));
   const response = await axiosClient.delete("/plugins/remove", {
-    headers: { "Content-Type": "application/json" },
     data: { pluginName },
+    headers: { "Content-Type": "application/json" },
   });
   return response.data;
 };

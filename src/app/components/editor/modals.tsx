@@ -170,9 +170,21 @@ export function PluginManager({ plugins, installedPlugins, onInstall, onUninstal
   const [uploading, setUploading] = useState(false);
   const [installingId, setInstallingId] = useState<string | null>(null);
   const [uninstallingId, setUninstallingId] = useState<string | null>(null);
+  const [installedSearch, setInstalledSearch] = useState("");
+  const [browseSearch, setBrowseSearch] = useState("");
   const installed = installedPlugins;
   const available = plugins;
+  const filteredInstalled = installed.filter(p =>
+    installedSearch.trim() === ""
+      ? true
+      : (p.name ?? "").toLowerCase().includes(installedSearch.trim().toLowerCase())
+  );
 
+  const filteredAvailable = available.filter(p =>
+    browseSearch.trim() === ""
+      ? true
+      : (p.name ?? "").toLowerCase().includes(browseSearch.trim().toLowerCase())
+  );
   const handleUpload = async () => {
     if (!uploadFile) return;
     setUploading(true);
@@ -233,23 +245,34 @@ export function PluginManager({ plugins, installedPlugins, onInstall, onUninstal
         <div className="flex-1 overflow-y-auto">
           {tab === "installed" && (
             <div>
-              {installed.length === 0 && <div className="py-12 text-center text-[12px] text-muted-foreground font-mono">No plugins installed</div>}
-              {installed.map(p => (
+              <div className="sticky top-0 z-10 flex items-center gap-2 px-5 py-2.5 border-b border-border bg-card">
+                <Search size={12} className="text-muted-foreground shrink-0" />
+                <input
+                  value={installedSearch}
+                  onChange={e => setInstalledSearch(e.target.value)}
+                  placeholder="Search installed plugins..."
+                  className="flex-1 bg-transparent text-[12px] font-mono text-foreground placeholder:text-muted-foreground outline-none"
+                />
+              </div>
+              {filteredInstalled.length === 0 && (
+                <div className="py-12 text-center text-[12px] text-muted-foreground font-mono">
+                  {installed.length === 0 ? "No plugins installed" : "No matching plugins"}
+                </div>
+              )}
+              {filteredInstalled.map(p => (
                 <div key={p.id} className="px-5 py-4 border-b border-border">
-                  <div className="flex items-start justify-between">
-                    <div>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-16">
                       <div className="flex items-center gap-2 mb-1">
-                        <span className="text-[13px] font-semibold text-foreground">{p.name}</span>
-                        <span className="text-[11px] font-mono text-emerald-500 border border-emerald-500/30 bg-emerald-500/10 px-2">v{p.version}</span>
-                        <span className="text-[11px] font-mono text-emerald-500">● installed</span>
+                        <span className="text-[13px] font-semibold text-foreground truncate" title={p.name}>{p.name}</span>
+                        <span className="text-[11px] font-mono text-emerald-500 border border-emerald-500/30 bg-emerald-500/10 px-2 shrink-0">v{p.version}</span>
+                        <span className="text-[11px] font-mono text-emerald-500 shrink-0">● installed</span>
                       </div>
-                      {/* <div className="text-[12px] text-muted-foreground mb-1">{p.description}</div> */}
-                      {/* <div className="text-[11px] text-muted-foreground/60 font-mono">by {p.author} · {p.steps.length} steps</div> */}
                     </div>
                     <button
                       onClick={() => handleUninstall(p.id)}
                       disabled={uninstallingId === p.id}
-                      className="text-[11px] font-mono text-muted-foreground hover:text-red-500 border border-border hover:border-red-500/30 px-2.5 py-1 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="text-[11px] font-mono text-muted-foreground hover:text-red-500 border border-border hover:border-red-500/30 px-2.5 py-1 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
                     >
                       {uninstallingId === p.id ? "Removing..." : "Remove"}
                     </button>
@@ -265,7 +288,21 @@ export function PluginManager({ plugins, installedPlugins, onInstall, onUninstal
           )}
           {tab === "browse" && (
             <div>
-              {available.map(p => (
+              <div className="sticky top-0 z-10 flex items-center gap-2 px-5 py-2.5 border-b border-border bg-card">
+                <Search size={12} className="text-muted-foreground shrink-0" />
+                <input
+                  value={browseSearch}
+                  onChange={e => setBrowseSearch(e.target.value)}
+                  placeholder="Search available plugins..."
+                  className="flex-1 bg-transparent text-[12px] font-mono text-foreground placeholder:text-muted-foreground outline-none"
+                />
+              </div>
+              {filteredAvailable.length === 0 && (
+                <div className="py-12 text-center text-[12px] text-muted-foreground font-mono">
+                  {available.length === 0 ? "No packages available" : "No matching packages"}
+                </div>
+              )}
+              {filteredAvailable.map(p => (
                 <div key={p.id} className="px-5 py-4 border-b border-border">
                   <div className="flex items-start justify-between">
                     <div>
