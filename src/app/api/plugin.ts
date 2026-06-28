@@ -11,3 +11,13 @@ export const getInstruments = async () => {
   const { data } = await axiosClient.get("/plugins/instruments");
   return data;
 };
+
+export const getStepSchema = async (stepTypeName: string) => {
+  const { data } = await axiosClient.get("/testplans/steps/schema", {
+    params: {
+      stepTypeName,
+    },
+  });
+
+  return data;
+};

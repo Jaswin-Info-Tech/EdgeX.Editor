@@ -292,12 +292,30 @@ export function useEditorController() {
   };
 
   const handleSave = () => {
-    const blob = new Blob([JSON.stringify({ meta: planMeta, plan }, null, 2)], { type: "application/json" });
-    const anchor = document.createElement("a");
-    anchor.href = URL.createObjectURL(blob);
-    anchor.download = `${planMeta.name.replace(/\s+/g, "_")}.edgex`;
-    anchor.click();
-    addLog("INFO", "FileIO", `Saved: ${planMeta.name}.edgex`);
+    const jsonData = {
+      meta: planMeta,
+      step: plan.map((step: any) => {
+        const props = (step.properties || []).reduce((acc: any, prop: any) => {
+          acc[prop.label] = prop.value;
+          return acc;
+        }, {});
+
+        return {
+          id: step.id,
+          name: step.name,
+          status: step.status,
+          enabled: step.enabled,
+          properties: props,  // { CommandType: "ll", Commands: "ll", ... }
+        };
+      }),
+    };
+
+    console.log("JSON Object:", jsonData);
+    console.log("Formatted JSON:", JSON.stringify(jsonData, null, 2));
+
+    const blob = new Blob([JSON.stringify(jsonData, null, 2)], {
+      type: "application/json",
+    });
   };
 
   const handleSeqDrop = (event: DragEvent, parentId: string | null, idx: number) => {
