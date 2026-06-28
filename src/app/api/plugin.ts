@@ -25,3 +25,12 @@ export const removePlugin = async (pluginName: string) => {
   });
   return response.data;
 };
+
+export const uploadPlugin = async (file: File) => {
+  const formData = new FormData();
+  formData.append("file", file); // confirm the field name your backend expects — adjust if it's e.g. "package" or "plugin"
+  const response = await axiosClient.post("/plugins/upload", formData, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
+  return response.data;
+};

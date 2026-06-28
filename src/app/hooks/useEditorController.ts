@@ -5,7 +5,7 @@ import { useDragResize } from "../components/editor/resizable";
 import { BASE_LIBRARY } from "../data/library";
 import type { CtxMenu, LibraryItem, LogEntry, PlanMeta, Plugin, RunState, StepStatus, TestStep } from "../types/editor";
 import { addToParent, deleteIn, flatAll, makeSequence, makeStep, moveIn, nowTs, parseFreq, resetAll, setStatusIn, uid, updateIn, toArray } from "../utils/editor";
-import { removePlugin } from "../api/plugin";
+import { removePlugin, uploadPlugin } from "../api/plugin";
 import { installPackage, uninstallPackage } from "../api/package";
 // import { usePlugins } from "./usePlugin";
 import { useAvailablePackages } from "./usePackage";
@@ -393,21 +393,19 @@ const handleUninstallPackage = async (id: string) => {
     toast.error(`Failed to uninstall ${pluginName}`);
   }
 };
-
-  const handleUploadPlugin = (filename: string) => {
-    const plugin: Plugin = {
-      id: `up-${uid()}`,
-      name: filename.replace(/\.(tappackage|dll)$/, ""),
-      version: "1.0.0",
-      author: "Custom",
-      state: "installed",
-      description: `Custom plugin from ${filename}`,
-      steps: [{ id: `lup-${uid()}`, name: "Custom Step", category: "Custom", type: "flow", description: "Step from uploaded plugin", defaultProps: [{ key: "param1", label: "Parameter 1", type: "string", value: "", group: "Parameters" }] }],
-    };
-    setPlugins(prev => [...prev, plugin]);
-    addLog("INFO", "Plugins", `Installed: ${filename}`);
+const handleUploadPlugin = async (file: File) => {
+  try {
+    await uploadPlugin(file);
+    addLog("INFO", "Plugins", `Installed: ${file.name}`);
+    toast.success(`${file.name} installed successfully`);
+    refreshPluginData();
+    setTimeout(refreshPluginData, 1500);
     setShowPluginMgr(false);
-  };
+  } catch {
+    addLog("ERROR", "Plugins", `Unable to install: ${file.name}`);
+    toast.error(`Failed to install ${file.name}`);
+  }
+};
 
   const handleSave = () => {
     const blob = new Blob([JSON.stringify({ meta: planMeta, plan }, null, 2)], { type: "application/json" });

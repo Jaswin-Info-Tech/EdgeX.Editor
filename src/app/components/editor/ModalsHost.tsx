@@ -17,7 +17,7 @@ interface ModalsHostProps {
   handleInstallPlugin: (id: string) => Promise<void>;
   handleUninstallPlugin: (id: string) => Promise<void>;
   handleUninstallPackage: (id: string) => Promise<void>;
-  handleUploadPlugin: (filename: string) => void;
+  handleUploadPlugin: (file: File) => Promise<void>;
   contextMenu: any;
   setContextMenu: (value: any) => void;
   handleContextAction: (action: string, stepId: string) => void;
