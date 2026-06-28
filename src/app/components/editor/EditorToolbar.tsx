@@ -12,6 +12,7 @@ interface EditorToolbarProps {
   setShowPluginMgr: (value: boolean) => void;
   setShowInstrumentsPanel: (value: boolean) => void;
   setShowDutsPanel: (value: boolean) => void;
+  setShowTestPlansPanel: (value: boolean) => void;
   setAddStepParentId: (value: string | null) => void;
   setAddStepIdx: (value: number | undefined) => void;
   setShowAddStep: (value: boolean) => void;
@@ -34,6 +35,7 @@ export function EditorToolbar({
   setShowPluginMgr,
   setShowInstrumentsPanel,
   setShowDutsPanel,
+  setShowTestPlansPanel,
   setAddStepParentId,
   setAddStepIdx,
   setShowAddStep,
@@ -96,6 +98,9 @@ export function EditorToolbar({
       </ToolBtn>
       <ToolBtn onClick={() => setShowDutsPanel(true)} title="DUTs">
         <Cpu size={14} />{!isTablet && "DUTs"}
+      </ToolBtn>
+      <ToolBtn onClick={() => setShowTestPlansPanel(true)} title="Test Plans">
+        <FolderPlus size={14} />{!isTablet && "Test Plans"}
       </ToolBtn>
 
       <div className="ml-auto flex items-center gap-3 font-mono text-[12px] text-muted-foreground shrink-0">

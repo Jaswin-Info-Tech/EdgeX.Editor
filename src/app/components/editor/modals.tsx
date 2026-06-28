@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Check, ChevronLeft, ChevronRight, Download, FilePlus, Package, Plus, RefreshCw, Search, Upload, X } from "lucide-react";
-import type { CtxMenu, InstrumentItem, LibraryItem, PlanMeta, Plugin } from "../../types/editor";
+import type { CtxMenu, DutItem, InstrumentItem, LibraryItem, PlanMeta, Plugin } from "../../types/editor";
 import { TYPE_LABEL, TYPE_STRIPE } from "../../constants/editor";
 import { TypeIcon } from "./atoms";
 
@@ -98,9 +98,9 @@ export function NewPlanModal({ onClose, onCreate }: { onClose: () => void; onCre
 
 // ─── Add Step Modal ───────────────────────────────────────────────────────────
 
-export function AddStepModal({ library, instruments, onAdd, onClose }: { library: LibraryItem[]; instruments: InstrumentItem[]; onAdd: (i: LibraryItem) => void; onClose: () => void }) {
+export function AddStepModal({ library, instruments, duts, onAdd, onClose }: { library: LibraryItem[]; instruments: InstrumentItem[]; duts: DutItem[]; onAdd: (i: LibraryItem) => void; onClose: () => void }) {
   const [search, setSearch] = useState("");
-  const [section, setSection] = useState<"all" | "steps" | "instruments">("all");
+  const [section, setSection] = useState<"all" | "steps" | "instruments" | "duts">("all");
 
   const instrumentItems = instruments.map((instrument): LibraryItem => ({
     id: `instrument:${instrument.name}:${instrument.assembly}`,
@@ -117,11 +117,29 @@ export function AddStepModal({ library, instruments, onAdd, onClose }: { library
     ],
   }));
 
+  const dutItems = duts.map((dut): LibraryItem => ({
+    id: `dut:${dut.name}:${dut.serialNumber || dut.model || ""}`,
+    name: dut.name,
+    category: "DUTs",
+    type: "dut",
+    description: [dut.model || "DUT", dut.serialNumber ? `SN ${dut.serialNumber}` : "", dut.firmware ? `FW ${dut.firmware}` : ""].filter(Boolean).join(" · "),
+    baseType: dut.baseType as string | undefined,
+    assembly: dut.assembly as string | undefined,
+    defaultProps: [
+      { key: "dutName", label: "DUT Name", type: "string", value: dut.name, group: "DUT" },
+      { key: "dutSerial", label: "Serial Number", type: "string", value: dut.serialNumber, group: "DUT" },
+      { key: "dutModel", label: "Model", type: "string", value: dut.model, group: "DUT" },
+      { key: "dutFirmware", label: "Firmware", type: "string", value: dut.firmware, group: "DUT" },
+    ],
+  }));
+
   const items = section === "steps"
     ? library
     : section === "instruments"
       ? instrumentItems
-      : [...library, ...instrumentItems];
+      : section === "duts"
+        ? dutItems
+        : [...library, ...instrumentItems, ...dutItems];
 
   const filtered = items.filter(item => {
     const haystack = `${item.name} ${item.description} ${(item as any).baseType ?? ""} ${(item as any).assembly ?? ""}`.toLowerCase();
@@ -141,8 +159,9 @@ export function AddStepModal({ library, instruments, onAdd, onClose }: { library
               ["all", "All"],
               ["steps", "Test Steps"],
               ["instruments", "Instruments"],
+              ["duts", "DUTs"],
             ].map(([value, label]) => (
-              <button key={value} onClick={() => setSection(value as "all" | "steps" | "instruments")}
+              <button key={value} onClick={() => setSection(value as "all" | "steps" | "instruments" | "duts")}
                 className={`w-full text-left px-3 py-2 text-[12px] font-mono transition-colors border-l-2
                   ${section === value ? "text-primary border-primary bg-primary/8" : "text-muted-foreground border-transparent hover:text-foreground hover:bg-secondary"}`}>
                 {label}
@@ -153,7 +172,7 @@ export function AddStepModal({ library, instruments, onAdd, onClose }: { library
             <div className="px-3 py-2 border-b border-border">
               <div className="flex items-center gap-2 border border-border px-2 py-1.5 bg-background">
                 <Search size={12} className="text-muted-foreground shrink-0" />
-                <input value={search} onChange={e => setSearch(e.target.value)} placeholder={section === "instruments" ? "Search instruments..." : "Search steps..."}
+                <input value={search} onChange={e => setSearch(e.target.value)} placeholder={section === "instruments" ? "Search instruments..." : section === "duts" ? "Search DUTs..." : "Search steps..."}
                   className="flex-1 bg-transparent text-[12px] font-mono text-foreground placeholder:text-muted-foreground outline-none" />
               </div>
             </div>
