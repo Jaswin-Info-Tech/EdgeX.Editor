@@ -9,6 +9,7 @@ import { usePackages } from "./usePackage";
 import { usePackageUpload } from "./usePackageUpload";
 import { usePlugins, useInstruments } from "./usePlugin";
 import { useWindowWidth } from "./useWindowWidth";
+import { composeTestPlan } from "../api/plugin";
 
 
 export function useEditorController() {
@@ -291,31 +292,45 @@ export function useEditorController() {
     // setShowPluginMgr(false);
   };
 
-  const handleSave = () => {
-    const jsonData = {
-      meta: planMeta,
-      step: plan.map((step: any) => {
-        const props = (step.properties || []).reduce((acc: any, prop: any) => {
-          acc[prop.label] = prop.value;
-          return acc;
-        }, {});
+  const formatStepForCompose = (step: TestStep): any => {
+    const props = (step.properties || []).reduce((acc: Record<string, any>, prop: any) => {
+      acc[prop.label] = prop.value;
+      return acc;
+    }, {});
 
-        return {
-          id: step.id,
-          name: step.name,
-          status: step.status,
-          enabled: step.enabled,
-          properties: props,  // { CommandType: "ll", Commands: "ll", ... }
-        };
-      }),
+    const formattedStep: any = {
+      id: step.id,
+      name: step.name,
+      status: step.status,
+      enabled: step.enabled,
+      properties: props,
+    };
+
+    if (step.children?.length) {
+      formattedStep.children = step.children.map(formatStepForCompose);
+    }
+
+    return formattedStep;
+  };
+
+  const handleSave = async () => {
+    const jsonData = {
+      outputPath: "C:\\TestPlans\\SamplePlan.UntitledTestPlan",
+      overwrite: true,
+      steps: plan.map(formatStepForCompose),
     };
 
     console.log("JSON Object:", jsonData);
     console.log("Formatted JSON:", JSON.stringify(jsonData, null, 2));
 
-    const blob = new Blob([JSON.stringify(jsonData, null, 2)], {
-      type: "application/json",
-    });
+    try {
+      const response = await composeTestPlan(jsonData);
+      addLog("INFO", "TestPlans", `Saved: ${jsonData.outputPath}`);
+      return response;
+    } catch (error) {
+      console.error("Failed to compose test plan:", error);
+      addLog("ERROR", "TestPlans", "Failed to save test plan.");
+    }
   };
 
   const handleSeqDrop = (event: DragEvent, parentId: string | null, idx: number) => {
