@@ -34,7 +34,6 @@ type SelectOption = string | { label: string; value: string; description?: strin
 
 interface EditorContext {
   instrumentOptions: SelectOption[];
-  schemaInstrumentOptions: SelectOption[];
   testStepOptions: SelectOption[];
   planStepOptions: SelectOption[];
 }
@@ -53,41 +52,6 @@ const toBackendRecordOption = (item: any): SelectOption => ({
   value: String(item?.name ?? ""),
   description: [item?.baseType, item?.assembly].filter(Boolean).join(" | "),
 });
-
-const getTypeName = (type: string) => {
-  const normalized = String(type ?? "").split("[[").pop()?.split(",")[0] ?? "";
-  return normalized.split(".").filter(Boolean).pop() || normalized || type;
-};
-
-const toSchemaInstrumentOption = (schema: any, prop: any): SelectOption => {
-  const type = String(prop?.type ?? "");
-  return {
-    label: getTypeName(type),
-    value: type,
-    description: String(schema?.assembly ?? ""),
-  };
-};
-
-const getSchemaInstrumentOptions = (schemas: any[] = []) => {
-  const allOptions: SelectOption[] = [];
-  const seenAll = new Set<string>();
-
-  schemas.forEach(schema => {
-    (schema?.properties ?? []).forEach((prop: any) => {
-      if (normalizeEditorType(prop?.editorType) !== "instrument-selector" || !prop?.type) {
-        return;
-      }
-
-      const option = toSchemaInstrumentOption(schema, prop);
-      if (!seenAll.has(option.value)) {
-        seenAll.add(option.value);
-        allOptions.push(option);
-      }
-    });
-  });
-
-  return allOptions;
-};
 
 const getSchemaRecords = (response: any) => {
   if (Array.isArray(response?.schemas)) return response.schemas;
@@ -193,7 +157,7 @@ function SelectEditor({ prop, value, onChange }: EditorProps) {
           const option = normalizeOption(item);
           return (
             <option key={option.value} value={option.value}>
-              {option.description ? `${option.label} - ${option.description}` : option.label}
+              {option.label}
             </option>
           );
         })}
@@ -550,10 +514,7 @@ function renderEditor(
     if (hasStaticOptions) return prop;
 
     if (editorType === "instrument-selector") {
-      const options = context.schemaInstrumentOptions.length > 0
-        ? context.schemaInstrumentOptions
-        : context.instrumentOptions;
-      return { ...prop, options };
+      return { ...prop, options: context.instrumentOptions };
     }
 
     if (editorType === "test-step") {
@@ -630,12 +591,7 @@ export function PropertiesPanel({
   const getSchemaPropertyKey = (prop: any) => `${prop.displayName || prop.name} || ${prop.name}`;
   const schemaRecords = useMemo(() => getSchemaRecords(schemaResponse), [schemaResponse]);
   const schemaProperties = useMemo(() => schemaRecords[0]?.properties ?? [], [schemaRecords]);
-  const schemaInstrumentOptions = useMemo(
-    () => getSchemaInstrumentOptions(schemaRecords),
-    [schemaRecords]
-  );
   const editorContext = useMemo<EditorContext>(() => ({
-    schemaInstrumentOptions,
     instrumentOptions: instruments
       .filter((instrument: any) => instrument?.canCreateInstance !== false && instrument?.isBrowsable !== false)
       .filter((instrument: any) => instrument?.name)
@@ -651,7 +607,7 @@ export function PropertiesPanel({
         value: step.id,
         description: step.type,
       })),
-  }), [instruments, testSteps, plan, selectedStep?.id, schemaInstrumentOptions]);
+  }), [instruments, testSteps, plan, selectedStep?.id]);
 
   useEffect(() => {
     if (!selectedStep) {
