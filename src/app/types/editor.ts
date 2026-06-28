@@ -43,6 +43,7 @@ export interface Plugin {
   packageName?: string;
   pluginName?: string;
   assembly?: string;
+  baseType?: string;
   updateAvailable?: boolean;
   status?: string;
 }

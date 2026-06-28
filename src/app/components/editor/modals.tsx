@@ -242,7 +242,7 @@ export function PluginManager({ plugins, installedPlugins, onInstall, onUninstal
             </button>
           ))}
         </div>
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto overflow-x-hidden">
           {tab === "installed" && (
             <div>
               <div className="sticky top-0 z-10 flex items-center gap-2 px-5 py-2.5 border-b border-border bg-card">
@@ -259,29 +259,72 @@ export function PluginManager({ plugins, installedPlugins, onInstall, onUninstal
                   {installed.length === 0 ? "No plugins installed" : "No matching plugins"}
                 </div>
               )}
-              {filteredInstalled.map(p => (
+              {filteredInstalled.map((p) => (
                 <div key={p.id} className="px-5 py-4 border-b border-border">
                   <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-16">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="text-[13px] font-semibold text-foreground truncate" title={p.name}>{p.name}</span>
-                        <span className="text-[11px] font-mono text-emerald-500 border border-emerald-500/30 bg-emerald-500/10 px-2 shrink-0">v{p.version}</span>
-                        <span className="text-[11px] font-mono text-emerald-500 shrink-0">● installed</span>
+                    <div className="flex-1 min-w-0">
+                      {/* Header */}
+                      <div className="flex items-center gap-2 mb-2 min-w-0">
+                        <span
+                          className="flex-1 min-w-0 truncate text-[13px] font-semibold text-foreground"
+                          title={p.name}
+                        >
+                          {p.name}
+                        </span>
+
+                        {/* <span className="text-[11px] font-mono text-emerald-500 border border-emerald-500/30 bg-emerald-500/10 px-2 shrink-0">
+                          {p.version}
+                        </span> */}
+
+                        <span className="text-[11px] font-mono text-emerald-500 shrink-0">
+                          ● installed
+                        </span>
+                      </div>
+
+                      {/* Details */}
+                      <div className="space-y-1 text-[11px] font-mono text-muted-foreground">
+
+                        <div className="mt-3 flex flex-wrap gap-1.5">
+                          {p.baseType && (
+                            <span
+                              className="text-[11px] font-mono border border-border px-2 py-0.5 text-muted-foreground"
+                              title={p.baseType}
+                            >
+                              {p.baseType}
+                            </span>
+                          )}
+
+                          {p.assembly && (
+                            <span
+                              className="text-[11px] font-mono border border-border px-2 py-0.5 text-muted-foreground"
+                              title={p.assembly}
+                            >
+                              {p.assembly}
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
+
                     <button
                       onClick={() => handleUninstall(p.id)}
                       disabled={uninstallingId === p.id}
-                      className="text-[11px] font-mono text-muted-foreground hover:text-red-500 border border-border hover:border-red-500/30 px-2.5 py-1 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
+                      className="shrink-0 text-[11px] font-mono text-muted-foreground hover:text-red-500 border border-border hover:border-red-500/30 px-2.5 py-1 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {uninstallingId === p.id ? "Removing..." : "Remove"}
                     </button>
                   </div>
-                  <div className="mt-3 flex flex-wrap gap-1.5">
-                    {(p.steps ?? []).map(s => (
-                      <span key={s.id} className="text-[11px] font-mono border border-border px-2 py-0.5 text-muted-foreground">{s.name}</span>
+
+                  {/* <div className="mt-3 flex flex-wrap gap-1.5">
+                    {(p.steps ?? []).map((s) => (
+                      <span
+                        key={s.id}
+                        className="text-[11px] font-mono border border-border px-2 py-0.5 text-muted-foreground"
+                      >
+                        {s.name}
+                      </span>
                     ))}
-                  </div>
+                  </div> */}
                 </div>
               ))}
             </div>
