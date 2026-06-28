@@ -6,7 +6,8 @@ import type { CtxMenu, LibraryItem, LogEntry, PlanMeta, Plugin, RunState, StepSt
 import { addToParent, deleteIn, flatAll, makeSequence, makeStep, moveIn, nowTs, parseFreq, resetAll, setStatusIn, uid, updateIn } from "../utils/editor";
 // import { usePlugins } from "./usePlugin";
 import { usePackages } from "./usePackage";
-import { usePlugins, useInstruments } from "./usePlugin";
+import { useDuts, usePlugins, useInstruments } from "./usePlugin";
+import { usePackageUpload } from "./usePackageUpload";
 import { useWindowWidth } from "./useWindowWidth";
 
 
@@ -15,6 +16,7 @@ export function useEditorController() {
   const isDesktop = winW >= 1280;
   const isTablet = winW >= 768 && winW < 1024;
   const { data: packagesData } = usePackages();
+  const uploadPackage = usePackageUpload();
   const [plan, setPlan] = useState<TestStep[]>([]);
   const [planMeta, setPlanMeta] = useState<PlanMeta>({ name: "Untitled Test Plan", description: "", author: "", version: "1.0.0", dutName: "", dutSerial: "", dutModel: "", dutFirmware: "" });
   const [hasPlan, setHasPlan] = useState(false);
@@ -83,6 +85,7 @@ export function useEditorController() {
     return [...baseCatalog, ...pluginSteps];
   }, [data, plugins]);
   const { data: instruments, isLoading: isInstrumentsLoading, isError: isInstrumentsError } = useInstruments();
+  const { data: duts, isLoading: isDutsLoading, isError: isDutsError } = useDuts();
 
   const selectedStep = selectedId ? flatAll(plan).find(step => step.id === selectedId) : null;
   const toggleExpand = (id: string) => setExpanded(prev => {
@@ -254,19 +257,41 @@ export function useEditorController() {
     }, 1500);
   };
 
-  const handleUploadPlugin = (filename: string) => {
+  const handleUploadPlugin = async (file: File) => {
+    const uploadedPackage = await uploadPackage.mutateAsync(file);
+
+    if (Array.isArray(uploadedPackage)) {
+      setPlugins(uploadedPackage);
+      addLog("INFO", "Plugins", `Installed: ${file.name}`);
+      // setShowPluginMgr(false);
+      return;
+    }
+
+    const pluginFromApi = uploadedPackage?.package ?? uploadedPackage?.plugin ?? uploadedPackage;
+    if (pluginFromApi?.id && pluginFromApi?.name) {
+      setPlugins(prev => {
+        const nextPlugin = { ...pluginFromApi, state: "installed" as const };
+        return prev.some(plugin => plugin.id === nextPlugin.id)
+          ? prev.map(plugin => plugin.id === nextPlugin.id ? nextPlugin : plugin)
+          : [...prev, nextPlugin];
+      });
+      addLog("INFO", "Plugins", `Installed: ${file.name}`);
+      // setShowPluginMgr(false);
+      return;
+    }
+
     const plugin: Plugin = {
       id: `up-${uid()}`,
-      name: filename.replace(/\.(tappackage|dll)$/, ""),
+      name: file.name.replace(/\.(zip|tappackage|dll)$/i, ""),
       version: "1.0.0",
       author: "Custom",
       state: "installed",
-      description: `Custom plugin from ${filename}`,
+      description: `Custom plugin from ${file.name}`,
       steps: [{ id: `lup-${uid()}`, name: "Custom Step", category: "Custom", type: "flow", description: "Step from uploaded plugin", defaultProps: [{ key: "param1", label: "Parameter 1", type: "string", value: "", group: "Parameters" }] }],
     };
     setPlugins(prev => [...prev, plugin]);
-    addLog("INFO", "Plugins", `Installed: ${filename}`);
-    setShowPluginMgr(false);
+    addLog("INFO", "Plugins", `Installed: ${file.name}`);
+    // setShowPluginMgr(false);
   };
 
   const handleSave = () => {
@@ -330,6 +355,9 @@ export function useEditorController() {
     instruments: instruments ?? [],
     isInstrumentsLoading,
     isInstrumentsError,
+    duts: duts ?? [],
+    isDutsLoading,
+    isDutsError,
     plan,
     planMeta,
     stats,

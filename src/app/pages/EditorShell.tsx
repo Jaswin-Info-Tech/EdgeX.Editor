@@ -54,6 +54,9 @@ interface EditorShellProps {
   instruments: any[];
   isInstrumentsLoading: boolean;
   isInstrumentsError: boolean;
+  duts: any[];
+  isDutsLoading: boolean;
+  isDutsError: boolean;
   plan: any;
   planMeta: any;
   stats: any;
@@ -139,6 +142,9 @@ export function EditorShell(props: EditorShellProps) {
     instruments,
     isInstrumentsLoading,
     isInstrumentsError,
+    duts,
+    isDutsLoading,
+    isDutsError,
     plan,
     planMeta,
     stats,
@@ -178,10 +184,11 @@ export function EditorShell(props: EditorShellProps) {
     libFilterOpen,
     setDragLibItem,
   } = props;
-
   const [libCat, setLibCat] = useState("All");
   const [instrumentSearch, setInstrumentSearch] = useState("");
   const [showInstrumentsPanel, setShowInstrumentsPanel] = useState(false);
+  const [dutSearch, setDutSearch] = useState("");
+  const [showDutsPanel, setShowDutsPanel] = useState(false);
   const displayLibrary = data?.length ? data : library;
 
   const libCats = useMemo<string[]>(
@@ -212,6 +219,16 @@ export function EditorShell(props: EditorShellProps) {
         .some(value => String(value ?? "").toLowerCase().includes(search));
     }),
     [instruments, instrumentSearch]
+  );
+
+  const filteredDuts = useMemo(
+    () => duts.filter((dut: any) => {
+      const search = dutSearch.trim().toLowerCase();
+      if (!search) return true;
+      return [dut.name, dut.serialNumber, dut.model, dut.firmware, dut.baseType, dut.assembly]
+        .some(value => String(value ?? "").toLowerCase().includes(search));
+    }),
+    [duts, dutSearch]
   );
 
   const filteredLogs = useMemo(
@@ -358,6 +375,7 @@ export function EditorShell(props: EditorShellProps) {
         setLeftTab={setLeftTab}
         setShowPluginMgr={setShowPluginMgr}
         setShowInstrumentsPanel={setShowInstrumentsPanel}
+        setShowDutsPanel={setShowDutsPanel}
         setAddStepParentId={setAddStepParentId}
         setAddStepIdx={setAddStepIdx}
         setShowAddStep={setShowAddStep}
@@ -461,6 +479,55 @@ export function EditorShell(props: EditorShellProps) {
             </div>
             <div className="px-4 py-2 border-t border-border bg-muted/20 text-[11px] text-muted-foreground font-mono">
               {filteredInstruments.length} instruments
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showDutsPanel && (
+        <div className="fixed inset-0 bg-black/75 flex items-center justify-center z-50" onClick={() => { setShowDutsPanel(false); setDutSearch(""); }}>
+          <div className="bg-card border border-border w-[660px] max-w-[92vw] h-[520px] max-h-[85vh] flex flex-col shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-3 border-b border-border bg-muted/30">
+              <div className="flex items-center gap-2">
+                <span className="text-[13px] font-semibold text-foreground">DUTs</span>
+              </div>
+              <button onClick={() => { setShowDutsPanel(false); setDutSearch(""); }} className="text-muted-foreground hover:text-foreground">
+                <X size={14} />
+              </button>
+            </div>
+            <div className="px-3 py-3 border-b border-border shrink-0">
+              <div className="flex items-center gap-2 border border-border px-2.5 py-2 bg-background">
+                <Search size={13} className="text-muted-foreground shrink-0" />
+                <input value={dutSearch} onChange={e => setDutSearch(e.target.value)} placeholder="Search DUTs..." className="flex-1 bg-transparent text-[12px] font-mono text-foreground placeholder:text-muted-foreground outline-none" />
+                {dutSearch && <button onClick={() => setDutSearch("")} className="text-muted-foreground hover:text-foreground shrink-0"><X size={10} /></button>}
+              </div>
+            </div>
+            <div className="flex-1 overflow-y-auto">
+              {isDutsLoading ? (
+                <div className="px-5 py-8 text-center text-[12px] font-mono text-muted-foreground">Loading DUTs...</div>
+              ) : isDutsError ? (
+                <div className="px-5 py-8 text-center text-[12px] font-mono text-destructive">Unable to load DUTs.</div>
+              ) : filteredDuts.length === 0 ? (
+                <div className="px-5 py-8 text-center text-[12px] font-mono text-muted-foreground">{dutSearch ? "No matching DUTs." : "No DUTs available."}</div>
+              ) : filteredDuts.map((dut: any, index: number) => (
+                <div key={`${dut.name}:${dut.serialNumber}:${index}`} className="px-5 py-4 border-b border-border">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
+                        <span className="text-[13px] font-semibold text-foreground">{dut.name || "Unnamed DUT"}</span>
+                        {dut.baseType && <span className="text-[11px] font-mono text-muted-foreground border border-border px-2">{dut.baseType}</span>}
+                        {dut.model && <span className="text-[11px] font-mono text-muted-foreground border border-border px-2">{dut.model}</span>}
+                        {dut.serialNumber && <span className="text-[11px] font-mono text-muted-foreground border border-border px-2">SN: {dut.serialNumber}</span>}
+                      </div>
+                      {dut.firmware && <div className="text-[12px] text-muted-foreground mb-1">Firmware: {dut.firmware}</div>}
+                      {dut.assembly && <div className="text-[11px] text-muted-foreground/70 font-mono">{dut.assembly}</div>}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="px-4 py-2 border-t border-border bg-muted/20 text-[11px] text-muted-foreground font-mono">
+              {filteredDuts.length} DUTs
             </div>
           </div>
         </div>

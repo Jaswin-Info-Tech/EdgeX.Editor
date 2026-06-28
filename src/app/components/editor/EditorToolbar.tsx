@@ -1,4 +1,4 @@
-import { FilePlus, FolderOpen, FolderPlus, Package, Pause, Play, Plus, RotateCcw, Save, Square } from "lucide-react";
+import { Cpu, FilePlus, FolderOpen, FolderPlus, Package, Pause, Play, Plus, RotateCcw, Save, Square } from "lucide-react";
 import { ToolBtn } from "./atoms";
 
 interface EditorToolbarProps {
@@ -11,6 +11,7 @@ interface EditorToolbarProps {
   setLeftTab: (value: "plan" | "library" | "plugins" | "instruments") => void;
   setShowPluginMgr: (value: boolean) => void;
   setShowInstrumentsPanel: (value: boolean) => void;
+  setShowDutsPanel: (value: boolean) => void;
   setAddStepParentId: (value: string | null) => void;
   setAddStepIdx: (value: number | undefined) => void;
   setShowAddStep: (value: boolean) => void;
@@ -32,6 +33,7 @@ export function EditorToolbar({
   setLeftTab,
   setShowPluginMgr,
   setShowInstrumentsPanel,
+  setShowDutsPanel,
   setAddStepParentId,
   setAddStepIdx,
   setShowAddStep,
@@ -91,6 +93,9 @@ export function EditorToolbar({
       </ToolBtn>
       <ToolBtn onClick={() => setShowInstrumentsPanel(true)} title="Instruments">
         <Package size={14} />{!isTablet && "Instruments"}
+      </ToolBtn>
+      <ToolBtn onClick={() => setShowDutsPanel(true)} title="DUTs">
+        <Cpu size={14} />{!isTablet && "DUTs"}
       </ToolBtn>
 
       <div className="ml-auto flex items-center gap-3 font-mono text-[12px] text-muted-foreground shrink-0">

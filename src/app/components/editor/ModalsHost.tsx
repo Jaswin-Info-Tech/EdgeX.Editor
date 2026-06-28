@@ -15,7 +15,7 @@ interface ModalsHostProps {
   setShowPluginMgr: (value: boolean) => void;
   plugins: any[];
   handleInstallPlugin: (id: string) => void;
-  handleUploadPlugin: (filename: string) => void;
+  handleUploadPlugin: (file: File) => Promise<void> | void;
   contextMenu: any;
   setContextMenu: (value: any) => void;
   handleContextAction: (action: string, stepId: string) => void;
@@ -40,7 +40,9 @@ export function ModalsHost({
   contextMenu,
   setContextMenu,
   handleContextAction,
-}: ModalsHostProps) {
+}: ModalsHostProps)
+{
+  // console.log(plugins,"kkkkkk") 
   return (
     <>
       {showNewPlan && (
