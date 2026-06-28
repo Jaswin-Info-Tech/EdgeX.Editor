@@ -34,6 +34,16 @@ export interface InstrumentItem {
   isBrowsable: boolean;
 }
 
+export interface DutItem {
+  name: string;
+  serialNumber: string;
+  model: string;
+  firmware: string;
+  assembly?: string;
+  baseType?: string;
+  [key: string]: unknown;
+}
+
 export interface Plugin {
   id: string; name: string; version: string; author: string; description: string;
   state: "installed" | "installing" | "available"; steps?: LibraryItem[];

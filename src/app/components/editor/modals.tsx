@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Check, ChevronLeft, ChevronRight, Download, FilePlus, Package, Plus, RefreshCw, Search, Upload, X } from "lucide-react";
-import type { CtxMenu, LibraryItem, PlanMeta, Plugin } from "../../types/editor";
+import type { CtxMenu, InstrumentItem, LibraryItem, PlanMeta, Plugin } from "../../types/editor";
 import { TYPE_LABEL, TYPE_STRIPE } from "../../constants/editor";
 import { TypeIcon } from "./atoms";
 
@@ -98,29 +98,54 @@ export function NewPlanModal({ onClose, onCreate }: { onClose: () => void; onCre
 
 // ─── Add Step Modal ───────────────────────────────────────────────────────────
 
-export function AddStepModal({ library, onAdd, onClose }: { library: LibraryItem[]; onAdd: (i: LibraryItem) => void; onClose: () => void }) {
+export function AddStepModal({ library, instruments, onAdd, onClose }: { library: LibraryItem[]; instruments: InstrumentItem[]; onAdd: (i: LibraryItem) => void; onClose: () => void }) {
   const [search, setSearch] = useState("");
-  const [cat, setCat] = useState("All");
-  const cats = ["All", ...new Set(library.map(l => l.category))];
-  const filtered = library.filter(l =>
-    (cat === "All" || l.category === cat) &&
-    (l.name.toLowerCase().includes(search.toLowerCase()) || l.description.toLowerCase().includes(search.toLowerCase()))
-  );
+  const [section, setSection] = useState<"all" | "steps" | "instruments">("all");
+
+  const instrumentItems = instruments.map((instrument): LibraryItem => ({
+    id: `instrument:${instrument.name}:${instrument.assembly}`,
+    name: instrument.name,
+    category: "Instruments",
+    type: "instrument",
+    description: `Instrument from ${instrument.assembly}`,
+    baseType: instrument.baseType,
+    assembly: instrument.assembly,
+    defaultProps: [
+      { key: "instrumentName", label: "Instrument Name", type: "string", value: instrument.name, group: "Instrument" },
+      { key: "baseType", label: "Base Type", type: "string", value: instrument.baseType, group: "Instrument" },
+      { key: "assembly", label: "Assembly", type: "string", value: instrument.assembly, group: "Instrument" },
+    ],
+  }));
+
+  const items = section === "steps"
+    ? library
+    : section === "instruments"
+      ? instrumentItems
+      : [...library, ...instrumentItems];
+
+  const filtered = items.filter(item => {
+    const haystack = `${item.name} ${item.description} ${(item as any).baseType ?? ""} ${(item as any).assembly ?? ""}`.toLowerCase();
+    return haystack.includes(search.toLowerCase());
+  });
 
   return (
     <div className="fixed inset-0 bg-black/75 flex items-center justify-center z-50" onClick={onClose}>
       <div className="bg-card border border-border w-[620px] h-[480px] flex flex-col shadow-2xl" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-muted/30">
-          <div className="flex items-center gap-2"><Plus size={15} className="text-primary" /><span className="text-[13px] font-semibold text-foreground">Add Test Step</span></div>
+          <div className="flex items-center gap-2"><Plus size={15} className="text-primary" /><span className="text-[13px] font-semibold text-foreground">Add Item</span></div>
           <button onClick={onClose} className="text-muted-foreground hover:text-foreground"><X size={14} /></button>
         </div>
         <div className="flex flex-1 overflow-hidden">
           <div className="w-40 border-r border-border overflow-y-auto shrink-0">
-            {cats.map(c => (
-              <button key={c} onClick={() => setCat(c)}
+            {[
+              ["all", "All"],
+              ["steps", "Test Steps"],
+              ["instruments", "Instruments"],
+            ].map(([value, label]) => (
+              <button key={value} onClick={() => setSection(value as "all" | "steps" | "instruments")}
                 className={`w-full text-left px-3 py-2 text-[12px] font-mono transition-colors border-l-2
-                  ${cat === c ? "text-primary border-primary bg-primary/8" : "text-muted-foreground border-transparent hover:text-foreground hover:bg-secondary"}`}>
-                {c}
+                  ${section === value ? "text-primary border-primary bg-primary/8" : "text-muted-foreground border-transparent hover:text-foreground hover:bg-secondary"}`}>
+                {label}
               </button>
             ))}
           </div>
@@ -128,12 +153,12 @@ export function AddStepModal({ library, onAdd, onClose }: { library: LibraryItem
             <div className="px-3 py-2 border-b border-border">
               <div className="flex items-center gap-2 border border-border px-2 py-1.5 bg-background">
                 <Search size={12} className="text-muted-foreground shrink-0" />
-                <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search steps..."
+                <input value={search} onChange={e => setSearch(e.target.value)} placeholder={section === "instruments" ? "Search instruments..." : "Search steps..."}
                   className="flex-1 bg-transparent text-[12px] font-mono text-foreground placeholder:text-muted-foreground outline-none" />
               </div>
             </div>
             <div className="flex-1 overflow-y-auto">
-              {filtered.length === 0 && <div className="py-8 text-center text-[12px] text-muted-foreground font-mono">No matching steps</div>}
+              {filtered.length === 0 && <div className="py-8 text-center text-[12px] text-muted-foreground font-mono">No matching items</div>}
               {filtered.map(item => (
                 <button key={item.id} onClick={() => { onAdd(item); onClose(); }}
                   className="w-full text-left px-4 py-3 hover:bg-secondary group transition-colors border-b border-border/40">
@@ -153,7 +178,7 @@ export function AddStepModal({ library, onAdd, onClose }: { library: LibraryItem
           </div>
         </div>
         <div className="px-4 py-2 border-t border-border bg-muted/20 text-[11px] text-muted-foreground font-mono">
-          {filtered.length} steps · double-click or click to add
+          {filtered.length} items · click to add
         </div>
       </div>
     </div>

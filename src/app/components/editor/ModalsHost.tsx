@@ -10,6 +10,7 @@ interface ModalsHostProps {
   handleAddStep: (item: any, parentId?: string | null, atIdx?: number) => void;
   addStepParentId: string | null;
   addStepIdx: number | undefined;
+  instruments: any[];
   showPluginMgr: boolean;
   setShowPluginMgr: (value: boolean) => void;
   plugins: any[];
@@ -30,6 +31,7 @@ export function ModalsHost({
   handleAddStep,
   addStepParentId,
   addStepIdx,
+  instruments,
   showPluginMgr,
   setShowPluginMgr,
   plugins,
@@ -52,6 +54,7 @@ export function ModalsHost({
       {showAddStep && (
         <AddStepModal
           library={library}
+          instruments={instruments}
           onClose={() => setShowAddStep(false)}
           onAdd={item => handleAddStep(item, addStepParentId, addStepIdx)}
         />

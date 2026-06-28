@@ -53,10 +53,12 @@ export function SequenceEditor({
         onDragOver={e => {
           if (dragLibItem) {
             e.preventDefault();
+            e.stopPropagation();
             setDropIdx(plan.length);
           }
         }}
         onDrop={e => {
+          e.stopPropagation();
           if (dragLibItem) handleSeqDrop(e, null, plan.length);
         }}
       >
@@ -74,7 +76,7 @@ export function SequenceEditor({
         ) : plan.length === 0 ? (
           <div
             className="flex flex-col items-center justify-center h-full gap-4 p-8"
-            onDragOver={e => { if (dragLibItem) e.preventDefault(); }}
+            onDragOver={e => { if (dragLibItem) { e.preventDefault(); e.stopPropagation(); } }}
             onDrop={e => { 
               e.stopPropagation();
               if (dragLibItem) handleSeqDrop(e, null, 0); 
@@ -102,9 +104,10 @@ export function SequenceEditor({
               <div
                 onDragOver={e => {
                   e.preventDefault();
+                  e.stopPropagation();
                   setDropIdx(plan.length);
                 }}
-                onDrop={e => handleSeqDrop(e, null, plan.length)}
+                onDrop={e => { e.stopPropagation(); handleSeqDrop(e, null, plan.length); }}
                 className={`h-12 flex items-center justify-center text-[12px] font-mono border border-dashed m-3 transition-colors
                   ${dropIdx === plan.length ? "border-primary text-primary bg-primary/5" : "border-border/40 text-muted-foreground/30"}`}
               >
