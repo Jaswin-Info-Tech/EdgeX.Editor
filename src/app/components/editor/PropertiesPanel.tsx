@@ -586,8 +586,8 @@ export function PropertiesPanel({
 }: PropertiesPanelProps) {
   const [schemaResponse, setSchemaResponse] = useState<any>(null);
   const [schemaError, setSchemaError] = useState<string | null>(null);
+  console.log(selectedStep,"llallla")
   const [schemaPropertyValues, setSchemaPropertyValues] = useState<Record<string, any>>({});
-
   const getSchemaPropertyKey = (prop: any) => `${prop.displayName || prop.name} || ${prop.name}`;
   const schemaRecords = useMemo(() => getSchemaRecords(schemaResponse), [schemaResponse]);
   const schemaProperties = useMemo(() => schemaRecords[0]?.properties ?? [], [schemaRecords]);
@@ -621,7 +621,12 @@ export function PropertiesPanel({
     setSchemaError(null);
     const fetchSchema = async () => {
       try {
-        const data = await getStepSchema(selectedStep.name);
+        const stepTypeName = selectedStep.stepTypeName
+          ?? selectedStep.typeName
+          ?? selectedStep.fullName
+          ?? selectedStep.className
+          ?? selectedStep.name;
+        const data = await getStepSchema(stepTypeName);
         if (cancelled) return;
         setSchemaResponse(data);
         setSchemaError(null);

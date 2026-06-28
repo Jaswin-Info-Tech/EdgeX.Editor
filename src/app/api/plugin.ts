@@ -23,6 +23,8 @@ export const getStepSchema = async (stepTypeName: string) => {
 };
 
 export const composeTestPlan = async (payload: any) => {
-  const { data } = await axiosClient.post("/testplans/compose", payload);
+  const { data } = await axiosClient.post("/testplans/compose", {
+    request: payload,
+  });
   return data;
 };

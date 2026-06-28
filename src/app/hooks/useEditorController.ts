@@ -298,11 +298,15 @@ export function useEditorController() {
       return acc;
     }, {});
 
+    const stepTypeName = (step as TestStep & { stepTypeName?: string; typeName?: string; fullName?: string; className?: string }).stepTypeName
+      ?? (step as TestStep & { stepTypeName?: string; typeName?: string; fullName?: string; className?: string }).typeName
+      ?? (step as TestStep & { stepTypeName?: string; typeName?: string; fullName?: string; className?: string }).fullName
+      ?? (step as TestStep & { stepTypeName?: string; typeName?: string; fullName?: string; className?: string }).className
+      ?? step.name;
+
     const formattedStep: any = {
-      id: step.id,
-      name: step.name,
-      status: step.status,
-      enabled: step.enabled,
+      stepTypeName,
+      // name: step.name,
       properties: props,
     };
 

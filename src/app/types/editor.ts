@@ -11,6 +11,10 @@ export interface TestStep {
   id: string; name: string; type: string; status: StepStatus;
   children?: TestStep[]; enabled: boolean; properties: Property[];
   description?: string; breakpoint?: boolean;
+  stepTypeName?: string;
+  typeName?: string;
+  fullName?: string;
+  className?: string;
 }
 
 export interface LogEntry {
@@ -24,6 +28,10 @@ export interface LibraryItem {
   baseType?: string;
   assembly?: string;
   defaultProps: Property[];
+  stepTypeName?: string;
+  typeName?: string;
+  fullName?: string;
+  className?: string;
 }
 
 export interface InstrumentItem {
