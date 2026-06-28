@@ -1,6 +1,7 @@
 // PropertiesPanel.tsx
 import { Plus, Sliders, Trash2, Plug } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import type { Dispatch, ReactNode, SetStateAction } from "react";
 import { TYPE_STRIPE } from "../../constants/editor";
 import { deleteIn, flatAll, formatFreq, updateIn } from "../../utils/editor";
 import { StatusPill, Toggle, TypeIcon } from "./atoms";
@@ -14,11 +15,11 @@ const labelCls =
 const wrapCls = "px-3 py-2.5 border-b border-border/40";
 
 // ─── Shared sub-components ────────────────────────────────────────────────────
-function FieldLabel({ children }: { children: React.ReactNode }) {
+function FieldLabel({ children }: { children: ReactNode }) {
   return <label className={labelCls}>{children}</label>;
 }
 
-function FieldWrap({ children }: { children: React.ReactNode }) {
+function FieldWrap({ children }: { children: ReactNode }) {
   return <div className={wrapCls}>{children}</div>;
 }
 
@@ -33,12 +34,16 @@ type SelectOption = string | { label: string; value: string; description?: strin
 
 interface EditorContext {
   instrumentOptions: SelectOption[];
+  schemaInstrumentOptions: SelectOption[];
   testStepOptions: SelectOption[];
   planStepOptions: SelectOption[];
 }
 
 const normalizeOption = (item: SelectOption) =>
   typeof item === "string" ? { label: item, value: item } : item;
+
+const getSelectOptions = (prop: any): SelectOption[] =>
+  (prop.enumValues?.length ?? 0) > 0 ? prop.enumValues : prop.options ?? [];
 
 const normalizeEditorType = (editorType: string = "") =>
   editorType.trim().toLowerCase().replace(/[\s_]+/g, "-");
@@ -48,6 +53,48 @@ const toBackendRecordOption = (item: any): SelectOption => ({
   value: String(item?.name ?? ""),
   description: [item?.baseType, item?.assembly].filter(Boolean).join(" | "),
 });
+
+const getTypeName = (type: string) => {
+  const normalized = String(type ?? "").split("[[").pop()?.split(",")[0] ?? "";
+  return normalized.split(".").filter(Boolean).pop() || normalized || type;
+};
+
+const toSchemaInstrumentOption = (schema: any, prop: any): SelectOption => {
+  const type = String(prop?.type ?? "");
+  return {
+    label: getTypeName(type),
+    value: type,
+    description: String(schema?.assembly ?? ""),
+  };
+};
+
+const getSchemaInstrumentOptions = (schemas: any[] = []) => {
+  const allOptions: SelectOption[] = [];
+  const seenAll = new Set<string>();
+
+  schemas.forEach(schema => {
+    (schema?.properties ?? []).forEach((prop: any) => {
+      if (normalizeEditorType(prop?.editorType) !== "instrument-selector" || !prop?.type) {
+        return;
+      }
+
+      const option = toSchemaInstrumentOption(schema, prop);
+      if (!seenAll.has(option.value)) {
+        seenAll.add(option.value);
+        allOptions.push(option);
+      }
+    });
+  });
+
+  return allOptions;
+};
+
+const getSchemaRecords = (response: any) => {
+  if (Array.isArray(response?.schemas)) return response.schemas;
+  if (Array.isArray(response)) return response;
+  if (response?.properties) return [response];
+  return [];
+};
 
 // ─── text ─────────────────────────────────────────────────────────────────────
 function TextEditor({ prop, value, onChange }: EditorProps) {
@@ -132,7 +179,7 @@ function CheckboxEditor({ prop, value, onChange }: EditorProps) {
 // ─── select (dropdown / instrument-selector / dut-selector / result-listener/test-step) ─
 function SelectEditor({ prop, value, onChange }: EditorProps) {
   const label = prop.displayName || prop.name;
-  const options: SelectOption[] = prop.enumValues ?? prop.options ?? [];
+  const options = getSelectOptions(prop);
   return (
     <FieldWrap>
       <FieldLabel>{label}</FieldLabel>
@@ -158,7 +205,7 @@ function SelectEditor({ prop, value, onChange }: EditorProps) {
 // ─── multiselect ──────────────────────────────────────────────────────────────
 function MultiselectEditor({ prop, value, onChange }: EditorProps) {
   const label = prop.displayName || prop.name;
-  const options: SelectOption[] = prop.enumValues ?? prop.options ?? [];
+  const options = getSelectOptions(prop);
   const selected: string[] = Array.isArray(value) ? value : [];
 
   const toggle = (item: SelectOption) => {
@@ -438,7 +485,7 @@ function FolderEditor({ prop, value, onChange }: EditorProps) {
 // ─── step-selector ────────────────────────────────────────────────────────────
 function StepSelectorEditor({ prop, value, onChange }: EditorProps) {
   const label = prop.displayName || prop.name;
-  const steps: SelectOption[] = prop.enumValues ?? prop.options ?? [];
+  const steps = getSelectOptions(prop);
   return (
     <FieldWrap>
       <FieldLabel>{label}</FieldLabel>
@@ -491,7 +538,7 @@ function UnknownEditor({ prop, value, onChange }: EditorProps) {
 function renderEditor(
   prop: any,
   schemaPropertyValues: Record<string, any>,
-  setSchemaPropertyValues: React.Dispatch<React.SetStateAction<Record<string, any>>>,
+  setSchemaPropertyValues: Dispatch<SetStateAction<Record<string, any>>>,
   context: EditorContext
 ) {
   const value = schemaPropertyValues[prop.name];
@@ -503,7 +550,10 @@ function renderEditor(
     if (hasStaticOptions) return prop;
 
     if (editorType === "instrument-selector") {
-      return { ...prop, options: context.instrumentOptions };
+      const options = context.schemaInstrumentOptions.length > 0
+        ? context.schemaInstrumentOptions
+        : context.instrumentOptions;
+      return { ...prop, options };
     }
 
     if (editorType === "test-step") {
@@ -578,8 +628,14 @@ export function PropertiesPanel({
   const [schemaPropertyValues, setSchemaPropertyValues] = useState<Record<string, any>>({});
 
   const getSchemaPropertyKey = (prop: any) => `${prop.displayName || prop.name} || ${prop.name}`;
-  const schemaProperties = schemaResponse?.schemas?.[0]?.properties ?? [];
+  const schemaRecords = useMemo(() => getSchemaRecords(schemaResponse), [schemaResponse]);
+  const schemaProperties = useMemo(() => schemaRecords[0]?.properties ?? [], [schemaRecords]);
+  const schemaInstrumentOptions = useMemo(
+    () => getSchemaInstrumentOptions(schemaRecords),
+    [schemaRecords]
+  );
   const editorContext = useMemo<EditorContext>(() => ({
+    schemaInstrumentOptions,
     instrumentOptions: instruments
       .filter((instrument: any) => instrument?.canCreateInstance !== false && instrument?.isBrowsable !== false)
       .filter((instrument: any) => instrument?.name)
@@ -595,7 +651,7 @@ export function PropertiesPanel({
         value: step.id,
         description: step.type,
       })),
-  }), [instruments, testSteps, plan, selectedStep?.id]);
+  }), [instruments, testSteps, plan, selectedStep?.id, schemaInstrumentOptions]);
 
   useEffect(() => {
     if (!selectedStep) {
@@ -604,17 +660,25 @@ export function PropertiesPanel({
       setSchemaPropertyValues({});
       return;
     }
+    let cancelled = false;
+    setSchemaResponse(null);
+    setSchemaError(null);
     const fetchSchema = async () => {
       try {
         const data = await getStepSchema(selectedStep.name);
+        if (cancelled) return;
         setSchemaResponse(data);
         setSchemaError(null);
       } catch (err) {
+        if (cancelled) return;
         setSchemaError(String(err));
       }
     };
     fetchSchema();
-  }, [selectedStep]);
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedStep?.name]);
 
   useEffect(() => {
     if (!selectedStep) { setSchemaPropertyValues({}); return; }
@@ -738,7 +802,11 @@ export function PropertiesPanel({
           </div>
           {schemaProperties.length > 0
             ? schemaProperties.map((prop: any) => renderEditor(prop, schemaPropertyValues, setSchemaPropertyValues, editorContext))
-            : <div className="px-3 py-4 text-[12px] text-muted-foreground font-mono">No configurable properties.</div>
+            : (
+              <div className="px-3 py-4 text-[12px] text-muted-foreground font-mono">
+                {schemaError ? `Unable to load schema: ${schemaError}` : "No configurable properties."}
+              </div>
+            )
           }
           <div className="px-3 py-3 border-t border-border mt-1">
             <button
