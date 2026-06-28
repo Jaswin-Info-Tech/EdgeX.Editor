@@ -2,17 +2,18 @@
 import { useQuery } from "@tanstack/react-query";
 import { getAvailablePackages, getInstalledPackages } from "../api/package";
 
-export const usePackages = () => {
+export const usePackages = (packageName = "") => {
+  const normalizedPackageName = packageName.trim();
   return useQuery({
-    queryKey: ["packages"],
-    queryFn: getInstalledPackages,
+    queryKey: ["packages", normalizedPackageName],
+    queryFn: () => getInstalledPackages(normalizedPackageName),
   });
 };
 
-export const useAvailablePackages = () => {
+export const useAvailablePackages = (search = "") => {
+  const normalizedSearch = search.trim();
   return useQuery({
-    queryKey: ["available-packages"],
-    queryFn: getAvailablePackages,
+    queryKey: ["available-packages", normalizedSearch],
+    queryFn: () => getAvailablePackages(normalizedSearch),
   });
 };
-

@@ -8,7 +8,7 @@ import { addToParent, deleteIn, flatAll, makeSequence, makeStep, moveIn, nowTs, 
 import { removePlugin, uploadPlugin } from "../api/plugin";
 import { installPackage, uninstallPackage } from "../api/package";
 // import { usePlugins } from "./usePlugin";
-import { useAvailablePackages } from "./usePackage";
+import { useAvailablePackages, usePackages } from "./usePackage";
 import { useInstalledPlugins, usePlugins, useInstruments } from "./usePlugin";
 import { useWindowWidth } from "./useWindowWidth";
 
@@ -18,7 +18,17 @@ export function useEditorController() {
   const isDesktop = winW >= 1280;
   const isTablet = winW >= 768 && winW < 1024;
   const { data: installedPluginsData, refetch: refetchInstalledPlugins } = useInstalledPlugins();
-  const { data: availablePackagesData, refetch: refetchAvailablePackages } = useAvailablePackages();
+  const [installedPackageSearch, setInstalledPackageSearch] = useState("");
+  const {
+    data: installedPackagesData,
+    isFetching: isInstalledPackagesFetching,
+  } = usePackages(installedPackageSearch);
+  const [availablePackageSearch, setAvailablePackageSearch] = useState("");
+  const {
+    data: availablePackagesData,
+    refetch: refetchAvailablePackages,
+    isFetching: isAvailablePackagesFetching,
+  } = useAvailablePackages(availablePackageSearch);
   const [plan, setPlan] = useState<TestStep[]>([]);
   const [planMeta, setPlanMeta] = useState<PlanMeta>({ name: "Untitled Test Plan", description: "", author: "", version: "1.0.0", dutName: "", dutSerial: "", dutModel: "", dutFirmware: "" });
   const [hasPlan, setHasPlan] = useState(false);
@@ -34,6 +44,7 @@ export function useEditorController() {
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
   const [plugins, setPlugins] = useState<Plugin[]>([]);
   const [installedPlugins, setInstalledPlugins] = useState<Plugin[]>([]);
+  const [installedPackages, setInstalledPackages] = useState<Plugin[]>([]);
   const [renaming, setRenaming] = useState<string | null>(null);
   const [renameVal, setRenameVal] = useState("");
   const [contextMenu, setContextMenu] = useState<CtxMenu | null>(null);
@@ -148,6 +159,34 @@ export function useEditorController() {
 
     setInstalledPlugins(toArray(installedPluginsData).map((item: any, index) => normalizeInstalledPlugin(item, index)));
   }, [installedPluginsData]);
+
+  useEffect(() => {
+    const normalizeInstalledPackage = (item: any, index: number): Plugin => {
+      const name = String(item.name ?? item.pluginName ?? item.packageName ?? "Untitled Plugin");
+
+      return {
+        ...item,
+        id: String(item.id ?? item.name ?? item.packageName ?? item.pluginName ?? `package:${name}:${index}`),
+        name,
+        version: String(item.version ?? ""),
+        author: String(item.author ?? item.publisher ?? ""),
+        description: String(item.description ?? "Installed package"),
+        state: "installed",
+        isInstalled: true,
+        status: "Installed",
+        uninstallName: String(item.pluginName ?? item.packageName ?? item.name ?? name),
+        updateAvailable: false,
+        steps: Array.isArray(item.steps) ? item.steps : [],
+      };
+    };
+
+    const packageItems = toArray(installedPackagesData);
+    const isPackageCollection = Array.isArray((installedPackagesData as any)?.packages) || Array.isArray((installedPackagesData as any)?.value);
+    const normalizedItems = packageItems.length === 0 && installedPackagesData && typeof installedPackagesData === "object" && !isPackageCollection
+      ? [installedPackagesData]
+      : packageItems;
+    setInstalledPackages(normalizedItems.map((item: any, index) => normalizeInstalledPackage(item, index)));
+  }, [installedPackagesData]);
 
   const addLog = useCallback((level: LogEntry["level"], source: string, message: string) => {
     setLogs(prev => [...prev, { id: logId.current++, timestamp: nowTs(), level, source, message }]);
@@ -486,6 +525,13 @@ export function useEditorController() {
     handleAddStep,
     plugins,
     installedPlugins,
+    installedPackages,
+    installedPackageSearch,
+    setInstalledPackageSearch,
+    isInstalledPackagesFetching,
+    availablePackageSearch,
+    setAvailablePackageSearch,
+    isAvailablePackagesFetching,
     handleInstallPlugin,
     handleUninstallPlugin,
     handleUninstallPackage,

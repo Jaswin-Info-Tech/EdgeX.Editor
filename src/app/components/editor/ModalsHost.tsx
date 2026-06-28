@@ -13,7 +13,13 @@ interface ModalsHostProps {
   showPluginMgr: boolean;
   setShowPluginMgr: (value: boolean) => void;
   plugins: any[];
-  installedPlugins: any[];
+  installedPackages: any[];
+  installedPackageSearch: string;
+  setInstalledPackageSearch: (value: string) => void;
+  isInstalledPackagesFetching: boolean;
+  availablePackageSearch: string;
+  setAvailablePackageSearch: (value: string) => void;
+  isAvailablePackagesFetching: boolean;
   handleInstallPlugin: (id: string) => Promise<void>;
   handleUninstallPlugin: (id: string) => Promise<void>;
   handleUninstallPackage: (id: string) => Promise<void>;
@@ -36,7 +42,13 @@ export function ModalsHost({
   showPluginMgr,
   setShowPluginMgr,
   plugins,
-  installedPlugins,
+  installedPackages,
+  installedPackageSearch,
+  setInstalledPackageSearch,
+  isInstalledPackagesFetching,
+  availablePackageSearch,
+  setAvailablePackageSearch,
+  isAvailablePackagesFetching,
   handleInstallPlugin,
   handleUninstallPlugin,
   handleUninstallPackage,
@@ -63,7 +75,13 @@ export function ModalsHost({
       {showPluginMgr && (
         <PluginManager
           plugins={plugins}
-          installedPlugins={installedPlugins}
+          installedPlugins={installedPackages}
+          installedSearch={installedPackageSearch}
+          setInstalledSearch={setInstalledPackageSearch}
+          isInstalledLoading={isInstalledPackagesFetching}
+          availableSearch={availablePackageSearch}
+          setAvailableSearch={setAvailablePackageSearch}
+          isAvailableLoading={isAvailablePackagesFetching}
           onInstall={handleInstallPlugin}
           onUninstall={handleUninstallPlugin}
           onUninstallPackage={handleUninstallPackage}

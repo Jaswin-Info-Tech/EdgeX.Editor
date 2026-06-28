@@ -48,7 +48,13 @@ interface EditorShellProps {
   setShowNewPlan: any;
   handleAddStep: any;
   plugins: any;
-  installedPlugins: any;
+  installedPackages: any;
+  installedPackageSearch: string;
+  setInstalledPackageSearch: (value: string) => void;
+  isInstalledPackagesFetching: boolean;
+  availablePackageSearch: string;
+  setAvailablePackageSearch: (value: string) => void;
+  isAvailablePackagesFetching: boolean;
   handleInstallPlugin: any;
   handleUninstallPlugin: any;
   handleUninstallPackage: any;
@@ -136,7 +142,13 @@ export function EditorShell(props: EditorShellProps) {
     setShowNewPlan,
     handleAddStep,
     plugins,
-    installedPlugins,
+    installedPackages,
+    installedPackageSearch,
+    setInstalledPackageSearch,
+    isInstalledPackagesFetching,
+    availablePackageSearch,
+    setAvailablePackageSearch,
+    isAvailablePackagesFetching,
     handleInstallPlugin,
     handleUninstallPlugin,
     handleUninstallPackage,
@@ -435,7 +447,13 @@ export function EditorShell(props: EditorShellProps) {
         showPluginMgr={showPluginMgr}
         setShowPluginMgr={setShowPluginMgr}
         plugins={plugins}
-        installedPlugins={installedPlugins}
+        installedPackages={installedPackages}
+        installedPackageSearch={installedPackageSearch}
+        setInstalledPackageSearch={setInstalledPackageSearch}
+        isInstalledPackagesFetching={isInstalledPackagesFetching}
+        availablePackageSearch={availablePackageSearch}
+        setAvailablePackageSearch={setAvailablePackageSearch}
+        isAvailablePackagesFetching={isAvailablePackagesFetching}
         handleInstallPlugin={handleInstallPlugin}
         handleUninstallPlugin={handleUninstallPlugin}
         handleUninstallPackage={handleUninstallPackage}
