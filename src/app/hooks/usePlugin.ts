@@ -1,7 +1,14 @@
 // hooks/useUsers.js
 import { useQuery } from "@tanstack/react-query";
-import { getInstruments, getSteps } from "../api/plugin";
+import { getInstalledPlugins, getInstruments, getSteps } from "../api/plugin";
 import type { InstrumentItem, LibraryItem } from "../types/editor";
+
+export const useInstalledPlugins = () => {
+  return useQuery({
+    queryKey: ["installed-plugins"],
+    queryFn: getInstalledPlugins,
+  });
+};
 
 export const usePlugins = () => {
   return useQuery({

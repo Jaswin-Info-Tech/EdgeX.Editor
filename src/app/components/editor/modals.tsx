@@ -162,15 +162,15 @@ export function AddStepModal({ library, onAdd, onClose }: { library: LibraryItem
 
 // ─── Plugin Manager ───────────────────────────────────────────────────────────
 
-export function PluginManager({ plugins, onInstall, onUninstall, onUpload, onClose }: {
-  plugins: Plugin[]; onInstall: (id: string) => Promise<void>; onUninstall: (id: string) => Promise<void>; onUpload: (f: string) => void; onClose: () => void;
+export function PluginManager({ plugins, installedPlugins, onInstall, onUninstall, onUpload, onClose }: {
+  plugins: Plugin[]; installedPlugins: Plugin[]; onInstall: (id: string) => Promise<void>; onUninstall: (id: string) => Promise<void>; onUpload: (f: string) => void; onClose: () => void;
 }) {
   const [tab, setTab] = useState<"installed" | "browse" | "upload">("installed");
   const [uploadFile, setUploadFile] = useState("");
   const [uploading, setUploading] = useState(false);
   const [installingId, setInstallingId] = useState<string | null>(null);
   const [uninstallingId, setUninstallingId] = useState<string | null>(null);
-  const installed = plugins.filter(p => p.state === "installed");
+  const installed = installedPlugins;
   const available = plugins;
 
   const handleUpload = () => {

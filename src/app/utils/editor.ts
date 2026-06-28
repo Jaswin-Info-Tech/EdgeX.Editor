@@ -88,5 +88,6 @@ export function nowTs() { return new Date().toISOString().slice(11, 23); }
 export function toArray<T = any>(data: unknown): T[] {
   if (Array.isArray(data)) return data;
   if (Array.isArray((data as any)?.packages)) return (data as any).packages;
+  if (Array.isArray((data as any)?.value)) return (data as any).value;
   return [];
 }

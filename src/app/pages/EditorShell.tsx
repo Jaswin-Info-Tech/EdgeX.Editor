@@ -48,6 +48,7 @@ interface EditorShellProps {
   setShowNewPlan: any;
   handleAddStep: any;
   plugins: any;
+  installedPlugins: any;
   handleInstallPlugin: any;
   handleUninstallPlugin: any;
   setShowPluginMgr: any;
@@ -134,6 +135,7 @@ export function EditorShell(props: EditorShellProps) {
     setShowNewPlan,
     handleAddStep,
     plugins,
+    installedPlugins,
     handleInstallPlugin,
     handleUninstallPlugin,
     setShowPluginMgr,
@@ -431,6 +433,7 @@ export function EditorShell(props: EditorShellProps) {
         showPluginMgr={showPluginMgr}
         setShowPluginMgr={setShowPluginMgr}
         plugins={plugins}
+        installedPlugins={installedPlugins}
         handleInstallPlugin={handleInstallPlugin}
         handleUninstallPlugin={handleUninstallPlugin}
         handleUploadPlugin={handleUploadPlugin}

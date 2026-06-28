@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { DragEvent } from "react";
-import { toast } from "react-toastify";
+import { toast } from "sonner";
 import { useDragResize } from "../components/editor/resizable";
 import { BASE_LIBRARY } from "../data/library";
 import type { CtxMenu, LibraryItem, LogEntry, PlanMeta, Plugin, RunState, StepStatus, TestStep } from "../types/editor";
@@ -8,8 +8,8 @@ import { addToParent, deleteIn, flatAll, makeSequence, makeStep, moveIn, nowTs, 
 import { removePlugin } from "../api/plugin";
 import { installPackage } from "../api/package";
 // import { usePlugins } from "./usePlugin";
-import { useAvailablePackages, usePackages } from "./usePackage";
-import { usePlugins, useInstruments } from "./usePlugin";
+import { useAvailablePackages } from "./usePackage";
+import { useInstalledPlugins, usePlugins, useInstruments } from "./usePlugin";
 import { useWindowWidth } from "./useWindowWidth";
 
 
@@ -17,7 +17,7 @@ export function useEditorController() {
   const winW = useWindowWidth();
   const isDesktop = winW >= 1280;
   const isTablet = winW >= 768 && winW < 1024;
-  const { data: packagesData, refetch: refetchPackages } = usePackages();
+  const { data: installedPluginsData, refetch: refetchInstalledPlugins } = useInstalledPlugins();
   const { data: availablePackagesData, refetch: refetchAvailablePackages } = useAvailablePackages();
   const [plan, setPlan] = useState<TestStep[]>([]);
   const [planMeta, setPlanMeta] = useState<PlanMeta>({ name: "Untitled Test Plan", description: "", author: "", version: "1.0.0", dutName: "", dutSerial: "", dutModel: "", dutFirmware: "" });
@@ -33,6 +33,7 @@ export function useEditorController() {
   const [libFilterOpen, setLibFilterOpen] = useState(false);
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
   const [plugins, setPlugins] = useState<Plugin[]>([]);
+  const [installedPlugins, setInstalledPlugins] = useState<Plugin[]>([]);
   const [renaming, setRenaming] = useState<string | null>(null);
   const [renameVal, setRenameVal] = useState("");
   const [contextMenu, setContextMenu] = useState<CtxMenu | null>(null);
@@ -78,37 +79,70 @@ export function useEditorController() {
       return fallback;
     };
 
-    const normalizePlugin = (item: any, fallbackInstalled: boolean): Plugin => {
+    const normalizePackagePlugin = (item: any, fallbackInstalled: boolean): Plugin => {
       const statusInstalled = String(item.status ?? "").trim().toLowerCase() === "installed";
       const isInstalled = item.isInstalled === undefined
         ? fallbackInstalled || statusInstalled
         : asBool(item.isInstalled, fallbackInstalled || statusInstalled);
+      const name = String(item.name ?? item.packageName ?? item.pluginName ?? "Untitled Plugin");
       return {
         ...item,
         id: String(item.id ?? item.name ?? item.packageName ?? item.pluginName ?? ""),
-        name: String(item.name ?? item.packageName ?? item.pluginName ?? "Untitled Plugin"),
+        name,
         version: String(item.version ?? ""),
         author: String(item.author ?? item.publisher ?? ""),
         description: String(item.description ?? ""),
         state: isInstalled ? "installed" : "available",
         isInstalled,
+        uninstallName: String(item.pluginName ?? item.packageName ?? name),
         updateAvailable: asBool(item.updateAvailable),
         status: String(item.status ?? (isInstalled ? "Installed" : "Available")),
         steps: Array.isArray(item.steps) ? item.steps : [],
       };
     };
 
-    const availableCatalog = toArray(availablePackagesData).map((item: any) => normalizePlugin(item, false));
-    const installedPackages = toArray(packagesData).map((item: any) => normalizePlugin(item, true));
+    const availableCatalog = toArray(availablePackagesData).map((item: any) => normalizePackagePlugin(item, false));
+    setPlugins(availableCatalog);
+  }, [availablePackagesData]);
 
-    const byKey = new Map<string, Plugin>();
-    availableCatalog.forEach(plugin => byKey.set(plugin.id || plugin.name, plugin));
-    installedPackages.forEach(plugin => {
-      const key = plugin.id || plugin.name;
-      byKey.set(key, { ...byKey.get(key), ...plugin, state: "installed", isInstalled: true, status: "Installed" });
-    });
-    setPlugins(Array.from(byKey.values()));
-  }, [packagesData, availablePackagesData]);
+  useEffect(() => {
+    const normalizeInstalledPlugin = (item: any, index: number): Plugin => {
+      const name = String(item.name ?? item.pluginName ?? item.packageName ?? "Untitled Plugin");
+      const assembly = String(item.assembly ?? "");
+      const baseType = String(item.baseType ?? "");
+
+      return {
+        ...item,
+        id: String(item.id ?? `${assembly || "plugin"}:${name}:${index}`),
+        name,
+        version: String(item.version ?? ""),
+        author: String(item.author ?? item.publisher ?? assembly),
+        description: baseType || assembly || "Installed plugin",
+        state: "installed",
+        isInstalled: true,
+        status: "Installed",
+        assembly,
+        baseType,
+        canCreateInstance: Boolean(item.canCreateInstance),
+        isBrowsable: Boolean(item.isBrowsable),
+        uninstallName: String(item.pluginName ?? item.packageName ?? item.name ?? name),
+        steps: baseType.includes("TestStep")
+          ? [{
+            id: String(item.id ?? name),
+            name,
+            category: assembly || "Plugins",
+            description: baseType,
+            type: "plugin",
+            baseType,
+            assembly,
+            defaultProps: [],
+          }]
+          : [],
+      };
+    };
+
+    setInstalledPlugins(toArray(installedPluginsData).map((item: any, index) => normalizeInstalledPlugin(item, index)));
+  }, [installedPluginsData]);
 
   const addLog = useCallback((level: LogEntry["level"], source: string, message: string) => {
     setLogs(prev => [...prev, { id: logId.current++, timestamp: nowTs(), level, source, message }]);
@@ -116,8 +150,7 @@ export function useEditorController() {
 
   const library: LibraryItem[] = [
     ...BASE_LIBRARY,
-    ...plugins
-      .filter(plugin => plugin.state === "installed")
+    ...installedPlugins
       .flatMap(plugin => (plugin.steps ?? []).map(step => ({ ...step, pluginId: plugin.id }))),
     // ...plugins.filter(plugin => plugin.status === "installed").flatMap(plugin => plugin.steps.map(step => ({ ...step, pluginId: plugin.id })) ),
   ];
@@ -299,7 +332,7 @@ export function useEditorController() {
       ));
       addLog("INFO", "Plugins", `${action === "updated" ? "Updated" : "Installed"}: ${pluginName}`);
       toast.success(`${pluginName} ${action} successfully`);
-      refetchPackages();
+      refetchInstalledPlugins();
       refetchAvailablePackages();
     } catch {
       setPlugins(prev => prev.map(item => item.id === id
@@ -312,15 +345,15 @@ export function useEditorController() {
   };
 
   const handleUninstallPlugin = async (id: string) => {
-    const plugin = plugins.find(item => item.id === id);
+    const plugin = installedPlugins.find(item => item.id === id);
     const pluginName = plugin?.name ?? "Plugin";
+    const uninstallName = plugin?.uninstallName ?? pluginName;
     try {
-      await removePlugin(pluginName);
-      setPlugins(prev => prev.map(item => item.id === id ? { ...item, state: "available", isInstalled: false, status: "Available", updateAvailable: false } : item));
+      await removePlugin(uninstallName);
+      setInstalledPlugins(prev => prev.filter(item => item.id !== id));
       addLog("INFO", "Plugins", `Uninstalled: ${pluginName}`);
       toast.success(`${pluginName} uninstalled successfully`);
-      refetchPackages();
-      refetchAvailablePackages();
+      refetchInstalledPlugins();
     } catch {
       addLog("ERROR", "Plugins", `Unable to uninstall: ${pluginName}`);
       toast.error(`Failed to uninstall ${pluginName}`);
@@ -398,6 +431,7 @@ export function useEditorController() {
     setShowNewPlan,
     handleAddStep,
     plugins,
+    installedPlugins,
     handleInstallPlugin,
     handleUninstallPlugin,
     setShowPluginMgr,
