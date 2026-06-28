@@ -40,6 +40,9 @@ export interface Plugin {
   steps?: LibraryItem[];
   isInstalled?: boolean;
   uninstallName?: string;
+  packageName?: string;
+  pluginName?: string;
+  assembly?: string;
   updateAvailable?: boolean;
   status?: string;
 }

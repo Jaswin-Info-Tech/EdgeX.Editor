@@ -17,9 +17,9 @@ export const getInstruments = async () => {
   return data;
 };
 
-export const removePlugin = async (pluginName: string) => {
+export const removePlugin = async (plugin: { pluginName: string; packageName?: string; assembly?: string }) => {
   const response = await axiosClient.delete("/plugins/remove", {
-    data: { pluginName },
+    data: plugin,
     headers: { "Content-Type": "application/json" },
   });
   return response.data;

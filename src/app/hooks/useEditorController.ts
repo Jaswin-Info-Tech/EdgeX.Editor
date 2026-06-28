@@ -110,11 +110,16 @@ export function useEditorController() {
       const name = String(item.name ?? item.pluginName ?? item.packageName ?? "Untitled Plugin");
       const assembly = String(item.assembly ?? "");
       const baseType = String(item.baseType ?? "");
+      const packageName = item.packageName === undefined ? undefined : String(item.packageName);
+      const pluginName = item.pluginName === undefined ? undefined : String(item.pluginName);
+      const uninstallName = packageName || pluginName || assembly || name;
 
       return {
         ...item,
         id: String(item.id ?? `${assembly || "plugin"}:${name}:${index}`),
         name,
+        packageName,
+        pluginName,
         version: String(item.version ?? ""),
         author: String(item.author ?? item.publisher ?? assembly),
         description: baseType || assembly || "Installed plugin",
@@ -125,7 +130,7 @@ export function useEditorController() {
         baseType,
         canCreateInstance: Boolean(item.canCreateInstance),
         isBrowsable: Boolean(item.isBrowsable),
-        uninstallName: String(item.pluginName ?? item.packageName ?? item.name ?? name),
+        uninstallName,
         steps: baseType.includes("TestStep")
           ? [{
             id: String(item.id ?? name),
@@ -327,6 +332,8 @@ export function useEditorController() {
     const plugin = plugins.find(item => item.id === id);
     const pluginName = plugin?.name ?? "Plugin";
     const action = plugin?.isInstalled ? "updated" : "installed";
+    const actionLabel = action === "updated" ? "Update" : "Install";
+    const toastId = toast.loading(`${actionLabel} started for ${pluginName}...`);
 
     try {
       setPlugins(prev => prev.map(item => item.id === id ? { ...item, state: "installing" } : item));
@@ -336,7 +343,7 @@ export function useEditorController() {
         : item
       ));
       addLog("INFO", "Plugins", `${action === "updated" ? "Updated" : "Installed"}: ${pluginName}`);
-      toast.success(`${pluginName} ${action} successfully`);
+      toast.success(`${pluginName} ${action} successfully`, { id: toastId });
       refreshPluginData();
       setTimeout(refreshPluginData, 1500); // safety net in case backend hasn't registered the install yet
     } catch {
@@ -345,7 +352,7 @@ export function useEditorController() {
         : item
       ));
       addLog("ERROR", "Plugins", `Unable to ${action === "updated" ? "update" : "install"}: ${pluginName}`);
-      toast.error(`Failed to ${action === "updated" ? "update" : "install"} ${pluginName}`);
+      toast.error(`Failed to ${action === "updated" ? "update" : "install"} ${pluginName}`, { id: toastId });
     }
   };
 
@@ -353,22 +360,37 @@ export function useEditorController() {
     const plugin = installedPlugins.find(item => item.id === id);
     const pluginName = plugin?.name ?? "Plugin";
     const uninstallName = plugin?.uninstallName ?? pluginName;
+    const toastId = toast.loading(`Removing ${pluginName}...`);
     console.log("Uninstalling:", { id, pluginName, uninstallName, plugin });
     try {
-      const result = await removePlugin(uninstallName);
+      const result = await removePlugin({
+        pluginName: uninstallName,
+        packageName: plugin?.packageName,
+        assembly: plugin?.assembly,
+      });
       console.log("Uninstall API response:", result);
-      toast.success(`${pluginName} uninstalled successfully`);
-      setTimeout(() => window.location.reload(), 800);
+      setInstalledPlugins(prev => prev.filter(item =>
+        item.id !== id &&
+        item.uninstallName !== uninstallName &&
+        item.packageName !== plugin?.packageName &&
+        item.pluginName !== plugin?.pluginName &&
+        item.assembly !== plugin?.assembly
+      ));
+      addLog("INFO", "Plugins", `Removed: ${pluginName}`);
+      toast.success(`${pluginName} removed successfully`, { id: toastId });
+      refreshPluginData();
+      setTimeout(refreshPluginData, 1500);
     } catch (err) {
       console.error("Uninstall API error:", err);
       addLog("ERROR", "Plugins", `Unable to uninstall: ${pluginName}`);
-      toast.error(`Failed to uninstall ${pluginName}`);
+      toast.error(`Failed to remove ${pluginName}`, { id: toastId });
     }
   };
   const handleUninstallPackage = async (id: string) => {
     const plugin = plugins.find(item => item.id === id);
     const pluginName = plugin?.name ?? "Plugin";
     const uninstallName = plugin?.uninstallName ?? pluginName;
+    const toastId = toast.loading(`Uninstalling ${pluginName}...`);
 
     try {
       setPlugins(prev => prev.map(item => item.id === id ? { ...item, state: "uninstalling" } : item));
@@ -383,24 +405,27 @@ export function useEditorController() {
       setInstalledPlugins(prev => prev.filter(item => item.uninstallName !== uninstallName && item.name !== pluginName));
 
       addLog("INFO", "Plugins", `Uninstalled: ${pluginName}`);
-      toast.success(`${pluginName} uninstalled successfully`);
+      toast.success(`${pluginName} uninstalled successfully`, { id: toastId });
       refreshPluginData();
       setTimeout(refreshPluginData, 1500);
     } catch {
       setPlugins(prev => prev.map(item => item.id === id ? { ...item, state: "installed", isInstalled: true } : item));
       addLog("ERROR", "Plugins", `Unable to uninstall: ${pluginName}`);
-      toast.error(`Failed to uninstall ${pluginName}`);
+      toast.error(`Failed to uninstall ${pluginName}`, { id: toastId });
     }
   };
 
   const handleUploadPlugin = async (file: File) => {
+    const toastId = toast.loading(`Uploading ${file.name}...`);
     try {
       await uploadPlugin(file);
-      toast.success(`${file.name} installed successfully`);
-      window.location.reload();
+      addLog("INFO", "Plugins", `Uploaded: ${file.name}`);
+      toast.success(`${file.name} uploaded and installed successfully`, { id: toastId });
+      refreshPluginData();
+      setTimeout(refreshPluginData, 1500);
     } catch {
       addLog("ERROR", "Plugins", `Unable to install: ${file.name}`);
-      toast.error(`Failed to install ${file.name}`);
+      toast.error(`Failed to upload ${file.name}`, { id: toastId });
     }
   };
 
