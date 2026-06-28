@@ -20,6 +20,7 @@ export function TypeIcon({ type, size = 13 }: { type: string; size?: number }) {
   if (type === "rf") return <Radio {...p} />;
   if (type === "measure") return <BarChart2 {...p} />;
   if (type === "network") return <Wifi {...p} />;
+  if (type === "dut") return <Cpu {...p} />;
   if (type === "hw") return <Cpu {...p} />;
   if (type === "instrument") return <Zap {...p} />;
   return <Clock {...p} />;

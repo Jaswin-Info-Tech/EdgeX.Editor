@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Search, X } from "lucide-react";
+import { Search, X, Clock } from "lucide-react";
 import { ConsolePanel } from "../components/editor/ConsolePanel";
 import { EditorToolbar } from "../components/editor/EditorToolbar";
 import { LeftPanel } from "../components/editor/LeftPanel";
@@ -9,6 +9,7 @@ import { PropertiesDock } from "../components/editor/PropertiesDock";
 import { PropertiesPanel } from "../components/editor/PropertiesPanel";
 import { SequenceEditor } from "../components/editor/SequenceEditor";
 import { Splitter } from "../components/editor/resizable";
+import { useTestPlans } from "../hooks/usePlugin";
 
 interface EditorShellProps {
   selectedId: any;
@@ -189,6 +190,8 @@ export function EditorShell(props: EditorShellProps) {
   const [showInstrumentsPanel, setShowInstrumentsPanel] = useState(false);
   const [dutSearch, setDutSearch] = useState("");
   const [showDutsPanel, setShowDutsPanel] = useState(false);
+  const [testPlanQuery, setTestPlanQuery] = useState("D:\\");
+  const [showTestPlansPanel, setShowTestPlansPanel] = useState(false);
   const displayLibrary = data?.length ? data : library;
 
   const libCats = useMemo<string[]>(
@@ -230,6 +233,8 @@ export function EditorShell(props: EditorShellProps) {
     }),
     [duts, dutSearch]
   );
+
+  const { data: testPlans = [], isLoading: isTestPlansLoading, isError: isTestPlansError } = useTestPlans(testPlanQuery.trim() || undefined);
 
   const filteredLogs = useMemo(
     () => consoleFilter === "ALL" ? logs : logs.filter((entry: any) => entry.level === consoleFilter),
@@ -357,7 +362,6 @@ export function EditorShell(props: EditorShellProps) {
         setIsDark={setIsDark}
         setShowNewPlan={setShowNewPlan}
         setShowPluginMgr={setShowPluginMgr}
-        setShowInstrumentsPanel={setShowInstrumentsPanel}
         handleSave={handleSave}
         handleRun={handleRun}
         handleStop={handleStop}
@@ -376,6 +380,7 @@ export function EditorShell(props: EditorShellProps) {
         setShowPluginMgr={setShowPluginMgr}
         setShowInstrumentsPanel={setShowInstrumentsPanel}
         setShowDutsPanel={setShowDutsPanel}
+        setShowTestPlansPanel={setShowTestPlansPanel}
         setAddStepParentId={setAddStepParentId}
         setAddStepIdx={setAddStepIdx}
         setShowAddStep={setShowAddStep}
@@ -533,6 +538,56 @@ export function EditorShell(props: EditorShellProps) {
         </div>
       )}
 
+      {showTestPlansPanel && (
+        <div className="fixed inset-0 bg-black/75 flex items-center justify-center z-50" onClick={() => setShowTestPlansPanel(false)}>
+          <div className="bg-card border border-border w-[760px] max-w-[92vw] h-[540px] max-h-[85vh] flex flex-col shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-3 border-b border-border bg-muted/30">
+              <div className="flex items-center gap-2">
+                <span className="text-[13px] font-semibold text-foreground">Test Plans</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <button onClick={() => {}} className="flex items-center gap-2 px-3 py-1.5 bg-primary text-primary-foreground text-[12px] font-mono font-semibold hover:bg-primary/90 transition-colors">
+                  <Clock size={12} /> History
+                </button>
+                <button onClick={() => setShowTestPlansPanel(false)} className="text-muted-foreground hover:text-foreground">
+                  <X size={14} />
+                </button>
+              </div>
+            </div>
+            <div className="px-3 py-3 border-b border-border shrink-0">
+              <div className="flex items-center gap-2 border border-border px-2.5 py-2 bg-background">
+                <Search size={13} className="text-muted-foreground shrink-0" />
+                <input value={testPlanQuery} onChange={e => setTestPlanQuery(e.target.value)} placeholder="Search test plans..." className="flex-1 bg-transparent text-[12px] font-mono text-foreground placeholder:text-muted-foreground outline-none" />
+                {testPlanQuery && <button onClick={() => setTestPlanQuery("")} className="text-muted-foreground hover:text-foreground shrink-0"><X size={10} /></button>}
+              </div>
+            </div>
+            <div className="flex-1 overflow-y-auto">
+              {isTestPlansLoading ? (
+                <div className="px-5 py-8 text-center text-[12px] font-mono text-muted-foreground">Loading test plans...</div>
+              ) : isTestPlansError ? (
+                <div className="px-5 py-8 text-center text-[12px] font-mono text-destructive">Unable to load test plans.</div>
+              ) : testPlans.length === 0 ? (
+                <div className="px-5 py-8 text-center text-[12px] font-mono text-muted-foreground">No test plans found.</div>
+              ) : testPlans.map((plan: any, index: number) => (
+                <div key={`${plan.path}:${index}`} className="px-5 py-4 border-b border-border">
+                  <div className="flex flex-col gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-[13px] font-semibold text-foreground">{plan.name}</span>
+                      <span className="text-[11px] font-mono text-muted-foreground border border-border px-2">{plan.stepCount} steps</span>
+                      <span className="text-[11px] font-mono text-muted-foreground border border-border px-2">{new Date(plan.lastModified).toLocaleString()}</span>
+                    </div>
+                    <div className="text-[12px] text-muted-foreground break-all">{String(plan.path ?? "").replace(/\\/g, "\\\\")}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="px-4 py-2 border-t border-border bg-muted/20 text-[11px] text-muted-foreground font-mono">
+              {testPlans.length} test plans
+            </div>
+          </div>
+        </div>
+      )}
+
       {showConsole && (
         <ConsolePanel
           showConsole={showConsole}
@@ -559,6 +614,7 @@ export function EditorShell(props: EditorShellProps) {
         addStepParentId={addStepParentId}
         addStepIdx={addStepIdx}
         instruments={instruments}
+        duts={duts}
         showPluginMgr={showPluginMgr}
         setShowPluginMgr={setShowPluginMgr}
         plugins={plugins}

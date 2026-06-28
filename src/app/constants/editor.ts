@@ -2,12 +2,12 @@ import type { StepStatus } from "../types/editor";
 
 export const TYPE_STRIPE: Record<string, string> = {
   sequence: "#3b82f6", rf: "#a855f7", measure: "#10b981",
-  network: "#06b6d4", hw: "#f97316", instrument: "#eab308", flow: "#64748b",
+  network: "#06b6d4", hw: "#f97316", instrument: "#eab308", dut: "#22c55e", flow: "#64748b",
 };
 
 export const TYPE_LABEL: Record<string, string> = {
   sequence: "SEQ", rf: "RF", measure: "MSR", network: "NET",
-  hw: "HW", instrument: "INST", flow: "FLOW",
+  hw: "HW", instrument: "INST", dut: "DUT", flow: "FLOW",
 };
 
 export const STATUS_COLOR: Record<StepStatus, string> = {

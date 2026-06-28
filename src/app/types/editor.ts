@@ -44,6 +44,13 @@ export interface DutItem {
   [key: string]: unknown;
 }
 
+export interface TestPlanItem {
+  name: string;
+  path: string;
+  stepCount: number;
+  lastModified: string;
+}
+
 export interface Plugin {
   id: string; name: string; version: string; author: string; description: string;
   state: "installed" | "installing" | "available"; steps?: LibraryItem[];
