@@ -162,8 +162,8 @@ export function AddStepModal({ library, onAdd, onClose }: { library: LibraryItem
 
 // ─── Plugin Manager ───────────────────────────────────────────────────────────
 
-export function PluginManager({ plugins, installedPlugins, onInstall, onUninstall, onUpload, onClose }: {
-  plugins: Plugin[]; installedPlugins: Plugin[]; onInstall: (id: string) => Promise<void>; onUninstall: (id: string) => Promise<void>; onUpload: (f: string) => void; onClose: () => void;
+export function PluginManager({ plugins, installedPlugins, onInstall, onUninstall, onUninstallPackage, onUpload, onClose }: {
+  plugins: Plugin[]; installedPlugins: Plugin[]; onInstall: (id: string) => Promise<void>; onUninstall: (id: string) => Promise<void>; onUninstallPackage: (id: string) => Promise<void>; onUpload: (f: string) => void; onClose: () => void;
 }) {
   const [tab, setTab] = useState<"installed" | "browse" | "upload">("installed");
   const [uploadFile, setUploadFile] = useState("");
@@ -188,6 +188,16 @@ export function PluginManager({ plugins, installedPlugins, onInstall, onUninstal
       setUninstallingId(null);
     }
   };
+
+  const handlePackageUninstall = async (id: string) => {
+  if (uninstallingId) return;
+  setUninstallingId(id);
+  try {
+    await onUninstallPackage(id);
+  } finally {
+    setUninstallingId(null);
+  }
+};
 
   const handleInstall = async (id: string) => {
     if (installingId) return;
@@ -279,13 +289,15 @@ export function PluginManager({ plugins, installedPlugins, onInstall, onUninstal
                           <Download size={11} /> {installingId === p.id ? "Installing..." : "Install"}
                         </button>
                       )}
-                      <button
-                        onClick={() => handleUninstall(p.id)}
-                        disabled={!p.isInstalled || uninstallingId === p.id}
-                        className="text-[11px] font-mono text-muted-foreground hover:text-red-500 border border-border hover:border-red-500/30 px-2.5 py-1 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                      >
-                        {uninstallingId === p.id ? "Uninstalling..." : "Uninstall"}
-                      </button>
+                      {p.isInstalled && (
+                        <button
+                          onClick={() => handlePackageUninstall(p.id)}
+                          disabled={uninstallingId === p.id}
+                          className="text-[11px] font-mono text-muted-foreground hover:text-red-500 border border-border hover:border-red-500/30 px-2.5 py-1 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                        >
+                          {uninstallingId === p.id ? "Uninstalling..." : "Uninstall"}
+                        </button>
+                      )}
                     </div>
                   </div>
                   <div className="mt-3 flex flex-wrap gap-1.5">

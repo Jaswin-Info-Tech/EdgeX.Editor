@@ -6,7 +6,7 @@ import { BASE_LIBRARY } from "../data/library";
 import type { CtxMenu, LibraryItem, LogEntry, PlanMeta, Plugin, RunState, StepStatus, TestStep } from "../types/editor";
 import { addToParent, deleteIn, flatAll, makeSequence, makeStep, moveIn, nowTs, parseFreq, resetAll, setStatusIn, uid, updateIn, toArray } from "../utils/editor";
 import { removePlugin } from "../api/plugin";
-import { installPackage } from "../api/package";
+import { installPackage, uninstallPackage } from "../api/package";
 // import { usePlugins } from "./usePlugin";
 import { useAvailablePackages } from "./usePackage";
 import { useInstalledPlugins, usePlugins, useInstruments } from "./usePlugin";
@@ -318,47 +318,81 @@ export function useEditorController() {
     setLogs([{ id: logId.current++, timestamp: nowTs(), level: "INFO", source: "EdgeX", message: "Plan reset. Ready." }]);
   };
 
-  const handleInstallPlugin = async (id: string) => {
-    const plugin = plugins.find(item => item.id === id);
-    const pluginName = plugin?.name ?? "Plugin";
-    const action = plugin?.isInstalled ? "updated" : "installed";
+  const refreshPluginData = useCallback(() => {
+  refetchInstalledPlugins();
+  refetchAvailablePackages();
+}, [refetchInstalledPlugins, refetchAvailablePackages]);
 
-    try {
-      setPlugins(prev => prev.map(item => item.id === id ? { ...item, state: "installing" } : item));
-      await installPackage(pluginName);
-      setPlugins(prev => prev.map(item => item.id === id
-        ? { ...item, state: "installed", isInstalled: true, status: "Installed", updateAvailable: false }
-        : item
-      ));
-      addLog("INFO", "Plugins", `${action === "updated" ? "Updated" : "Installed"}: ${pluginName}`);
-      toast.success(`${pluginName} ${action} successfully`);
-      refetchInstalledPlugins();
-      refetchAvailablePackages();
-    } catch {
-      setPlugins(prev => prev.map(item => item.id === id
-        ? { ...item, state: item.isInstalled ? "installed" : "available" }
-        : item
-      ));
-      addLog("ERROR", "Plugins", `Unable to ${action === "updated" ? "update" : "install"}: ${pluginName}`);
-      toast.error(`Failed to ${action === "updated" ? "update" : "install"} ${pluginName}`);
-    }
-  };
+const handleInstallPlugin = async (id: string) => {
+  const plugin = plugins.find(item => item.id === id);
+  const pluginName = plugin?.name ?? "Plugin";
+  const action = plugin?.isInstalled ? "updated" : "installed";
+
+  try {
+    setPlugins(prev => prev.map(item => item.id === id ? { ...item, state: "installing" } : item));
+    await installPackage(pluginName);
+    setPlugins(prev => prev.map(item => item.id === id
+      ? { ...item, state: "installed", isInstalled: true, status: "Installed", updateAvailable: false }
+      : item
+    ));
+    addLog("INFO", "Plugins", `${action === "updated" ? "Updated" : "Installed"}: ${pluginName}`);
+    toast.success(`${pluginName} ${action} successfully`);
+    refreshPluginData();
+    setTimeout(refreshPluginData, 1500); // safety net in case backend hasn't registered the install yet
+  } catch {
+    setPlugins(prev => prev.map(item => item.id === id
+      ? { ...item, state: item.isInstalled ? "installed" : "available" }
+      : item
+    ));
+    addLog("ERROR", "Plugins", `Unable to ${action === "updated" ? "update" : "install"}: ${pluginName}`);
+    toast.error(`Failed to ${action === "updated" ? "update" : "install"} ${pluginName}`);
+  }
+};
 
   const handleUninstallPlugin = async (id: string) => {
-    const plugin = installedPlugins.find(item => item.id === id);
-    const pluginName = plugin?.name ?? "Plugin";
-    const uninstallName = plugin?.uninstallName ?? pluginName;
-    try {
-      await removePlugin(uninstallName);
-      setInstalledPlugins(prev => prev.filter(item => item.id !== id));
-      addLog("INFO", "Plugins", `Uninstalled: ${pluginName}`);
-      toast.success(`${pluginName} uninstalled successfully`);
-      refetchInstalledPlugins();
-    } catch {
-      addLog("ERROR", "Plugins", `Unable to uninstall: ${pluginName}`);
-      toast.error(`Failed to uninstall ${pluginName}`);
-    }
-  };
+  const plugin = installedPlugins.find(item => item.id === id);
+  const pluginName = plugin?.name ?? "Plugin";
+  const uninstallName = plugin?.uninstallName ?? pluginName;
+  try {
+    await removePlugin(uninstallName);
+    setInstalledPlugins(prev => prev.filter(item => item.id !== id));
+    addLog("INFO", "Plugins", `Uninstalled: ${pluginName}`);
+    toast.success(`${pluginName} uninstalled successfully`);
+    refreshPluginData();
+    setTimeout(refreshPluginData, 1500);
+  } catch {
+    addLog("ERROR", "Plugins", `Unable to uninstall: ${pluginName}`);
+    toast.error(`Failed to uninstall ${pluginName}`);
+  }
+};
+
+const handleUninstallPackage = async (id: string) => {
+  const plugin = plugins.find(item => item.id === id);
+  const pluginName = plugin?.name ?? "Plugin";
+  const uninstallName = plugin?.uninstallName ?? pluginName;
+
+  try {
+    setPlugins(prev => prev.map(item => item.id === id ? { ...item, state: "uninstalling" } : item));
+    await uninstallPackage(uninstallName);
+
+    // Keep it in the list, just flip it back to "available"
+    setPlugins(prev => prev.map(item => item.id === id
+      ? { ...item, state: "available", isInstalled: false, status: "Available", updateAvailable: false }
+      : item
+    ));
+    // Drop the matching entry from Installed tab too
+    setInstalledPlugins(prev => prev.filter(item => item.uninstallName !== uninstallName && item.name !== pluginName));
+
+    addLog("INFO", "Plugins", `Uninstalled: ${pluginName}`);
+    toast.success(`${pluginName} uninstalled successfully`);
+    refreshPluginData();
+    setTimeout(refreshPluginData, 1500);
+  } catch {
+    setPlugins(prev => prev.map(item => item.id === id ? { ...item, state: "installed", isInstalled: true } : item));
+    addLog("ERROR", "Plugins", `Unable to uninstall: ${pluginName}`);
+    toast.error(`Failed to uninstall ${pluginName}`);
+  }
+};
 
   const handleUploadPlugin = (filename: string) => {
     const plugin: Plugin = {
@@ -434,6 +468,7 @@ export function useEditorController() {
     installedPlugins,
     handleInstallPlugin,
     handleUninstallPlugin,
+    handleUninstallPackage,
     setShowPluginMgr,
     instruments: instruments ?? [],
     isInstrumentsLoading,

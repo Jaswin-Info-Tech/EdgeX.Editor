@@ -51,6 +51,7 @@ interface EditorShellProps {
   installedPlugins: any;
   handleInstallPlugin: any;
   handleUninstallPlugin: any;
+  handleUninstallPackage: any;
   setShowPluginMgr: any;
   instruments: any[];
   isInstrumentsLoading: boolean;
@@ -138,6 +139,7 @@ export function EditorShell(props: EditorShellProps) {
     installedPlugins,
     handleInstallPlugin,
     handleUninstallPlugin,
+    handleUninstallPackage,
     setShowPluginMgr,
     instruments,
     isInstrumentsLoading,
@@ -436,6 +438,7 @@ export function EditorShell(props: EditorShellProps) {
         installedPlugins={installedPlugins}
         handleInstallPlugin={handleInstallPlugin}
         handleUninstallPlugin={handleUninstallPlugin}
+        handleUninstallPackage={handleUninstallPackage}
         handleUploadPlugin={handleUploadPlugin}
         contextMenu={contextMenu}
         setContextMenu={setContextMenu}

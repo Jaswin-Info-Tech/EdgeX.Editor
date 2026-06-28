@@ -16,3 +16,8 @@ export const installPackage = async (packageName: string) => {
   const response = await axiosClient.post("/packages/install", [packageName]);
   return response.data;
 };
+
+export const uninstallPackage = async (packageName: string) => {
+  const response = await axiosClient.post("/packages/uninstall", [packageName]);
+  return response.data;
+};
