@@ -2,21 +2,13 @@
 
 import axiosClient from "./client";
 
-export const getInstalledPackages = async (packageName = "") => {
-  const normalizedPackageName = packageName.trim();
-  const response = await axiosClient.get(
-    normalizedPackageName
-      ? `/packages/installed/${encodeURIComponent(normalizedPackageName)}`
-      : "/packages/installed"
-  );
+export const getInstalledPackages = async () => {
+  const response = await axiosClient.get("/packages/installed");
   return response.data;
 };
 
-export const getAvailablePackages = async (search = "") => {
-  const normalizedSearch = search.trim();
-  const response = await axiosClient.get("/packages/available", {
-    params: normalizedSearch ? { search: normalizedSearch } : undefined,
-  });
+export const getAvailablePackages = async () => {
+  const response = await axiosClient.get("/packages/available");
   return response.data.packages; 
 };
 
