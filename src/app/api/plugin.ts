@@ -12,6 +12,20 @@ export const getInstruments = async () => {
   return data;
 };
 
+export const getStepSchema = async (stepTypeName: string) => {
+  const { data } = await axiosClient.get("/testplans/steps/schema", {
+    params: {
+      stepTypeName,
+    },
+  });
+
+  return data;
+};
+
+export const composeTestPlan = async (payload: any) => {
+  const { data } = await axiosClient.post("/testplans/compose", payload); // ✅ send directly
+  return data;
+};
 export const getDuts = async () => {
   const { data } = await axiosClient.get("/plugins/duts");
   return data;

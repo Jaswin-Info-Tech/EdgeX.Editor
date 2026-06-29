@@ -6,3 +6,8 @@ export const getTestPlans = async (rootPath?: string) => {
   });
   return data;
 };
+
+export const getTestPlanEditorModel = async (path: string) => {
+  const { data } = await axiosClient.post("/testplans/editor-model", { path });
+  return data;
+};

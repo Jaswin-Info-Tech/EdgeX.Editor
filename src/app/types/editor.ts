@@ -4,13 +4,26 @@ export type RunState = "idle" | "running" | "paused" | "completed";
 export interface Property {
   key: string; label: string;
   type: "string" | "number" | "boolean" | "enum" | "frequency";
-  value: string | number | boolean; unit?: string; options?: string[]; group: string;
+  value: string | number | boolean; unit?: string; options?: string[]; group: string; isEditable?: boolean;
 }
 
 export interface TestStep {
-  id: string; name: string; type: string; status: StepStatus;
-  children?: TestStep[]; enabled: boolean; properties: Property[];
-  description?: string; breakpoint?: boolean;
+  id: string;
+  name: string;
+  type: string;
+  status: StepStatus;
+  children?: TestStep[];
+  enabled: boolean;
+  properties: Property[];
+  description?: string;
+  breakpoint?: boolean;
+  stepTypeName?: string;
+  typeName?: string;
+  fullName?: string;
+  className?: string;
+  // ✅ Add these
+  assembly?: string;
+  baseType?: string;
 }
 
 export interface LogEntry {
