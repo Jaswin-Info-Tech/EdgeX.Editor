@@ -61,7 +61,7 @@ export function NewPlanModal({ onClose, onCreate }: { onClose: () => void; onCre
           {step === 2 && (
             <div className="space-y-0">
               {[["Plan Name", meta.name], ["Author", meta.author || "—"], ["Version", meta.version],
-                ["DUT Name", meta.dutName || "—"], ["DUT Serial", meta.dutSerial || "—"], ["DUT Model", meta.dutModel || "—"]
+              ["DUT Name", meta.dutName || "—"], ["DUT Serial", meta.dutSerial || "—"], ["DUT Model", meta.dutModel || "—"]
               ].map(([k, v]) => (
                 <div key={k} className="flex items-center justify-between py-2 border-b border-border/50">
                   <span className="text-[12px] font-mono text-muted-foreground">{k}</span>
@@ -205,30 +205,75 @@ export function AddStepModal({ library, instruments, duts, onAdd, onClose }: { l
 }
 
 // ─── Plugin Manager ───────────────────────────────────────────────────────────
+export function PluginManager({
+  plugins, installedPlugins, onInstall, onUninstall, onUninstallPackage, onUpload, onClose,
+  installedSearch, setInstalledSearch, browseSearch, setBrowseSearch,
+}: {
+  plugins: Plugin[]; installedPlugins: Plugin[]; onInstall: (id: string) => Promise<void>; onUninstall: (id: string) => Promise<void>; onUninstallPackage: (id: string) => Promise<void>; onUpload: (file: File) => Promise<void>; onClose: () => void;
+  installedSearch: string; setInstalledSearch: (v: string) => void;
+  browseSearch: string; setBrowseSearch: (v: string) => void;
 
-export function PluginManager({ plugins, onInstall, onUpload, onClose }: {
-  plugins: Plugin[]; onInstall: (id: string) => void; onUpload: (file: File) => Promise<void> | void; onClose: () => void;
 }) {
   const [tab, setTab] = useState<"installed" | "browse" | "upload">("installed");
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
-  const [uploadError, setUploadError] = useState("");
-  const installed = plugins.filter(p => p.state === "installed");
-  const available = plugins.filter(p => p.state === "available");
+  const [installingId, setInstallingId] = useState<string | null>(null);
+  const [uninstallingId, setUninstallingId] = useState<string | null>(null);
+  // const [installedSearch, setInstalledSearch] = useState("");
+  // const [browseSearch, setBrowseSearch] = useState("");
 
-console.log(plugins,"llllqqq")
+  // const filteredInstalled = installed.filter(p =>
+  //   installedSearch.trim() === ""
+  //     ? true
+  //     : (p.name ?? "").toLowerCase().includes(installedSearch.trim().toLowerCase())
+  // );
 
+  // const filteredAvailable = available.filter(p =>
+  //   browseSearch.trim() === ""
+  //     ? true
+  //     : (p.name ?? "").toLowerCase().includes(browseSearch.trim().toLowerCase())
+  // );
+
+  const installed = installedPlugins;
+  const available = plugins;
   const handleUpload = async () => {
     if (!uploadFile) return;
     setUploading(true);
-    setUploadError("");
     try {
       await onUpload(uploadFile);
       setUploadFile(null);
-    } catch (error) {
-      setUploadError(error instanceof Error ? error.message : "Upload failed");
     } finally {
       setUploading(false);
+    }
+  };
+
+  const handleUninstall = async (id: string) => {
+    if (uninstallingId) return;
+    setUninstallingId(id);
+    try {
+      await onUninstall(id);
+    } finally {
+      setUninstallingId(null);
+    }
+  };
+
+  const handlePackageUninstall = async (id: string) => {
+    if (uninstallingId) return;
+    setUninstallingId(id);
+    try {
+      await onUninstallPackage(id);
+    } finally {
+      setUninstallingId(null);
+    }
+  };
+
+  const handleInstall = async (id: string) => {
+    if (installingId) return;
+    setInstallingId(id);
+    try {
+      await onInstall(id);
+    } finally {
+      setInstallingId(null);
     }
   };
 
@@ -248,35 +293,127 @@ console.log(plugins,"llllqqq")
             </button>
           ))}
         </div>
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto overflow-x-hidden">
           {tab === "installed" && (
             <div>
-              {installed.length === 0 && <div className="py-12 text-center text-[12px] text-muted-foreground font-mono">No plugins installed</div>}
-              {installed.map(p => (
+              <div className="sticky top-0 z-10 flex items-center gap-2 px-5 py-2.5 border-b border-border bg-card">
+                <Search size={12} className="text-muted-foreground shrink-0" />
+                <input
+                  value={installedSearch}
+                  onChange={e => setInstalledSearch(e.target.value)}
+                  placeholder="Search installed plugins..."
+                  className="flex-1 bg-transparent text-[12px] font-mono text-foreground placeholder:text-muted-foreground outline-none"
+                />
+                {installedSearch && (
+                  <button
+                    onClick={() => setInstalledSearch("")}
+                    className="text-muted-foreground hover:text-foreground shrink-0"
+                    title="Clear search"
+                  >
+                    <X size={12} />
+                  </button>
+                )}
+              </div>
+              {installed.length === 0 && (
+                <div className="py-12 text-center text-[12px] text-muted-foreground font-mono">
+                  No plugins installed
+                </div>
+              )}
+              {installed.map((p) => (
                 <div key={p.id} className="px-5 py-4 border-b border-border">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="text-[13px] font-semibold text-foreground">{p.name}</span>
-                        <span className="text-[11px] font-mono text-emerald-500 border border-emerald-500/30 bg-emerald-500/10 px-2">v{p.version}</span>
-                        <span className="text-[11px] font-mono text-emerald-500">● installed</span>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      {/* Header */}
+                      <div className="flex items-center gap-2 mb-2 min-w-0">
+                        <span
+                          className="flex-1 min-w-0 truncate text-[13px] font-semibold text-foreground"
+                          title={p.name}
+                        >
+                          {p.name}
+                        </span>
+
+                        {/* <span className="text-[11px] font-mono text-emerald-500 border border-emerald-500/30 bg-emerald-500/10 px-2 shrink-0">
+                          {p.version}
+                        </span> */}
+
+                        <span className="text-[11px] font-mono text-emerald-500 shrink-0">
+                          ● installed
+                        </span>
                       </div>
-                      {/* <div className="text-[12px] text-muted-foreground mb-1">{p.description}</div> */}
-                      {/* <div className="text-[11px] text-muted-foreground/60 font-mono">by {p.author} · {p.steps.length} steps</div> */}
+
+                      {/* Details */}
+                      <div className="space-y-1 text-[11px] font-mono text-muted-foreground">
+
+                        <div className="mt-3 flex flex-wrap gap-1.5">
+                          {p.baseType && (
+                            <span
+                              className="text-[11px] font-mono border border-border px-2 py-0.5 text-muted-foreground"
+                              title={p.baseType}
+                            >
+                              {p.baseType}
+                            </span>
+                          )}
+
+                          {p.assembly && (
+                            <span
+                              className="text-[11px] font-mono border border-border px-2 py-0.5 text-muted-foreground"
+                              title={p.assembly}
+                            >
+                              {p.assembly}
+                            </span>
+                          )}
+                        </div>
+                      </div>
                     </div>
-                    <button className="text-[11px] font-mono text-muted-foreground hover:text-red-500 border border-border hover:border-red-500/30 px-2.5 py-1 transition-colors">Uninstall</button>
+
+                    <button
+                      onClick={() => handleUninstall(p.id)}
+                      disabled={uninstallingId === p.id}
+                      className="shrink-0 text-[11px] font-mono text-muted-foreground hover:text-red-500 border border-border hover:border-red-500/30 px-2.5 py-1 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {uninstallingId === p.id ? "Removing..." : "Remove"}
+                    </button>
                   </div>
-                  <div className="mt-3 flex flex-wrap gap-1.5">
-                    {(p.steps ?? []).map(s => (
-                      <span key={s.id} className="text-[11px] font-mono border border-border px-2 py-0.5 text-muted-foreground">{s.name}</span>
+
+                  {/* <div className="mt-3 flex flex-wrap gap-1.5">
+                    {(p.steps ?? []).map((s) => (
+                      <span
+                        key={s.id}
+                        className="text-[11px] font-mono border border-border px-2 py-0.5 text-muted-foreground"
+                      >
+                        {s.name}
+                      </span>
                     ))}
-                  </div>
+                  </div> */}
                 </div>
               ))}
             </div>
           )}
           {tab === "browse" && (
             <div>
+              <div className="sticky top-0 z-10 flex items-center gap-2 px-5 py-2.5 border-b border-border bg-card">
+                <Search size={12} className="text-muted-foreground shrink-0" />
+                <input
+                  value={browseSearch}
+                  onChange={e => setBrowseSearch(e.target.value)}
+                  placeholder="Search available plugins..."
+                  className="flex-1 bg-transparent text-[12px] font-mono text-foreground placeholder:text-muted-foreground outline-none"
+                />
+                {browseSearch && (
+                  <button
+                    onClick={() => setBrowseSearch("")}
+                    className="text-muted-foreground hover:text-foreground shrink-0"
+                    title="Clear search"
+                  >
+                    <X size={12} />
+                  </button>
+                )}
+              </div>
+              {available.length === 0 && (
+                <div className="py-12 text-center text-[12px] text-muted-foreground font-mono">
+                  No packages available
+                </div>
+              )}
               {available.map(p => (
                 <div key={p.id} className="px-5 py-4 border-b border-border">
                   <div className="flex items-start justify-between">
@@ -288,10 +425,34 @@ console.log(plugins,"llllqqq")
                       <div className="text-[12px] text-muted-foreground mb-1">{p.description}</div>
                       <div className="text-[11px] text-muted-foreground/60 font-mono">by {p.author} · {p.steps?.length ?? 0} steps</div>
                     </div>
-                    <button onClick={() => onInstall(p.id)}
-                      className="text-[11px] font-mono text-primary border border-primary/40 bg-primary/10 hover:bg-primary/20 px-3 py-1 flex items-center gap-1.5 transition-colors">
-                      <Download size={11} /> Install
-                    </button>
+                    <div className="flex items-center gap-2 shrink-0">
+                      {p.isInstalled ? (
+                        <button
+                          onClick={() => handleInstall(p.id)}
+                          disabled={installingId === p.id}
+                          className="text-[11px] font-mono text-primary border border-primary/40 bg-primary/10 hover:bg-primary/20 px-3 py-1 flex items-center gap-1.5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          <Download size={11} /> {installingId === p.id ? "Updating..." : "Update"}
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => handleInstall(p.id)}
+                          disabled={installingId === p.id}
+                          className="text-[11px] font-mono text-primary border border-primary/40 bg-primary/10 hover:bg-primary/20 px-3 py-1 flex items-center gap-1.5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          <Download size={11} /> {installingId === p.id ? "Installing..." : "Install"}
+                        </button>
+                      )}
+                      {p.isInstalled && (
+                        <button
+                          onClick={() => handlePackageUninstall(p.id)}
+                          disabled={uninstallingId === p.id}
+                          className="text-[11px] font-mono text-muted-foreground hover:text-red-500 border border-border hover:border-red-500/30 px-2.5 py-1 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                        >
+                          {uninstallingId === p.id ? "Uninstalling..." : "Uninstall"}
+                        </button>
+                      )}
+                    </div>
                   </div>
                   <div className="mt-3 flex flex-wrap gap-1.5">
                     {(p.steps ?? []).map(s => <span key={s.id} className="text-[11px] font-mono border border-border px-2 py-0.5 text-muted-foreground">{s.name}</span>)}
@@ -302,25 +463,23 @@ console.log(plugins,"llllqqq")
           )}
           {tab === "upload" && (
             <div className="px-6 py-6 space-y-4">
-              <div className="text-[12px] text-muted-foreground font-mono">Upload a  <span className="text-primary">zip</span> or <span className="text-primary">.tappackage</span> or <span className="text-primary">.dll</span> file to install a custom plugin.</div>
+
+              <div className="text-[12px] text-muted-foreground font-mono">Upload a <span className="text-primary">.zip</span> file to install a custom plugin.</div>
               <label className="block border-2 border-dashed border-border hover:border-primary/60 p-10 text-center cursor-pointer transition-colors group">
                 <Upload size={28} className="mx-auto text-muted-foreground group-hover:text-primary transition-colors mb-3" />
                 <div className="text-[12px] font-mono text-muted-foreground">
                   {uploadFile ? <span className="text-primary">{uploadFile.name}</span> : <>Drop file or <span className="text-primary underline">browse</span></>}
                 </div>
-                <div className="text-[11px] text-muted-foreground/60 mt-1">zip, .tappackage, .dll supported</div>
-                <input type="file" className="hidden" accept=".zip,.tappackage,.dll" onChange={e => {
-                  if (e.target.files?.[0]) {
-                    setUploadFile(e.target.files[0]);
-                    setUploadError("");
-                  }
-                }} />
+                <div className="text-[11px] text-muted-foreground/60 mt-1">.zip</div>
+                <input type="file" className="hidden" accept=".tappackage,.dll" onChange={e => { if (e.target.files?.[0]) setUploadFile(e.target.files[0]); }} />
+
               </label>
               {uploadError && <div className="text-[12px] text-red-500 font-mono">{uploadError}</div>}
               {uploadFile && (
                 <button onClick={handleUpload} disabled={uploading}
                   className="w-full h-9 bg-primary text-primary-foreground text-[12px] font-mono font-semibold hover:bg-primary/90 disabled:opacity-60 flex items-center justify-center gap-2 transition-colors">
-                  {uploading ? <><RefreshCw size={12} className="animate-spin" /> Uploading...</> : <><Upload size={12} /> Upload Package</>}
+                  {uploading ? <><RefreshCw size={12} className="animate-spin" /> Installing...</> : <><Upload size={12} /> Upload Package</>}
+
                 </button>
               )}
             </div>

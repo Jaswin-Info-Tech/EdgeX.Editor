@@ -1,14 +1,16 @@
-import { useState, useEffect, useMemo, Dispatch, SetStateAction, ReactNode } from "react";
-import { getStepSchema } from "../../api/plugin"; // adjust path as needed
-import { Plug } from "lucide-react";
-import { Plus, Sliders, Trash2 } from "lucide-react";
+// PropertiesPanel.tsx
+import { Plus, Sliders, Trash2, Plug, Key } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import type { Dispatch, ReactNode, SetStateAction } from "react";
 import { TYPE_STRIPE } from "../../constants/editor";
 import { deleteIn, flatAll, formatFreq, updateIn } from "../../utils/editor";
 import { StatusPill, Toggle, TypeIcon } from "./atoms";
+import { getStepSchema } from "../../api/plugin";
 
 // ─── Shared styles ────────────────────────────────────────────────────────────
 const inputCls =
   "w-full bg-background border border-border px-2 py-1.5 text-[12px] font-mono text-foreground outline-none focus:border-primary disabled:cursor-not-allowed disabled:opacity-60 disabled:bg-muted/30";
+  "w-full bg-background border border-border px-2 py-1.5 text-[12px] font-mono text-foreground outline-none focus:border-primary";
 const labelCls =
   "block text-[11px] font-mono text-muted-foreground mb-1.5 uppercase tracking-wide";
 const wrapCls = "px-3 py-2.5 border-b border-border/40";
@@ -741,6 +743,10 @@ const editorContext = useMemo<EditorContext>(
       ),
     ).filter((group): group is string => group !== "Schema Properties");
     const hasDisplayedProperties = groups.length > 0;
+
+    const groups: string[] = Array.from(
+      new Set((selectedStep.properties || []).map((p: any) => p.group as string))
+    ).filter((group): group is string => group !== "Schema Properties");
 
     const stripe = TYPE_STRIPE[selectedStep.type] || "#64748b";
 

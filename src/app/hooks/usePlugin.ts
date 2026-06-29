@@ -1,8 +1,13 @@
 // hooks/useUsers.js
 import { useQuery } from "@tanstack/react-query";
+
+import { getInstalledPlugins, getInstruments, getSteps } from "../api/plugin";
+import type { InstrumentItem, LibraryItem } from "../types/editor";
+
 import { getDuts, getInstruments, getSteps } from "../api/plugin";
 import { getTestPlans } from "../api/testplans";
 import type { DutItem, InstrumentItem, LibraryItem, TestPlanItem } from "../types/editor";
+
 
 export const usePlugins = () => {
   return useQuery({
@@ -39,6 +44,14 @@ export const useInstruments = () => {
     },
   });
 };
+
+
+export function useInstalledPlugins(search: string = "") {
+  return useQuery({
+    queryKey: ["installed-plugins", search],
+    queryFn: () => getInstalledPlugins(search),
+  });
+}
 
 export const useDuts = () => {
   return useQuery<DutItem[]>({
@@ -79,3 +92,4 @@ export const useTestPlans = (rootPath?: string, enabled = true) => {
     },
   });
 };
+

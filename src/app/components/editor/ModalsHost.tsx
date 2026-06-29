@@ -15,8 +15,15 @@ interface ModalsHostProps {
   showPluginMgr: boolean;
   setShowPluginMgr: (value: boolean) => void;
   plugins: any[];
-  handleInstallPlugin: (id: string) => void;
-  handleUploadPlugin: (file: File) => Promise<void> | void;
+  installedPlugins: any[];
+  handleInstallPlugin: (id: string) => Promise<void>;
+  handleUninstallPlugin: (id: string) => Promise<void>;
+  handleUninstallPackage: (id: string) => Promise<void>;
+  handleUploadPlugin: (file: File) => Promise<void>;
+   installedSearch: string;
+  setInstalledSearch: (value: string) => void;
+  browseSearch: string;
+  setBrowseSearch: (value: string) => void;
   contextMenu: any;
   setContextMenu: (value: any) => void;
   handleContextAction: (action: string, stepId: string) => void;
@@ -37,8 +44,15 @@ export function ModalsHost({
   showPluginMgr,
   setShowPluginMgr,
   plugins,
+  installedPlugins,
   handleInstallPlugin,
+  handleUninstallPlugin,
+  handleUninstallPackage,
   handleUploadPlugin,
+  installedSearch,
+  setInstalledSearch,
+  browseSearch,
+  setBrowseSearch,
   contextMenu,
   setContextMenu,
   handleContextAction,
@@ -65,9 +79,16 @@ export function ModalsHost({
       {showPluginMgr && (
         <PluginManager
           plugins={plugins}
+          installedPlugins={installedPlugins}
           onInstall={handleInstallPlugin}
+          onUninstall={handleUninstallPlugin}
+          onUninstallPackage={handleUninstallPackage}
           onUpload={handleUploadPlugin}
           onClose={() => setShowPluginMgr(false)}
+          installedSearch={installedSearch}
+          setInstalledSearch={setInstalledSearch}
+          browseSearch={browseSearch}
+          setBrowseSearch={setBrowseSearch}
         />
       )}
       {contextMenu && (
