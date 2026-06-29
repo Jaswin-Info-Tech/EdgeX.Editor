@@ -8,13 +8,22 @@ export interface Property {
 }
 
 export interface TestStep {
-  id: string; name: string; type: string; status: StepStatus;
-  children?: TestStep[]; enabled: boolean; properties: Property[];
-  description?: string; breakpoint?: boolean;
+  id: string;
+  name: string;
+  type: string;
+  status: StepStatus;
+  children?: TestStep[];
+  enabled: boolean;
+  properties: Property[];
+  description?: string;
+  breakpoint?: boolean;
   stepTypeName?: string;
   typeName?: string;
   fullName?: string;
   className?: string;
+  // ✅ Add these
+  assembly?: string;
+  baseType?: string;
 }
 
 export interface LogEntry {

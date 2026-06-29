@@ -298,16 +298,20 @@ export function useEditorController() {
       return acc;
     }, {});
 
-    const stepTypeName = (step as TestStep & { stepTypeName?: string; typeName?: string; fullName?: string; className?: string }).stepTypeName
-      ?? (step as TestStep & { stepTypeName?: string; typeName?: string; fullName?: string; className?: string }).typeName
-      ?? (step as TestStep & { stepTypeName?: string; typeName?: string; fullName?: string; className?: string }).fullName
-      ?? (step as TestStep & { stepTypeName?: string; typeName?: string; fullName?: string; className?: string }).className
+    const stepTypeName = step.stepTypeName
+      ?? step.typeName
+      ?? step.fullName
+      ?? step.className
       ?? step.name;
 
     const formattedStep: any = {
       stepTypeName,
-      // name: step.name,
+      ...(step.name && { name: step.name }),
       properties: props,
+      // ✅ Include schema metadata in the composed output
+      // ...(step.assembly && { assembly: step.assembly }),
+      // ...(step.baseType && { baseType: step.baseType }),
+      // ...(step.fullName && { fullName: step.fullName }),
     };
 
     if (step.children?.length) {
@@ -318,14 +322,14 @@ export function useEditorController() {
   };
 
   const handleSave = async () => {
+
     const jsonData = {
-      outputPath: "C:\\TestPlans\\SamplePlan.UntitledTestPlan",
+      outputPath: "D:\\plans\\SamplePlan.TapPlan",
       overwrite: true,
       steps: plan.map(formatStepForCompose),
     };
 
-    console.log("JSON Object:", jsonData);
-    console.log("Formatted JSON:", JSON.stringify(jsonData, null, 2));
+    console.log(JSON.stringify(jsonData, null, 2));
 
     try {
       const response = await composeTestPlan(jsonData);

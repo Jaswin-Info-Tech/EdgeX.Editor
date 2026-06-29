@@ -1,5 +1,5 @@
 // PropertiesPanel.tsx
-import { Plus, Sliders, Trash2, Plug } from "lucide-react";
+import { Plus, Sliders, Trash2, Plug, Key } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import type { Dispatch, ReactNode, SetStateAction } from "react";
 import { TYPE_STRIPE } from "../../constants/editor";
@@ -586,11 +586,12 @@ export function PropertiesPanel({
 }: PropertiesPanelProps) {
   const [schemaResponse, setSchemaResponse] = useState<any>(null);
   const [schemaError, setSchemaError] = useState<string | null>(null);
-  console.log(selectedStep,"llallla")
   const [schemaPropertyValues, setSchemaPropertyValues] = useState<Record<string, any>>({});
   const getSchemaPropertyKey = (prop: any) => `${prop.displayName || prop.name} || ${prop.name}`;
   const schemaRecords = useMemo(() => getSchemaRecords(schemaResponse), [schemaResponse]);
   const schemaProperties = useMemo(() => schemaRecords[0]?.properties ?? [], [schemaRecords]);
+  // console.log(schemaRecords,"qqqqq")
+
   const editorContext = useMemo<EditorContext>(() => ({
     instrumentOptions: instruments
       .filter((instrument: any) => instrument?.canCreateInstance !== false && instrument?.isBrowsable !== false)
@@ -655,6 +656,9 @@ export function PropertiesPanel({
   const commitSchemaProperties = () => {
     if (!selectedStep) return;
 
+    // Pull metadata from the first schema record
+    const meta = schemaRecords[0];
+
     setPlan((prev: any) => updateIn(prev, selectedStep.id, (step: any) => {
       const existingProps = step.properties || [];
 
@@ -669,10 +673,17 @@ export function PropertiesPanel({
         };
       });
 
-      // Remove ALL existing "Schema Properties" group entries first, then add fresh ones
       const keepProps = existingProps.filter((item: any) => item.group !== "Schema Properties");
 
-      return { ...step, properties: [...keepProps, ...newProps] };
+      return {
+        ...step,
+        properties: [...keepProps, ...newProps],
+        // ✅ Persist schema metadata onto the step
+        stepTypeName: meta?.fullName ?? step.stepTypeName,
+        assembly: meta?.assembly ?? step.assembly,
+        baseType: meta?.baseType ?? step.baseType,
+        fullName: meta?.fullName ?? step.fullName,
+      };
     }));
   };
 
