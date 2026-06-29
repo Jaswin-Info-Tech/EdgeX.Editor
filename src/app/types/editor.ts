@@ -8,9 +8,22 @@ export interface Property {
 }
 
 export interface TestStep {
-  id: string; name: string; type: string; status: StepStatus;
-  children?: TestStep[]; enabled: boolean; properties: Property[];
-  description?: string; breakpoint?: boolean;
+  id: string;
+  name: string;
+  type: string;
+  status: StepStatus;
+  children?: TestStep[];
+  enabled: boolean;
+  properties: Property[];
+  description?: string;
+  breakpoint?: boolean;
+  stepTypeName?: string;
+  typeName?: string;
+  fullName?: string;
+  className?: string;
+  // ✅ Add these
+  assembly?: string;
+  baseType?: string;
 }
 
 export interface LogEntry {
@@ -24,6 +37,10 @@ export interface LibraryItem {
   baseType?: string;
   assembly?: string;
   defaultProps: Property[];
+  stepTypeName?: string;
+  typeName?: string;
+  fullName?: string;
+  className?: string;
 }
 
 export interface InstrumentItem {
@@ -32,6 +49,23 @@ export interface InstrumentItem {
   baseType: string;
   canCreateInstance: boolean;
   isBrowsable: boolean;
+}
+
+export interface DutItem {
+  name: string;
+  serialNumber: string;
+  model: string;
+  firmware: string;
+  assembly?: string;
+  baseType?: string;
+  [key: string]: unknown;
+}
+
+export interface TestPlanItem {
+  name: string;
+  path: string;
+  stepCount: number;
+  lastModified: string;
 }
 
 export interface Plugin {
@@ -54,4 +88,3 @@ export interface PlanMeta {
 }
 
 export interface CtxMenu { x: number; y: number; stepId: string; }
-

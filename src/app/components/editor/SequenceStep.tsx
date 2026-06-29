@@ -71,12 +71,15 @@ export function SequenceStep(props: SequenceStepProps) {
     return (
       <div key={step.id}>
         {dragLibItem && (
-          <div onDragOver={e => { e.preventDefault(); setDropIdx(idx); }} onDrop={e => handleSeqDrop(e, parentId, idx)}
+          <div onDragOver={e => { e.preventDefault(); e.stopPropagation(); setDropIdx(idx); }} onDrop={e => { e.stopPropagation(); handleSeqDrop(e, parentId, idx); }}
             className={`h-1 transition-colors mx-1 mb-0.5 ${dropIdx === idx ? "bg-primary" : "bg-transparent"}`} />
         )}
         <div
-          onClick={() => { setSelectedId(step.id); if (isTablet) setRightOpen(true); }}
-          onContextMenu={e => { e.preventDefault(); setContextMenu({ x: e.clientX, y: e.clientY, stepId: step.id }); setSelectedId(step.id); }}
+          onClick={e => {
+            e.stopPropagation();
+            console.log("SequenceStep click", step.id, step.name); setSelectedId(step.id); if (isTablet) setRightOpen(true);
+          }}
+          onContextMenu={e => { e.preventDefault(); e.stopPropagation(); setContextMenu({ x: e.clientX, y: e.clientY, stepId: step.id }); setSelectedId(step.id); }}
           className={`flex items-stretch border-b border-border cursor-pointer group transition-colors
             ${isSel ? "bg-primary/8" : "hover:bg-secondary/60"}
             ${step.status === "running" ? "bg-yellow-500/5" : ""}
@@ -138,7 +141,7 @@ export function SequenceStep(props: SequenceStepProps) {
           <div className="border-l-2 border-primary/20 ml-6">
             {step.children!.map((c, ci) => <SequenceStep key={c.id} {...props} step={c} parentId={step.id} idx={ci} />)}
             {dragLibItem && (
-              <div onDragOver={e => { e.preventDefault(); setDropIdx(-1); }} onDrop={e => handleSeqDrop(e, step.id, step.children!.length)}
+              <div onDragOver={e => { e.preventDefault(); e.stopPropagation(); setDropIdx(-1); }} onDrop={e => { e.stopPropagation(); handleSeqDrop(e, step.id, step.children!.length); }}
                 className={`h-8 flex items-center justify-center text-[11px] font-mono border border-dashed transition-colors m-1
                   ${dropIdx === -1 ? "border-primary text-primary bg-primary/5" : "border-border/50 text-muted-foreground/40"}`}>
                 + Drop into {step.name}
@@ -154,6 +157,6 @@ export function SequenceStep(props: SequenceStepProps) {
     );
   };
 
-return renderSeqStep(step, parentId, idx); 
+  return renderSeqStep(step, parentId, idx);
 
 }

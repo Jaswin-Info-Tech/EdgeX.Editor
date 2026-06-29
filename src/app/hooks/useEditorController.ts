@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { DragEvent } from "react";
 import { toast } from "sonner";
 import { useDragResize } from "../components/editor/resizable";
@@ -12,6 +12,13 @@ import { useAvailablePackages } from "./usePackage";
 import { useInstalledPlugins, usePlugins, useInstruments } from "./usePlugin";
 import { useWindowWidth } from "./useWindowWidth";
 import { useDebounce } from "./useDebounce";
+
+import { usePackages } from "./usePackage";
+import { useDuts, usePlugins, useInstruments } from "./usePlugin";
+import { usePackageUpload } from "./usePackageUpload";
+import { useWindowWidth } from "./useWindowWidth";
+import { composeTestPlan } from "../api/plugin";
+
 
 
 export function useEditorController() {
@@ -165,8 +172,19 @@ export function useEditorController() {
       .flatMap(plugin => (plugin.steps ?? []).map(step => ({ ...step, pluginId: plugin.id }))),
     // ...plugins.filter(plugin => plugin.status === "installed").flatMap(plugin => plugin.steps.map(step => ({ ...step, pluginId: plugin.id })) ),
   ];
+
   const { data } = usePlugins();
+  const library: LibraryItem[] = useMemo(() => {
+    const apiSteps = Array.isArray(data) ? data : [];
+    const pluginSteps = plugins
+      .filter(plugin => plugin.state === "installed")
+      .flatMap(plugin => (plugin.steps ?? []).map(step => ({ ...step, pluginId: plugin.id })));
+
+    const baseCatalog = apiSteps.length > 0 ? apiSteps : BASE_LIBRARY;
+    return [...baseCatalog, ...pluginSteps];
+  }, [data, plugins]);
   const { data: instruments, isLoading: isInstrumentsLoading, isError: isInstrumentsError } = useInstruments();
+  const { data: duts, isLoading: isDutsLoading, isError: isDutsError } = useDuts();
 
   const selectedStep = selectedId ? flatAll(plan).find(step => step.id === selectedId) : null;
   const toggleExpand = (id: string) => setExpanded(prev => {
@@ -433,15 +451,56 @@ export function useEditorController() {
       addLog("ERROR", "Plugins", `Unable to install: ${file.name}`);
       toast.error(`Failed to upload ${file.name}`, { id: toastId });
     }
+
   };
 
-  const handleSave = () => {
-    const blob = new Blob([JSON.stringify({ meta: planMeta, plan }, null, 2)], { type: "application/json" });
-    const anchor = document.createElement("a");
-    anchor.href = URL.createObjectURL(blob);
-    anchor.download = `${planMeta.name.replace(/\s+/g, "_")}.edgex`;
-    anchor.click();
-    addLog("INFO", "FileIO", `Saved: ${planMeta.name}.edgex`);
+  const formatStepForCompose = (step: TestStep): any => {
+    const props = (step.properties || []).reduce((acc: Record<string, any>, prop: any) => {
+      acc[prop.label] = prop.value;
+      return acc;
+    }, {});
+
+    const stepTypeName = step.stepTypeName
+      ?? step.typeName
+      ?? step.fullName
+      ?? step.className
+      ?? step.name;
+
+    const formattedStep: any = {
+      stepTypeName,
+      ...(step.name && { name: step.name }),
+      properties: props,
+      // ✅ Include schema metadata in the composed output
+      // ...(step.assembly && { assembly: step.assembly }),
+      // ...(step.baseType && { baseType: step.baseType }),
+      // ...(step.fullName && { fullName: step.fullName }),
+    };
+
+    if (step.children?.length) {
+      formattedStep.children = step.children.map(formatStepForCompose);
+    }
+
+    return formattedStep;
+  };
+
+  const handleSave = async () => {
+
+    const jsonData = {
+      outputPath: "D:\\plans\\SamplePlan.TapPlan",
+      overwrite: true,
+      steps: plan.map(formatStepForCompose),
+    };
+
+    console.log(JSON.stringify(jsonData, null, 2));
+
+    try {
+      const response = await composeTestPlan(jsonData);
+      addLog("INFO", "TestPlans", `Saved: ${jsonData.outputPath}`);
+      return response;
+    } catch (error) {
+      console.error("Failed to compose test plan:", error);
+      addLog("ERROR", "TestPlans", "Failed to save test plan.");
+    }
   };
 
   const handleSeqDrop = (event: DragEvent, parentId: string | null, idx: number) => {
@@ -503,6 +562,9 @@ export function useEditorController() {
     instruments: instruments ?? [],
     isInstrumentsLoading,
     isInstrumentsError,
+    duts: duts ?? [],
+    isDutsLoading,
+    isDutsError,
     plan,
     planMeta,
     stats,

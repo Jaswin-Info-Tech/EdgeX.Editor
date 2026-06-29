@@ -1,4 +1,4 @@
-import { Check, Database, Download, Filter, FolderPlus, List, Package, Search, X } from "lucide-react";
+import { Check, Database, Filter, FolderPlus, List, Search, X } from "lucide-react";
 import { TYPE_STRIPE } from "../../constants/editor";
 import type { InstrumentItem, LibraryItem } from "../../types/editor";
 import { flatAll } from "../../utils/editor";
@@ -22,8 +22,8 @@ function instrumentToLibraryItem(instrument: InstrumentItem): LibraryItem {
 }
 
 interface LeftPanelProps {
-  leftTab: "plan" | "library" | "plugins" | "instruments";
-  setLeftTab: (value: "plan" | "library" | "plugins" | "instruments") => void;
+  leftTab: "plan" | "library" | "instruments";
+  setLeftTab: (value: "plan" | "library" | "instruments") => void;
   plan: any[];
   hasPlan: boolean;
   expanded: Set<string>;
@@ -110,7 +110,6 @@ export function LeftPanel({
         {([
           ["plan", "Plan", <List size={12} />],
           ["library", "Steps", <Database size={12} />],
-          ["plugins", "Plugins", <Package size={12} />],
         ] as const).map(([tab, label, icon]) => (
           <button
             key={tab}
@@ -250,83 +249,6 @@ export function LeftPanel({
             <span className="ml-auto text-[10px] font-mono text-primary/60">drag or double-click</span>
           </div>
         </>
-      )}
-      {leftTab === "instruments" && (
-        <>
-          <div className="px-3 py-3 border-b border-border shrink-0">
-            <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">Instruments</div>
-          </div>
-          <div className="flex items-center gap-2 px-2 py-2 border-b border-border shrink-0">
-            <div className="flex items-center gap-2 border border-border px-2.5 py-1.5 bg-background flex-1">
-              <Search size={11} className="text-muted-foreground shrink-0" />
-              <input value={instrumentSearch} onChange={e => setInstrumentSearch(e.target.value)} placeholder="Search instruments..." className="flex-1 bg-transparent text-[12px] font-mono text-foreground placeholder:text-muted-foreground outline-none" />
-              {instrumentSearch && <button onClick={() => setInstrumentSearch("")} className="text-muted-foreground hover:text-foreground shrink-0"><X size={10} /></button>}
-            </div>
-          </div>
-          <div className="flex-1 overflow-y-auto">
-            {isInstrumentsLoading ? (
-              <div className="px-4 py-6 text-center text-[12px] font-mono text-muted-foreground">Loading instruments...</div>
-            ) : isInstrumentsError ? (
-              <div className="px-4 py-6 text-center text-[12px] font-mono text-destructive">Unable to load instruments.</div>
-            ) : instruments.length === 0 ? (
-              <div className="px-4 py-6 text-center text-[12px] font-mono text-muted-foreground">{instrumentSearch ? "No matching instruments." : "No instruments available."}</div>
-            ) : instruments.map(instrument => (
-              <div
-                key={`${instrument.name}:${instrument.assembly}`}
-                draggable
-                onDragStart={() => setDragLibItem(instrumentToLibraryItem(instrument))}
-                onDragEnd={() => { setDragLibItem(null); setDropIdx(null); }}
-                onDoubleClick={() => {
-                  if (!hasPlan) {
-                    setShowNewPlan(true);
-                    return;
-                  }
-                  handleAddStep(instrumentToLibraryItem(instrument), selectedStep?.type === "sequence" ? selectedId : null);
-                }}
-                className="flex items-start gap-2.5 px-3 py-2.5 cursor-grab group border-b border-border/30 transition-colors"
-              >
-                <div className="w-[3px] h-4 mt-0.5 shrink-0" style={{ background: TYPE_STRIPE.instrument || "#eab308" }} />
-                <div className="flex-1 min-w-0">
-                  <div className="text-[12px] font-mono text-foreground font-medium group-hover:text-primary transition-colors">{instrument.name}</div>
-                  <div className="text-[11px] text-muted-foreground mt-1 leading-tight">Base Type: {instrument.baseType}</div>
-                  <div className="text-[11px] text-muted-foreground mt-0.5 leading-tight">Assembly: {instrument.assembly}</div>
-                </div>
-              </div>
-            ))}
-          </div>
-          <div className="px-3 h-7 border-t border-border flex items-center shrink-0">
-            <span className="text-[10px] font-mono text-muted-foreground">{instruments.length} instruments</span>
-            <span className="ml-auto text-[10px] font-mono text-primary/60">drag or double-click</span>
-          </div>
-        </>
-      )}
-
-      {leftTab === "plugins" && (
-        <div className="flex-1 flex flex-col overflow-hidden">
-          <div className="flex-1 overflow-y-auto divide-y divide-border/40">
-            {plugins.map(plugin => (
-              <div key={plugin.id} className="px-3 py-3">
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-[12px] font-mono text-foreground font-medium">{plugin.name}</span>
-                  <span className={`text-[10px] font-mono font-semibold ${plugin.state === "installed" ? "text-emerald-500" : plugin.state === "installing" ? "text-yellow-500 animate-pulse" : "text-muted-foreground"}`}>
-                    {plugin.state === "installed" ? "ACTIVE" : plugin.state === "installing" ? "INSTALLING" : "AVAILABLE"}
-                  </span>
-                </div>
-                <div className="text-[11px] text-muted-foreground font-mono">v{plugin.version} - {plugin.steps?.length ?? 0} steps</div>
-                {plugin.state === "available" && (
-                  <button onClick={() => handleInstallPlugin(plugin.id)} className="mt-1.5 text-[11px] font-mono text-primary border border-primary/30 px-2 py-0.5 hover:bg-primary/10 flex items-center gap-1">
-                    <Download size={10} /> Install
-                  </button>
-                )}
-              </div>
-            ))}
-          </div>
-          <div className="px-3 py-2 border-t border-border">
-            <button onClick={() => setShowPluginMgr(true)} className="w-full h-8 border border-border text-[12px] font-mono text-muted-foreground hover:text-foreground hover:bg-secondary flex items-center justify-center gap-2 transition-colors">
-              <Package size={12} /> Manage Plugins
-            </button>
-          </div>
-        </div>
       )}
     </>
   );

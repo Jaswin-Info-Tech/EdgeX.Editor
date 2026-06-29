@@ -10,6 +10,8 @@ interface ModalsHostProps {
   handleAddStep: (item: any, parentId?: string | null, atIdx?: number) => void;
   addStepParentId: string | null;
   addStepIdx: number | undefined;
+  instruments: any[];
+  duts: any[];
   showPluginMgr: boolean;
   setShowPluginMgr: (value: boolean) => void;
   plugins: any[];
@@ -37,6 +39,8 @@ export function ModalsHost({
   handleAddStep,
   addStepParentId,
   addStepIdx,
+  instruments,
+  duts,
   showPluginMgr,
   setShowPluginMgr,
   plugins,
@@ -52,7 +56,9 @@ export function ModalsHost({
   contextMenu,
   setContextMenu,
   handleContextAction,
-}: ModalsHostProps) {
+}: ModalsHostProps)
+{
+  // console.log(plugins,"kkkkkk") 
   return (
     <>
       {showNewPlan && (
@@ -64,6 +70,8 @@ export function ModalsHost({
       {showAddStep && (
         <AddStepModal
           library={library}
+          instruments={instruments}
+          duts={duts}
           onClose={() => setShowAddStep(false)}
           onAdd={item => handleAddStep(item, addStepParentId, addStepIdx)}
         />
