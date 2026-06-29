@@ -9,6 +9,7 @@ import { usePackages } from "./usePackage";
 import { useDuts, usePlugins, useInstruments } from "./usePlugin";
 import { usePackageUpload } from "./usePackageUpload";
 import { useWindowWidth } from "./useWindowWidth";
+import { composeTestPlan } from "../api/plugin";
 
 
 export function useEditorController() {
@@ -294,13 +295,53 @@ export function useEditorController() {
     // setShowPluginMgr(false);
   };
 
-  const handleSave = () => {
-    const blob = new Blob([JSON.stringify({ meta: planMeta, plan }, null, 2)], { type: "application/json" });
-    const anchor = document.createElement("a");
-    anchor.href = URL.createObjectURL(blob);
-    anchor.download = `${planMeta.name.replace(/\s+/g, "_")}.edgex`;
-    anchor.click();
-    addLog("INFO", "FileIO", `Saved: ${planMeta.name}.edgex`);
+  const formatStepForCompose = (step: TestStep): any => {
+    const props = (step.properties || []).reduce((acc: Record<string, any>, prop: any) => {
+      acc[prop.label] = prop.value;
+      return acc;
+    }, {});
+
+    const stepTypeName = step.stepTypeName
+      ?? step.typeName
+      ?? step.fullName
+      ?? step.className
+      ?? step.name;
+
+    const formattedStep: any = {
+      stepTypeName,
+      ...(step.name && { name: step.name }),
+      properties: props,
+      // ✅ Include schema metadata in the composed output
+      // ...(step.assembly && { assembly: step.assembly }),
+      // ...(step.baseType && { baseType: step.baseType }),
+      // ...(step.fullName && { fullName: step.fullName }),
+    };
+
+    if (step.children?.length) {
+      formattedStep.children = step.children.map(formatStepForCompose);
+    }
+
+    return formattedStep;
+  };
+
+  const handleSave = async () => {
+
+    const jsonData = {
+      outputPath: "D:\\plans\\SamplePlan.TapPlan",
+      overwrite: true,
+      steps: plan.map(formatStepForCompose),
+    };
+
+    console.log(JSON.stringify(jsonData, null, 2));
+
+    try {
+      const response = await composeTestPlan(jsonData);
+      addLog("INFO", "TestPlans", `Saved: ${jsonData.outputPath}`);
+      return response;
+    } catch (error) {
+      console.error("Failed to compose test plan:", error);
+      addLog("ERROR", "TestPlans", "Failed to save test plan.");
+    }
   };
 
   const handleSeqDrop = (event: DragEvent, parentId: string | null, idx: number) => {

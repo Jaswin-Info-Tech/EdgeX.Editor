@@ -75,8 +75,11 @@ export function SequenceStep(props: SequenceStepProps) {
             className={`h-1 transition-colors mx-1 mb-0.5 ${dropIdx === idx ? "bg-primary" : "bg-transparent"}`} />
         )}
         <div
-          onClick={() => { setSelectedId(step.id); if (isTablet) setRightOpen(true); }}
-          onContextMenu={e => { e.preventDefault(); setContextMenu({ x: e.clientX, y: e.clientY, stepId: step.id }); setSelectedId(step.id); }}
+          onClick={e => {
+            e.stopPropagation();
+            console.log("SequenceStep click", step.id, step.name); setSelectedId(step.id); if (isTablet) setRightOpen(true);
+          }}
+          onContextMenu={e => { e.preventDefault(); e.stopPropagation(); setContextMenu({ x: e.clientX, y: e.clientY, stepId: step.id }); setSelectedId(step.id); }}
           className={`flex items-stretch border-b border-border cursor-pointer group transition-colors
             ${isSel ? "bg-primary/8" : "hover:bg-secondary/60"}
             ${step.status === "running" ? "bg-yellow-500/5" : ""}
@@ -154,6 +157,6 @@ export function SequenceStep(props: SequenceStepProps) {
     );
   };
 
-return renderSeqStep(step, parentId, idx); 
+  return renderSeqStep(step, parentId, idx);
 
 }

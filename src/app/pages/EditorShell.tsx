@@ -260,6 +260,9 @@ export function EditorShell(props: EditorShellProps) {
     <PropertiesPanel
       selectedStep={selectedStep}
       selectedId={selectedId}
+      plan={plan}
+      instruments={instruments}
+      testSteps={displayLibrary}
       setPlan={setPlan}
       setSelectedId={setSelectedId}
       setAddStepParentId={setAddStepParentId}
