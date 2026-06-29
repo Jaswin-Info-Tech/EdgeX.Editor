@@ -7,9 +7,11 @@ export const getInstalledPackages = async () => {
   return response.data;
 };
 
-export const getAvailablePackages = async () => {
-  const response = await axiosClient.get("/packages/available");
-  return response.data.packages; 
+export const getAvailablePackages = async (search?: string) => {
+  const response = await axiosClient.get("/packages/available", {
+    params: search ? { search } : {},
+  });
+  return response.data.packages;
 };
 
 export const installPackage = async (packageName: string) => {

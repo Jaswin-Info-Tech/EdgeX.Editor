@@ -39,9 +39,9 @@ export const useInstruments = () => {
   });
 };
 
-export function useInstalledPlugins() {
+export function useInstalledPlugins(search: string = "") {
   return useQuery({
-    queryKey: ["installedPlugins"],
-    queryFn: getInstalledPlugins,
+    queryKey: ["installed-plugins", search],
+    queryFn: () => getInstalledPlugins(search),
   });
 }

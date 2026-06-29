@@ -9,10 +9,9 @@ export const usePackages = () => {
   });
 };
 
-export const useAvailablePackages = () => {
+export function useAvailablePackages(search: string = "") {
   return useQuery({
-    queryKey: ["available-packages"],
-    queryFn: getAvailablePackages,
+    queryKey: ["available-packages", search],
+    queryFn: () => getAvailablePackages(search),
   });
-};
-
+}

@@ -52,6 +52,10 @@ interface EditorShellProps {
   handleInstallPlugin: any;
   handleUninstallPlugin: any;
   handleUninstallPackage: any;
+  installedSearch: any;
+  setInstalledSearch: any;
+  browseSearch: any;
+  setBrowseSearch: any;
   setShowPluginMgr: any;
   instruments: any[];
   isInstrumentsLoading: boolean;
@@ -140,6 +144,10 @@ export function EditorShell(props: EditorShellProps) {
     handleInstallPlugin,
     handleUninstallPlugin,
     handleUninstallPackage,
+    installedSearch,
+    setInstalledSearch,
+    browseSearch,
+    setBrowseSearch,
     setShowPluginMgr,
     instruments,
     isInstrumentsLoading,
@@ -440,6 +448,10 @@ export function EditorShell(props: EditorShellProps) {
         handleUninstallPlugin={handleUninstallPlugin}
         handleUninstallPackage={handleUninstallPackage}
         handleUploadPlugin={handleUploadPlugin}
+        installedSearch={installedSearch}
+        setInstalledSearch={setInstalledSearch}
+        browseSearch={browseSearch}
+        setBrowseSearch={setBrowseSearch}
         contextMenu={contextMenu}
         setContextMenu={setContextMenu}
         handleContextAction={handleContextAction}

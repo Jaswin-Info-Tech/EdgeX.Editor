@@ -162,29 +162,36 @@ export function AddStepModal({ library, onAdd, onClose }: { library: LibraryItem
 
 // ─── Plugin Manager ───────────────────────────────────────────────────────────
 
-export function PluginManager({ plugins, installedPlugins, onInstall, onUninstall, onUninstallPackage, onUpload, onClose }: {
+export function PluginManager({
+  plugins, installedPlugins, onInstall, onUninstall, onUninstallPackage, onUpload, onClose,
+  installedSearch, setInstalledSearch, browseSearch, setBrowseSearch,
+}: {
   plugins: Plugin[]; installedPlugins: Plugin[]; onInstall: (id: string) => Promise<void>; onUninstall: (id: string) => Promise<void>; onUninstallPackage: (id: string) => Promise<void>; onUpload: (file: File) => Promise<void>; onClose: () => void;
+  installedSearch: string; setInstalledSearch: (v: string) => void;
+  browseSearch: string; setBrowseSearch: (v: string) => void;
 }) {
   const [tab, setTab] = useState<"installed" | "browse" | "upload">("installed");
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [installingId, setInstallingId] = useState<string | null>(null);
   const [uninstallingId, setUninstallingId] = useState<string | null>(null);
-  const [installedSearch, setInstalledSearch] = useState("");
-  const [browseSearch, setBrowseSearch] = useState("");
+  // const [installedSearch, setInstalledSearch] = useState("");
+  // const [browseSearch, setBrowseSearch] = useState("");
+
+  // const filteredInstalled = installed.filter(p =>
+  //   installedSearch.trim() === ""
+  //     ? true
+  //     : (p.name ?? "").toLowerCase().includes(installedSearch.trim().toLowerCase())
+  // );
+
+  // const filteredAvailable = available.filter(p =>
+  //   browseSearch.trim() === ""
+  //     ? true
+  //     : (p.name ?? "").toLowerCase().includes(browseSearch.trim().toLowerCase())
+  // );
+
   const installed = installedPlugins;
   const available = plugins;
-  const filteredInstalled = installed.filter(p =>
-    installedSearch.trim() === ""
-      ? true
-      : (p.name ?? "").toLowerCase().includes(installedSearch.trim().toLowerCase())
-  );
-
-  const filteredAvailable = available.filter(p =>
-    browseSearch.trim() === ""
-      ? true
-      : (p.name ?? "").toLowerCase().includes(browseSearch.trim().toLowerCase())
-  );
   const handleUpload = async () => {
     if (!uploadFile) return;
     setUploading(true);
@@ -253,13 +260,22 @@ export function PluginManager({ plugins, installedPlugins, onInstall, onUninstal
                   placeholder="Search installed plugins..."
                   className="flex-1 bg-transparent text-[12px] font-mono text-foreground placeholder:text-muted-foreground outline-none"
                 />
+                {installedSearch && (
+                  <button
+                    onClick={() => setInstalledSearch("")}
+                    className="text-muted-foreground hover:text-foreground shrink-0"
+                    title="Clear search"
+                  >
+                    <X size={12} />
+                  </button>
+                )}
               </div>
-              {filteredInstalled.length === 0 && (
+              {installed.length === 0 && (
                 <div className="py-12 text-center text-[12px] text-muted-foreground font-mono">
-                  {installed.length === 0 ? "No plugins installed" : "No matching plugins"}
+                  No plugins installed
                 </div>
               )}
-              {filteredInstalled.map((p) => (
+              {installed.map((p) => (
                 <div key={p.id} className="px-5 py-4 border-b border-border">
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex-1 min-w-0">
@@ -339,13 +355,22 @@ export function PluginManager({ plugins, installedPlugins, onInstall, onUninstal
                   placeholder="Search available plugins..."
                   className="flex-1 bg-transparent text-[12px] font-mono text-foreground placeholder:text-muted-foreground outline-none"
                 />
+                {browseSearch && (
+                  <button
+                    onClick={() => setBrowseSearch("")}
+                    className="text-muted-foreground hover:text-foreground shrink-0"
+                    title="Clear search"
+                  >
+                    <X size={12} />
+                  </button>
+                )}
               </div>
-              {filteredAvailable.length === 0 && (
+              {available.length === 0 && (
                 <div className="py-12 text-center text-[12px] text-muted-foreground font-mono">
-                  {available.length === 0 ? "No packages available" : "No matching packages"}
+                  No packages available
                 </div>
               )}
-              {filteredAvailable.map(p => (
+              {available.map(p => (
                 <div key={p.id} className="px-5 py-4 border-b border-border">
                   <div className="flex items-start justify-between">
                     <div>

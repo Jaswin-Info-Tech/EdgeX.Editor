@@ -11,14 +11,20 @@ import { installPackage, uninstallPackage } from "../api/package";
 import { useAvailablePackages } from "./usePackage";
 import { useInstalledPlugins, usePlugins, useInstruments } from "./usePlugin";
 import { useWindowWidth } from "./useWindowWidth";
+import { useDebounce } from "./useDebounce";
 
 
 export function useEditorController() {
   const winW = useWindowWidth();
   const isDesktop = winW >= 1280;
   const isTablet = winW >= 768 && winW < 1024;
-  const { data: installedPluginsData, refetch: refetchInstalledPlugins } = useInstalledPlugins();
-  const { data: availablePackagesData, refetch: refetchAvailablePackages } = useAvailablePackages();
+  const [installedSearch, setInstalledSearch] = useState("");
+  const [browseSearch, setBrowseSearch] = useState("");
+  const debouncedInstalledSearch = useDebounce(installedSearch);
+  const debouncedBrowseSearch = useDebounce(browseSearch);
+
+  const { data: installedPluginsData, refetch: refetchInstalledPlugins } = useInstalledPlugins(debouncedInstalledSearch);
+  const { data: availablePackagesData, refetch: refetchAvailablePackages } = useAvailablePackages(debouncedBrowseSearch)
   const [plan, setPlan] = useState<TestStep[]>([]);
   const [planMeta, setPlanMeta] = useState<PlanMeta>({ name: "Untitled Test Plan", description: "", author: "", version: "1.0.0", dutName: "", dutSerial: "", dutModel: "", dutFirmware: "" });
   const [hasPlan, setHasPlan] = useState(false);
@@ -486,6 +492,10 @@ export function useEditorController() {
     handleAddStep,
     plugins,
     installedPlugins,
+    installedSearch,
+    setInstalledSearch,
+    browseSearch,
+    setBrowseSearch,
     handleInstallPlugin,
     handleUninstallPlugin,
     handleUninstallPackage,

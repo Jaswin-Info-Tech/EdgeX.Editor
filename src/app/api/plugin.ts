@@ -2,8 +2,10 @@
 
 import axiosClient from "./client";
 
-export const getInstalledPlugins = async () => {
-  const { data } = await axiosClient.get("/plugins");
+export const getInstalledPlugins = async (search?: string) => {
+  const { data } = await axiosClient.get("/plugins", {
+    params: search ? { search } : {},
+  });
   return data;
 };
 
