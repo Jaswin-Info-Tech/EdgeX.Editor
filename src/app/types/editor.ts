@@ -70,7 +70,16 @@ export interface TestPlanItem {
 
 export interface Plugin {
   id: string; name: string; version: string; author: string; description: string;
-  state: "installed" | "installing" | "available"; steps?: LibraryItem[];
+  state?: "installed" | "installing" | "uninstalling" | "available";
+  steps?: LibraryItem[];
+  isInstalled?: boolean;
+  uninstallName?: string;
+  packageName?: string;
+  pluginName?: string;
+  assembly?: string;
+  baseType?: string;
+  updateAvailable?: boolean;
+  status?: string;
 }
 
 export interface PlanMeta {
