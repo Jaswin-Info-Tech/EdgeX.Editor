@@ -35,7 +35,8 @@ export const uploadPlugin = async (file: File) => {
     headers: { "Content-Type": "multipart/form-data" },
   });
   return response.data;
-=======
+};
+
 export const getStepSchema = async (stepTypeName: string) => {
   const { data } = await axiosClient.get("/testplans/steps/schema", {
     params: {

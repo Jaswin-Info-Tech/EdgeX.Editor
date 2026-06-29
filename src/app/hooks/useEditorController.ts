@@ -9,14 +9,12 @@ import { removePlugin, uploadPlugin } from "../api/plugin";
 import { installPackage, uninstallPackage } from "../api/package";
 // import { usePlugins } from "./usePlugin";
 import { useAvailablePackages } from "./usePackage";
-import { useInstalledPlugins, usePlugins, useInstruments } from "./usePlugin";
+import { useInstalledPlugins, useDuts, usePlugins, useInstruments } from "./usePlugin";
 import { useWindowWidth } from "./useWindowWidth";
 import { useDebounce } from "./useDebounce";
 
 import { usePackages } from "./usePackage";
-import { useDuts, usePlugins, useInstruments } from "./usePlugin";
 import { usePackageUpload } from "./usePackageUpload";
-import { useWindowWidth } from "./useWindowWidth";
 import { composeTestPlan } from "../api/plugin";
 
 
@@ -165,13 +163,6 @@ export function useEditorController() {
   const addLog = useCallback((level: LogEntry["level"], source: string, message: string) => {
     setLogs(prev => [...prev, { id: logId.current++, timestamp: nowTs(), level, source, message }]);
   }, []);
-
-  const library: LibraryItem[] = [
-    ...BASE_LIBRARY,
-    ...installedPlugins
-      .flatMap(plugin => (plugin.steps ?? []).map(step => ({ ...step, pluginId: plugin.id }))),
-    // ...plugins.filter(plugin => plugin.status === "installed").flatMap(plugin => plugin.steps.map(step => ({ ...step, pluginId: plugin.id })) ),
-  ];
 
   const { data } = usePlugins();
   const library: LibraryItem[] = useMemo(() => {
