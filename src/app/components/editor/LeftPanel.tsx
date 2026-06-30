@@ -161,12 +161,12 @@ export function LeftPanel({
                 </button>
               );
             })()}
-            {/* {hasPlan && <button onClick={handleAddGroup} className="text-muted-foreground hover:text-primary p-0.5 hover:bg-secondary ml-1"><FolderPlus size={12} /></button>} */}
+            
           </div>
           <div className="flex-1 overflow-y-auto">
             {!hasPlan ? (
               <div className="px-4 py-6 text-center">
-                {/* <div className="text-[12px] text-muted-foreground font-mono mb-3">No plan open</div> */}
+                
                 <button
                   onClick={() => setShowNewPlan(true)}
                   className="px-3 py-1.5 bg-primary text-primary-foreground text-[12px] font-mono hover:bg-primary/90"
@@ -175,12 +175,7 @@ export function LeftPanel({
                 </button>
               </div>
             ) : (
-              // : plan.length === 0 ? (
-              //   <div className="px-4 py-4 text-center">
-              //     <div className="text-[12px] text-muted-foreground font-mono mb-2">Empty plan</div>
-              //     <button onClick={handleAddGroup} className="text-primary text-[12px] font-mono hover:underline">+ Add sequence</button>
-              //   </div>
-              // )
+  
               plan.map((step) => (
                 <StepTree
                   key={step.id}
