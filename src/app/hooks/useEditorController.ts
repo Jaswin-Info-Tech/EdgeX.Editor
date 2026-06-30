@@ -552,19 +552,19 @@ export function useEditorController() {
     const jsonData = {
       outputPath: "D:\\plans\\SamplePlan.TapPlan",
       overwrite: true,
-      // steps: plan.map(formatStepForCompose),
+      steps: plan.map(formatStepForCompose),
     };
 
     console.log(JSON.stringify(jsonData, null, 2));
 
-    try {
-      const response = await createTestPlan(jsonData);
-      addLog("INFO", "TestPlans", `Saved: ${jsonData.outputPath}`);
-      return response;
-    } catch (error) {
-      console.error("Failed to compose test plan:", error);
-      addLog("ERROR", "TestPlans", "Failed to save test plan.");
-    }
+    // try {
+    //   const response = await composeTestPlan(jsonData);
+    //   addLog("INFO", "TestPlans", `Saved: ${jsonData.outputPath}`);
+    //   return response;
+    // } catch (error) {
+    //   console.error("Failed to compose test plan:", error);
+    //   addLog("ERROR", "TestPlans", "Failed to save test plan.");
+    // }
   };
 
   const handleSeqDrop = (event: DragEvent, parentId: string | null, idx: number) => {
