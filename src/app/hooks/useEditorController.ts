@@ -18,7 +18,6 @@ import { usePackageUpload } from "./usePackageUpload";
 import { composeTestPlan, runTestPlan } from "../api/plugin";
 
 
-
 export function useEditorController() {
   const winW = useWindowWidth();
   const isDesktop = winW >= 1280;
@@ -278,6 +277,7 @@ export function useEditorController() {
       ...step,
       properties: step.properties.map(prop => {
         if (prop.key !== key) return prop;
+        if (prop.isEditable === false) return prop;
         if (prop.type === "number") return { ...prop, value: parseFloat(raw) || 0 };
         if (prop.type === "boolean") return { ...prop, value: raw === "true" };
         if (prop.type === "frequency") return { ...prop, value: parseFreq(raw) };
@@ -510,10 +510,32 @@ const handleRun = async () => {
       stepTypeName,
       ...(step.name && { name: step.name }),
       properties: props,
-      // ✅ Include schema metadata in the composed output
-      // ...(step.assembly && { assembly: step.assembly }),
-      // ...(step.baseType && { baseType: step.baseType }),
-      // ...(step.fullName && { fullName: step.fullName }),
+    };
+
+    if (step.children?.length) {
+      formattedStep.children = step.children.map(formatStepForCompose);
+    }
+
+    return formattedStep;
+  };
+
+
+  const formatStepForCompose = (step: TestStep): any => {
+    const props = (step.properties || []).reduce((acc: Record<string, any>, prop: any) => {
+      acc[prop.label] = prop.value;
+      return acc;
+    }, {});
+
+    const stepTypeName = step.stepTypeName
+      ?? step.typeName
+      ?? step.fullName
+      ?? step.className
+      ?? step.name;
+
+    const formattedStep: any = {
+      stepTypeName,
+      ...(step.name && { name: step.name }),
+      properties: props,
     };
 
     if (step.children?.length) {
@@ -533,14 +555,6 @@ const handleRun = async () => {
 
     console.log(JSON.stringify(jsonData, null, 2));
 
-    try {
-      const response = await composeTestPlan(jsonData);
-      addLog("INFO", "TestPlans", `Saved: ${jsonData.outputPath}`);
-      return response;
-    } catch (error) {
-      console.error("Failed to compose test plan:", error);
-      addLog("ERROR", "TestPlans", "Failed to save test plan.");
-    }
   };
 
   const handleSeqDrop = (event: DragEvent, parentId: string | null, idx: number) => {
@@ -573,6 +587,8 @@ const handleRun = async () => {
     setDropIdx,
     handleSeqDrop,
     setPlan,
+    setPlanMeta,
+    setHasPlan,
     selectedStep,
     setAddStepParentId,
     setAddStepIdx,

@@ -1,5 +1,6 @@
-import { useMemo, useState } from "react";
-import { Search, X, Clock } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { AlertTriangle, Search, X } from "lucide-react";
+import { getTestPlanEditorModel } from "../api/testplans";
 import { ConsolePanel } from "../components/editor/ConsolePanel";
 import { EditorToolbar } from "../components/editor/EditorToolbar";
 import { LeftPanel } from "../components/editor/LeftPanel";
@@ -10,6 +11,8 @@ import { PropertiesPanel } from "../components/editor/PropertiesPanel";
 import { SequenceEditor } from "../components/editor/SequenceEditor";
 import { Splitter } from "../components/editor/resizable";
 import { useTestPlans } from "../hooks/usePlugin";
+import type { Property, TestStep } from "../types/editor";
+import { flatAll } from "../utils/editor";
 
 interface EditorShellProps {
   selectedId: any;
@@ -33,6 +36,8 @@ interface EditorShellProps {
   setDropIdx: any;
   handleSeqDrop: any;
   setPlan: any;
+  setPlanMeta: any;
+  setHasPlan: any;
   selectedStep: any;
   setAddStepParentId: any;
   setAddStepIdx: any;
@@ -128,6 +133,8 @@ export function EditorShell(props: EditorShellProps) {
     setDropIdx,
     handleSeqDrop,
     setPlan,
+    setPlanMeta,
+    setHasPlan,
     selectedStep,
     setAddStepParentId,
     setAddStepIdx,
@@ -205,6 +212,16 @@ export function EditorShell(props: EditorShellProps) {
   const [dutSearch, setDutSearch] = useState("");
   const [showDutsPanel, setShowDutsPanel] = useState(false);
   const [testPlanQuery, setTestPlanQuery] = useState("D:\\");
+  const [submittedTestPlanQuery, setSubmittedTestPlanQuery] = useState("");
+  const [hasSearchedTestPlans, setHasSearchedTestPlans] = useState(false);
+  const [testPlanSearchNonce, setTestPlanSearchNonce] = useState(0);
+  const [openingTestPlanPath, setOpeningTestPlanPath] = useState<string | null>(
+    null,
+  );
+  const [openTestPlanError, setOpenTestPlanError] = useState("");
+  const [savedPlanSignature, setSavedPlanSignature] = useState("");
+  const [pendingTestPlan, setPendingTestPlan] = useState<any | null>(null);
+  const [showUnsavedPlanWarning, setShowUnsavedPlanWarning] = useState(false);
   const [showTestPlansPanel, setShowTestPlansPanel] = useState(false);
   const displayLibrary = data?.length ? data : library;
 
@@ -213,46 +230,252 @@ export function EditorShell(props: EditorShellProps) {
       "All",
       ...Array.from(
         new Set<string>(
-          displayLibrary.map((item: any) => String(item.category))
-        )
+          displayLibrary.map((item: any) => String(item.category)),
+        ),
       ),
     ],
-    [displayLibrary]
+    [displayLibrary],
   );
 
   const filteredLib = useMemo(
-    () => displayLibrary.filter((item: any) =>
-      (libCat === "All" || item.category === libCat) &&
-      (libSearch === "" || item.name.toLowerCase().includes(libSearch.toLowerCase()))
-    ),
-    [displayLibrary, libCat, libSearch]
+    () =>
+      displayLibrary.filter(
+        (item: any) =>
+          (libCat === "All" || item.category === libCat) &&
+          (libSearch === "" ||
+            item.name.toLowerCase().includes(libSearch.toLowerCase())),
+      ),
+    [displayLibrary, libCat, libSearch],
   );
 
   const filteredInstruments = useMemo(
-    () => instruments.filter((instrument: any) => {
-      const search = instrumentSearch.trim().toLowerCase();
-      if (!search) return true;
-      return [instrument.name, instrument.baseType, instrument.assembly]
-        .some(value => String(value ?? "").toLowerCase().includes(search));
-    }),
-    [instruments, instrumentSearch]
+    () =>
+      instruments.filter((instrument: any) => {
+        const search = instrumentSearch.trim().toLowerCase();
+        if (!search) return true;
+        return [instrument.name, instrument.baseType, instrument.assembly].some(
+          (value) =>
+            String(value ?? "")
+              .toLowerCase()
+              .includes(search),
+        );
+      }),
+    [instruments, instrumentSearch],
   );
 
   const filteredDuts = useMemo(
-    () => duts.filter((dut: any) => {
-      const search = dutSearch.trim().toLowerCase();
-      if (!search) return true;
-      return [dut.name, dut.serialNumber, dut.model, dut.firmware, dut.baseType, dut.assembly]
-        .some(value => String(value ?? "").toLowerCase().includes(search));
-    }),
-    [duts, dutSearch]
+    () =>
+      duts.filter((dut: any) => {
+        const search = dutSearch.trim().toLowerCase();
+        if (!search) return true;
+        return [
+          dut.name,
+          dut.serialNumber,
+          dut.model,
+          dut.firmware,
+          dut.baseType,
+          dut.assembly,
+        ].some((value) =>
+          String(value ?? "")
+            .toLowerCase()
+            .includes(search),
+        );
+      }),
+    [duts, dutSearch],
   );
 
-  const { data: testPlans = [], isLoading: isTestPlansLoading, isError: isTestPlansError } = useTestPlans(testPlanQuery.trim() || undefined);
+  const {
+    data: testPlans = [],
+    isFetching: isTestPlansLoading,
+    isError: isTestPlansError,
+    refetch: searchTestPlans,
+  } = useTestPlans(submittedTestPlanQuery || undefined, false);
+
+  useEffect(() => {
+    if (!hasSearchedTestPlans) return;
+    searchTestPlans();
+  }, [hasSearchedTestPlans, searchTestPlans, testPlanSearchNonce]);
+
+  const handleSearchTestPlans = () => {
+    setSubmittedTestPlanQuery(testPlanQuery.trim());
+    setHasSearchedTestPlans(true);
+    setOpenTestPlanError("");
+    setTestPlanSearchNonce((value) => value + 1);
+  };
+
+  const getPlanSignature = (steps: any[], meta: any) => {
+    const normalizeStep = (step: any): any => ({
+      id: step.id,
+      name: step.name,
+      type: step.type,
+      enabled: step.enabled,
+      breakpoint: !!step.breakpoint,
+      properties: (step.properties || []).map((prop: any) => ({
+        key: prop.key,
+        label: prop.label,
+        type: prop.type,
+        value: prop.value,
+        unit: prop.unit,
+        options: prop.options,
+        group: prop.group,
+        isEditable: prop.isEditable,
+      })),
+      children: step.children?.map(normalizeStep),
+    });
+
+    return JSON.stringify({
+      meta,
+      steps: (steps || []).map(normalizeStep),
+    });
+  };
+
+  const currentPlanSignature = useMemo(
+    () => getPlanSignature(plan || [], planMeta),
+    [plan, planMeta],
+  );
+  const hasUnsavedPlanChanges =
+    hasPlan &&
+    !!savedPlanSignature &&
+    currentPlanSignature !== savedPlanSignature;
+
+  useEffect(() => {
+    if (hasPlan && !savedPlanSignature) {
+      setSavedPlanSignature(currentPlanSignature);
+    }
+  }, [currentPlanSignature, hasPlan, savedPlanSignature]);
+
+  const handleSaveAndMarkClean = async () => {
+    const snapshotSignature = getPlanSignature(plan || [], planMeta);
+    const result = await handleSave();
+    setSavedPlanSignature(snapshotSignature);
+    setShowUnsavedPlanWarning(false);
+    setPendingTestPlan(null);
+    return result;
+  };
+
+  const toEditorProperty = (property: any): Property => {
+    const enumValues = Array.isArray(property.enumValues)
+      ? property.enumValues.map(String)
+      : [];
+    const rawValue = property.value;
+    const hasEnum = enumValues.length > 0;
+    const isBoolean =
+      typeof rawValue === "boolean" ||
+      String(property.type ?? "").includes("Boolean");
+    const isNumber = typeof rawValue === "number" && !hasEnum;
+    const value =
+      hasEnum && typeof rawValue === "number"
+        ? (enumValues[rawValue] ?? String(rawValue))
+        : rawValue == null
+          ? ""
+          : Array.isArray(rawValue) || typeof rawValue === "object"
+            ? JSON.stringify(rawValue)
+            : rawValue;
+
+    return {
+      key: String(property.name ?? property.displayName ?? ""),
+      label: String(property.displayName ?? property.name ?? ""),
+      type: hasEnum
+        ? "enum"
+        : isBoolean
+          ? "boolean"
+          : isNumber
+            ? "number"
+            : "string",
+      value: value as Property["value"],
+      options: hasEnum ? enumValues : undefined,
+      isEditable: property.isEditable !== false,
+      group: property.isEditable === false ? "Read Only" : "Properties",
+    };
+  };
+
+  const toEditorStep = (step: any): TestStep => {
+    const children = Array.isArray(step.children)
+      ? step.children.map(toEditorStep)
+      : [];
+    const stepType = String(step.type ?? "unknown");
+
+    return {
+      id: String(step.stepId ?? step.path ?? crypto.randomUUID()),
+      name: String(step.name ?? "Unnamed Step"),
+      type: stepType,
+      status: "pending",
+      enabled: Boolean(step.enabled ?? true),
+      description: String(step.path ?? ""),
+      properties: Array.isArray(step.properties)
+        ? step.properties.map(toEditorProperty)
+        : [],
+      children: children.length > 0 ? children : undefined,
+      stepTypeName: stepType,
+      typeName: stepType,
+      fullName: stepType,
+      className: stepType,
+    };
+  };
+
+  const handleOpenTestPlan = async (testPlan: any) => {
+    const path = String(testPlan.path ?? "");
+    if (!path || openingTestPlanPath) return;
+
+    if (hasUnsavedPlanChanges) {
+      setPendingTestPlan(testPlan);
+      setShowUnsavedPlanWarning(true);
+      return;
+    }
+
+    setOpeningTestPlanPath(path);
+    setOpenTestPlanError("");
+    try {
+      const editorModel = await getTestPlanEditorModel(path);
+      const steps = Array.isArray(editorModel.steps)
+        ? editorModel.steps.map(toEditorStep)
+        : [];
+      const allSteps = flatAll(steps);
+      const meta = {
+        name: String(
+          editorModel.planName ?? testPlan.name ?? "Untitled Test Plan",
+        ),
+        description: String(editorModel.path ?? path),
+        author: "",
+        version: "",
+        dutName: "",
+        dutSerial: "",
+        dutModel: "",
+        dutFirmware: "",
+      };
+
+      setPlanMeta(meta);
+      setPlan(steps);
+      setSavedPlanSignature(getPlanSignature(steps, meta));
+      setShowUnsavedPlanWarning(false);
+      setHasPlan(true);
+      setSelectedId(allSteps[0]?.id ?? null);
+      setExpanded(
+        new Set(
+          allSteps
+            .filter((step) => step.children?.length)
+            .map((step) => step.id),
+        ),
+      );
+      setLeftTab("plan");
+      setPendingTestPlan(null);
+      setShowUnsavedPlanWarning(false);
+      setShowTestPlansPanel(false);
+    } catch (error) {
+      setOpenTestPlanError(
+        error instanceof Error ? error.message : "Unable to open test plan.",
+      );
+    } finally {
+      setOpeningTestPlanPath(null);
+    }
+  };
 
   const filteredLogs = useMemo(
-    () => consoleFilter === "ALL" ? logs : logs.filter((entry: any) => entry.level === consoleFilter),
-    [consoleFilter, logs]
+    () =>
+      consoleFilter === "ALL"
+        ? logs
+        : logs.filter((entry: any) => entry.level === consoleFilter),
+    [consoleFilter, logs],
   );
 
   const instrumentToLibraryItem = (instrument: any) => ({
@@ -264,9 +487,27 @@ export function EditorShell(props: EditorShellProps) {
     baseType: instrument.baseType,
     assembly: instrument.assembly,
     defaultProps: [
-      { key: "instrumentName", label: "Instrument Name", type: "string", value: instrument.name, group: "Instrument" },
-      { key: "baseType", label: "Base Type", type: "string", value: instrument.baseType, group: "Instrument" },
-      { key: "assembly", label: "Assembly", type: "string", value: instrument.assembly, group: "Instrument" },
+      {
+        key: "instrumentName",
+        label: "Instrument Name",
+        type: "string",
+        value: instrument.name,
+        group: "Instrument",
+      },
+      {
+        key: "baseType",
+        label: "Base Type",
+        type: "string",
+        value: instrument.baseType,
+        group: "Instrument",
+      },
+      {
+        key: "assembly",
+        label: "Assembly",
+        type: "string",
+        value: instrument.assembly,
+        group: "Instrument",
+      },
     ],
   });
 
@@ -379,7 +620,7 @@ export function EditorShell(props: EditorShellProps) {
         setIsDark={setIsDark}
         setShowNewPlan={setShowNewPlan}
         setShowPluginMgr={setShowPluginMgr}
-        handleSave={handleSave}
+        handleSave={handleSaveAndMarkClean}
         handleRun={handleRun}
         handleStop={handleStop}
         handlePause={handlePause}
@@ -401,7 +642,7 @@ export function EditorShell(props: EditorShellProps) {
         setAddStepParentId={setAddStepParentId}
         setAddStepIdx={setAddStepIdx}
         setShowAddStep={setShowAddStep}
-        handleSave={handleSave}
+        handleSave={handleSaveAndMarkClean}
         handleRun={handleRun}
         handlePause={handlePause}
         handleStop={handleStop}
@@ -411,8 +652,14 @@ export function EditorShell(props: EditorShellProps) {
 
       <div className="flex flex-1 overflow-hidden relative">
         {isTablet && leftOpen && (
-          <div className="absolute inset-0 z-40" onClick={() => setLeftOpen(false)}>
-            <div className="absolute left-0 top-0 bottom-0 w-64 bg-card border-r border-border flex flex-col shadow-2xl z-50" onClick={e => e.stopPropagation()}>
+          <div
+            className="absolute inset-0 z-40"
+            onClick={() => setLeftOpen(false)}
+          >
+            <div
+              className="absolute left-0 top-0 bottom-0 w-64 bg-card border-r border-border flex flex-col shadow-2xl z-50"
+              onClick={(e) => e.stopPropagation()}
+            >
               {leftPanel}
             </div>
           </div>
@@ -420,7 +667,10 @@ export function EditorShell(props: EditorShellProps) {
 
         {!isTablet && leftOpen && (
           <>
-            <div className="shrink-0 flex flex-col border-r border-border bg-card overflow-hidden" style={{ width: leftW }}>
+            <div
+              className="shrink-0 flex flex-col border-r border-border bg-card overflow-hidden"
+              style={{ width: leftW }}
+            >
               {leftPanel}
             </div>
             <Splitter dir="h" onMouseDown={dragLeft} />
@@ -461,43 +711,91 @@ export function EditorShell(props: EditorShellProps) {
       </div>
 
       {showInstrumentsPanel && (
-        <div className="fixed inset-0 bg-black/75 flex items-center justify-center z-50" onClick={() => { setShowInstrumentsPanel(false); setInstrumentSearch(""); }}>
-          <div className="bg-card border border-border w-[660px] max-w-[92vw] h-[520px] max-h-[85vh] flex flex-col shadow-2xl" onClick={e => e.stopPropagation()}>
+        <div
+          className="fixed inset-0 bg-black/75 flex items-center justify-center z-50"
+          onClick={() => {
+            setShowInstrumentsPanel(false);
+            setInstrumentSearch("");
+          }}
+        >
+          <div
+            className="bg-card border border-border w-[660px] max-w-[92vw] h-[520px] max-h-[85vh] flex flex-col shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="flex items-center justify-between px-5 py-3 border-b border-border bg-muted/30">
               <div className="flex items-center gap-2">
-                <span className="text-[13px] font-semibold text-foreground">Instruments</span>
+                <span className="text-[13px] font-semibold text-foreground">
+                  Instruments
+                </span>
               </div>
-              <button onClick={() => { setShowInstrumentsPanel(false); setInstrumentSearch(""); }} className="text-muted-foreground hover:text-foreground">
+              <button
+                onClick={() => {
+                  setShowInstrumentsPanel(false);
+                  setInstrumentSearch("");
+                }}
+                className="text-muted-foreground hover:text-foreground"
+              >
                 <X size={14} />
               </button>
             </div>
             <div className="px-3 py-3 border-b border-border shrink-0">
               <div className="flex items-center gap-2 border border-border px-2.5 py-2 bg-background">
                 <Search size={13} className="text-muted-foreground shrink-0" />
-                <input value={instrumentSearch} onChange={e => setInstrumentSearch(e.target.value)} placeholder="Search instruments..." className="flex-1 bg-transparent text-[12px] font-mono text-foreground placeholder:text-muted-foreground outline-none" />
-                {instrumentSearch && <button onClick={() => setInstrumentSearch("")} className="text-muted-foreground hover:text-foreground shrink-0"><X size={10} /></button>}
+                <input
+                  value={instrumentSearch}
+                  onChange={(e) => setInstrumentSearch(e.target.value)}
+                  placeholder="Search instruments..."
+                  className="flex-1 bg-transparent text-[12px] font-mono text-foreground placeholder:text-muted-foreground outline-none"
+                />
+                {instrumentSearch && (
+                  <button
+                    onClick={() => setInstrumentSearch("")}
+                    className="text-muted-foreground hover:text-foreground shrink-0"
+                  >
+                    <X size={10} />
+                  </button>
+                )}
               </div>
             </div>
             <div className="flex-1 overflow-y-auto">
               {isInstrumentsLoading ? (
-                <div className="px-5 py-8 text-center text-[12px] font-mono text-muted-foreground">Loading instruments...</div>
+                <div className="px-5 py-8 text-center text-[12px] font-mono text-muted-foreground">
+                  Loading instruments...
+                </div>
               ) : isInstrumentsError ? (
-                <div className="px-5 py-8 text-center text-[12px] font-mono text-destructive">Unable to load instruments.</div>
+                <div className="px-5 py-8 text-center text-[12px] font-mono text-destructive">
+                  Unable to load instruments.
+                </div>
               ) : filteredInstruments.length === 0 ? (
-                <div className="px-5 py-8 text-center text-[12px] font-mono text-muted-foreground">{instrumentSearch ? "No matching instruments." : "No instruments available."}</div>
-              ) : filteredInstruments.map(instrument => (
-                <div key={`${instrument.name}:${instrument.assembly}`} className="px-5 py-4 border-b border-border">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="text-[13px] font-semibold text-foreground">{instrument.name}</span>
-                        <span className="text-[11px] font-mono text-muted-foreground border border-border px-2">{instrument.baseType}</span>
+                <div className="px-5 py-8 text-center text-[12px] font-mono text-muted-foreground">
+                  {instrumentSearch
+                    ? "No matching instruments."
+                    : "No instruments available."}
+                </div>
+              ) : (
+                filteredInstruments.map((instrument) => (
+                  <div
+                    key={`${instrument.name}:${instrument.assembly}`}
+                    className="px-5 py-4 border-b border-border"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-[13px] font-semibold text-foreground">
+                            {instrument.name}
+                          </span>
+                          <span className="text-[11px] font-mono text-muted-foreground border border-border px-2">
+                            {instrument.baseType}
+                          </span>
+                        </div>
+                        <div className="text-[12px] text-muted-foreground mb-1">
+                          {instrument.assembly}
+                        </div>
                       </div>
-                      <div className="text-[12px] text-muted-foreground mb-1">{instrument.assembly}</div>
                     </div>
                   </div>
-                </div>
-              ))}
+                ))
+              )}
             </div>
             <div className="px-4 py-2 border-t border-border bg-muted/20 text-[11px] text-muted-foreground font-mono">
               {filteredInstruments.length} instruments
@@ -507,46 +805,108 @@ export function EditorShell(props: EditorShellProps) {
       )}
 
       {showDutsPanel && (
-        <div className="fixed inset-0 bg-black/75 flex items-center justify-center z-50" onClick={() => { setShowDutsPanel(false); setDutSearch(""); }}>
-          <div className="bg-card border border-border w-[660px] max-w-[92vw] h-[520px] max-h-[85vh] flex flex-col shadow-2xl" onClick={e => e.stopPropagation()}>
+        <div
+          className="fixed inset-0 bg-black/75 flex items-center justify-center z-50"
+          onClick={() => {
+            setShowDutsPanel(false);
+            setDutSearch("");
+          }}
+        >
+          <div
+            className="bg-card border border-border w-[660px] max-w-[92vw] h-[520px] max-h-[85vh] flex flex-col shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="flex items-center justify-between px-5 py-3 border-b border-border bg-muted/30">
               <div className="flex items-center gap-2">
-                <span className="text-[13px] font-semibold text-foreground">DUTs</span>
+                <span className="text-[13px] font-semibold text-foreground">
+                  DUTs
+                </span>
               </div>
-              <button onClick={() => { setShowDutsPanel(false); setDutSearch(""); }} className="text-muted-foreground hover:text-foreground">
+              <button
+                onClick={() => {
+                  setShowDutsPanel(false);
+                  setDutSearch("");
+                }}
+                className="text-muted-foreground hover:text-foreground"
+              >
                 <X size={14} />
               </button>
             </div>
             <div className="px-3 py-3 border-b border-border shrink-0">
               <div className="flex items-center gap-2 border border-border px-2.5 py-2 bg-background">
                 <Search size={13} className="text-muted-foreground shrink-0" />
-                <input value={dutSearch} onChange={e => setDutSearch(e.target.value)} placeholder="Search DUTs..." className="flex-1 bg-transparent text-[12px] font-mono text-foreground placeholder:text-muted-foreground outline-none" />
-                {dutSearch && <button onClick={() => setDutSearch("")} className="text-muted-foreground hover:text-foreground shrink-0"><X size={10} /></button>}
+                <input
+                  value={dutSearch}
+                  onChange={(e) => setDutSearch(e.target.value)}
+                  placeholder="Search DUTs..."
+                  className="flex-1 bg-transparent text-[12px] font-mono text-foreground placeholder:text-muted-foreground outline-none"
+                />
+                {dutSearch && (
+                  <button
+                    onClick={() => setDutSearch("")}
+                    className="text-muted-foreground hover:text-foreground shrink-0"
+                  >
+                    <X size={10} />
+                  </button>
+                )}
               </div>
             </div>
             <div className="flex-1 overflow-y-auto">
               {isDutsLoading ? (
-                <div className="px-5 py-8 text-center text-[12px] font-mono text-muted-foreground">Loading DUTs...</div>
+                <div className="px-5 py-8 text-center text-[12px] font-mono text-muted-foreground">
+                  Loading DUTs...
+                </div>
               ) : isDutsError ? (
-                <div className="px-5 py-8 text-center text-[12px] font-mono text-destructive">Unable to load DUTs.</div>
+                <div className="px-5 py-8 text-center text-[12px] font-mono text-destructive">
+                  Unable to load DUTs.
+                </div>
               ) : filteredDuts.length === 0 ? (
-                <div className="px-5 py-8 text-center text-[12px] font-mono text-muted-foreground">{dutSearch ? "No matching DUTs." : "No DUTs available."}</div>
-              ) : filteredDuts.map((dut: any, index: number) => (
-                <div key={`${dut.name}:${dut.serialNumber}:${index}`} className="px-5 py-4 border-b border-border">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2 mb-1 flex-wrap">
-                        <span className="text-[13px] font-semibold text-foreground">{dut.name || "Unnamed DUT"}</span>
-                        {dut.baseType && <span className="text-[11px] font-mono text-muted-foreground border border-border px-2">{dut.baseType}</span>}
-                        {dut.model && <span className="text-[11px] font-mono text-muted-foreground border border-border px-2">{dut.model}</span>}
-                        {dut.serialNumber && <span className="text-[11px] font-mono text-muted-foreground border border-border px-2">SN: {dut.serialNumber}</span>}
+                <div className="px-5 py-8 text-center text-[12px] font-mono text-muted-foreground">
+                  {dutSearch ? "No matching DUTs." : "No DUTs available."}
+                </div>
+              ) : (
+                filteredDuts.map((dut: any, index: number) => (
+                  <div
+                    key={`${dut.name}:${dut.serialNumber}:${index}`}
+                    className="px-5 py-4 border-b border-border"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 mb-1 flex-wrap">
+                          <span className="text-[13px] font-semibold text-foreground">
+                            {dut.name || "Unnamed DUT"}
+                          </span>
+                          {dut.baseType && (
+                            <span className="text-[11px] font-mono text-muted-foreground border border-border px-2">
+                              {dut.baseType}
+                            </span>
+                          )}
+                          {dut.model && (
+                            <span className="text-[11px] font-mono text-muted-foreground border border-border px-2">
+                              {dut.model}
+                            </span>
+                          )}
+                          {dut.serialNumber && (
+                            <span className="text-[11px] font-mono text-muted-foreground border border-border px-2">
+                              SN: {dut.serialNumber}
+                            </span>
+                          )}
+                        </div>
+                        {dut.firmware && (
+                          <div className="text-[12px] text-muted-foreground mb-1">
+                            Firmware: {dut.firmware}
+                          </div>
+                        )}
+                        {dut.assembly && (
+                          <div className="text-[11px] text-muted-foreground/70 font-mono">
+                            {dut.assembly}
+                          </div>
+                        )}
                       </div>
-                      {dut.firmware && <div className="text-[12px] text-muted-foreground mb-1">Firmware: {dut.firmware}</div>}
-                      {dut.assembly && <div className="text-[11px] text-muted-foreground/70 font-mono">{dut.assembly}</div>}
                     </div>
                   </div>
-                </div>
-              ))}
+                ))
+              )}
             </div>
             <div className="px-4 py-2 border-t border-border bg-muted/20 text-[11px] text-muted-foreground font-mono">
               {filteredDuts.length} DUTs
@@ -556,47 +916,151 @@ export function EditorShell(props: EditorShellProps) {
       )}
 
       {showTestPlansPanel && (
-        <div className="fixed inset-0 bg-black/75 flex items-center justify-center z-50" onClick={() => setShowTestPlansPanel(false)}>
-          <div className="bg-card border border-border w-[760px] max-w-[92vw] h-[540px] max-h-[85vh] flex flex-col shadow-2xl" onClick={e => e.stopPropagation()}>
+        <div
+          className="fixed inset-0 bg-black/75 flex items-center justify-center z-50"
+          onClick={() => setShowTestPlansPanel(false)}
+        >
+          <div
+            className="bg-card border border-border w-[760px] max-w-[92vw] h-[540px] max-h-[85vh] flex flex-col shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="flex items-center justify-between px-5 py-3 border-b border-border bg-muted/30">
               <div className="flex items-center gap-2">
-                <span className="text-[13px] font-semibold text-foreground">Test Plans</span>
+                <span className="text-[13px] font-semibold text-foreground">
+                  Test Plans
+                </span>
               </div>
               <div className="flex items-center gap-2">
-                <button onClick={() => {}} className="flex items-center gap-2 px-3 py-1.5 bg-primary text-primary-foreground text-[12px] font-mono font-semibold hover:bg-primary/90 transition-colors">
-                  <Clock size={12} /> History
-                </button>
-                <button onClick={() => setShowTestPlansPanel(false)} className="text-muted-foreground hover:text-foreground">
+                <button
+                  onClick={() => setShowTestPlansPanel(false)}
+                  className="text-muted-foreground hover:text-foreground"
+                >
                   <X size={14} />
                 </button>
               </div>
             </div>
             <div className="px-3 py-3 border-b border-border shrink-0">
-              <div className="flex items-center gap-2 border border-border px-2.5 py-2 bg-background">
-                <Search size={13} className="text-muted-foreground shrink-0" />
-                <input value={testPlanQuery} onChange={e => setTestPlanQuery(e.target.value)} placeholder="Search test plans..." className="flex-1 bg-transparent text-[12px] font-mono text-foreground placeholder:text-muted-foreground outline-none" />
-                {testPlanQuery && <button onClick={() => setTestPlanQuery("")} className="text-muted-foreground hover:text-foreground shrink-0"><X size={10} /></button>}
+              <div className="flex items-center gap-2">
+                <div className="flex w-3/4 items-center gap-2 border border-border px-2.5 py-2 bg-background">
+                  <Search
+                    size={13}
+                    className="text-muted-foreground shrink-0"
+                  />
+                  <input
+                    value={testPlanQuery}
+                    onChange={(e) => setTestPlanQuery(e.target.value)}
+                    placeholder="Search test plans..."
+                    className="flex-1 bg-transparent text-[12px] font-mono text-foreground placeholder:text-muted-foreground outline-none"
+                  />
+                  {testPlanQuery && (
+                    <button
+                      onClick={() => setTestPlanQuery("")}
+                      className="text-muted-foreground hover:text-foreground shrink-0"
+                    >
+                      <X size={10} />
+                    </button>
+                  )}
+                </div>
+                <button
+                  onClick={handleSearchTestPlans}
+                  className="flex h-[34px] items-center gap-2 px-3 bg-primary text-primary-foreground text-[12px] font-mono font-semibold hover:bg-primary/90 transition-colors"
+                >
+                  <Search size={12} /> Search
+                </button>
               </div>
             </div>
-            <div className="flex-1 overflow-y-auto">
-              {isTestPlansLoading ? (
-                <div className="px-5 py-8 text-center text-[12px] font-mono text-muted-foreground">Loading test plans...</div>
-              ) : isTestPlansError ? (
-                <div className="px-5 py-8 text-center text-[12px] font-mono text-destructive">Unable to load test plans.</div>
-              ) : testPlans.length === 0 ? (
-                <div className="px-5 py-8 text-center text-[12px] font-mono text-muted-foreground">No test plans found.</div>
-              ) : testPlans.map((plan: any, index: number) => (
-                <div key={`${plan.path}:${index}`} className="px-5 py-4 border-b border-border">
-                  <div className="flex flex-col gap-2">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-[13px] font-semibold text-foreground">{plan.name}</span>
-                      <span className="text-[11px] font-mono text-muted-foreground border border-border px-2">{plan.stepCount} steps</span>
-                      <span className="text-[11px] font-mono text-muted-foreground border border-border px-2">{new Date(plan.lastModified).toLocaleString()}</span>
+            {showUnsavedPlanWarning && (
+              <div className="mx-4 mt-4 border border-yellow-500/30 bg-yellow-500/10 shadow-sm">
+                <div className="flex items-start gap-3 px-4 py-3">
+                  <AlertTriangle
+                    size={16}
+                    className="text-yellow-500 shrink-0 mt-0.5"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <div className="text-[13px] font-semibold text-foreground">
+                      Save changes before loading another test plan
                     </div>
-                    <div className="text-[12px] text-muted-foreground break-all">{String(plan.path ?? "").replace(/\\/g, "\\\\")}</div>
+                    <div className="text-[12px] text-muted-foreground mt-1 leading-relaxed">
+                      Your current test plan has unsaved sequence or property
+                      changes. Click Save before opening
+                      {pendingTestPlan?.name
+                        ? ` "${pendingTestPlan.name}"`
+                        : " another test plan"}
+                      .
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    {/* <button
+                      onClick={() => {
+                        setShowUnsavedPlanWarning(false);
+                        setPendingTestPlan(null);
+                      }}
+                      className="h-8 px-3 border border-border text-[12px] font-mono text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+                    >
+                      Keep Browsing
+                    </button> */}
+                    <button
+                      onClick={async () => {
+                        await handleSaveAndMarkClean();
+                      }}
+                      className="h-8 px-3 bg-primary text-primary-foreground text-[12px] font-mono font-semibold hover:bg-primary/90 transition-colors"
+                    >
+                      Save Changes
+                    </button>
                   </div>
                 </div>
-              ))}
+              </div>
+            )}
+            <div className="flex-1 overflow-y-auto">
+              {openTestPlanError && (
+                <div className="px-5 py-3 border-b border-border text-[12px] font-mono text-destructive">
+                  {openTestPlanError}
+                </div>
+              )}
+              {isTestPlansLoading ? (
+                <div className="px-5 py-8 text-center text-[12px] font-mono text-muted-foreground">
+                  Searching Test Plans..
+                </div>
+              ) : isTestPlansError ? (
+                <div className="px-5 py-8 text-center text-[12px] font-mono text-destructive">
+                  Unable to load test plans.
+                </div>
+              ) : hasSearchedTestPlans && testPlans.length === 0 ? (
+                <div className="px-5 py-8 text-center text-[12px] font-mono text-muted-foreground">
+                  No testplans found.
+                </div>
+              ) : (
+                testPlans.map((plan: any, index: number) => (
+                  <button
+                    key={`${plan.path}:${index}`}
+                    onClick={() => handleOpenTestPlan(plan)}
+                    disabled={!!openingTestPlanPath}
+                    className="w-full text-left px-5 py-4 border-b border-border transition-colors group hover:bg-secondary/60 focus:bg-primary/8 focus:outline-none disabled:cursor-wait disabled:opacity-60"
+                  >
+                    <div className="flex flex-col gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-[13px] font-semibold text-foreground group-hover:text-primary transition-colors">
+                          {plan.name}
+                        </span>
+                        <span className="text-[11px] font-mono text-muted-foreground border border-border px-2">
+                          {plan.stepCount} steps
+                        </span>
+                        <span className="text-[11px] font-mono text-muted-foreground border border-border px-2">
+                          {new Date(plan.lastModified).toLocaleString()}
+                        </span>
+                        {openingTestPlanPath === plan.path && (
+                          <span className="text-[11px] font-mono text-primary border border-primary/30 px-2">
+                            Opening...
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-[12px] text-muted-foreground break-all group-hover:text-foreground/70 transition-colors">
+                        {String(plan.path ?? "").replace(/\\/g, "\\\\")}
+                      </div>
+                    </div>
+                  </button>
+                ))
+              )}
             </div>
             <div className="px-4 py-2 border-t border-border bg-muted/20 text-[11px] text-muted-foreground font-mono">
               {testPlans.length} test plans
