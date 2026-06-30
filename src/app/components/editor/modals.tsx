@@ -322,12 +322,16 @@ export function PluginManager({
                   )}
                 </div>
               </div>
-              {installed.length === 0 && (
+              {isInstalledLoading ? (
                 <div className="py-12 text-center text-[12px] text-muted-foreground font-mono">
-                  No plugins installed
+                  Loading installed plugins...
+                </div>
+              ) : installed.length === 0 && (
+                <div className="py-12 text-center text-[12px] text-muted-foreground font-mono">
+                  {installedSearch ? "No matching plugins" : "No plugins installed"}
                 </div>
               )}
-              {installed.map((p, index) => (
+              {!isInstalledLoading && installed.map((p, index) => (
                 <div key={`${p.id}:${p.packageName ?? ""}:${p.assembly ?? ""}:${index}`} className="px-5 py-4 border-b border-border">
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex-1 min-w-0">
@@ -419,12 +423,16 @@ export function PluginManager({
                   )}
                 </div>
               </div>
-              {available.length === 0 && (
+              {isAvailableLoading ? (
                 <div className="py-12 text-center text-[12px] text-muted-foreground font-mono">
-                  No packages available
+                  Loading packages...
+                </div>
+              ) : available.length === 0 && (
+                <div className="py-12 text-center text-[12px] text-muted-foreground font-mono">
+                  {browseSearch ? "No matching packages" : "No packages available"}
                 </div>
               )}
-              {available.map((p, index) => (
+              {!isAvailableLoading && available.map((p, index) => (
                 <div key={`${p.id}:${p.packageName ?? ""}:${p.version ?? ""}:${index}`} className="px-5 py-4 border-b border-border">
                   <div className="flex items-start justify-between">
                     <div>
