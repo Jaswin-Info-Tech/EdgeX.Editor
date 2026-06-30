@@ -4,6 +4,23 @@ import type { CtxMenu, DutItem, InstrumentItem, LibraryItem, PlanMeta, Plugin } 
 import { TYPE_LABEL, TYPE_STRIPE } from "../../constants/editor";
 import { TypeIcon } from "./atoms";
 
+const matchesPluginSearch = (plugin: Plugin, query: string) => {
+  const search = query.trim().toLowerCase();
+  if (!search) return true;
+
+  const values = [
+    plugin.name,
+    plugin.description,
+    plugin.author,
+    plugin.version,
+    plugin.packageName,
+    plugin.pluginName,
+    ...(plugin.steps ?? []).flatMap(step => [step.name, step.description, step.category]),
+  ];
+
+  return values.some(value => String(value ?? "").toLowerCase().includes(search));
+};
+
 function Field({ label, value, onChange, placeholder, textarea }: any) {
   const cls = "w-full bg-background border border-border px-3 py-2 text-[13px] font-mono text-foreground placeholder:text-muted-foreground outline-none focus:border-primary transition-colors";
   return (
@@ -223,20 +240,8 @@ export function PluginManager({
   // const [installedSearch, setInstalledSearch] = useState("");
   // const [browseSearch, setBrowseSearch] = useState("");
 
-  // const filteredInstalled = installed.filter(p =>
-  //   installedSearch.trim() === ""
-  //     ? true
-  //     : (p.name ?? "").toLowerCase().includes(installedSearch.trim().toLowerCase())
-  // );
-
-  // const filteredAvailable = available.filter(p =>
-  //   browseSearch.trim() === ""
-  //     ? true
-  //     : (p.name ?? "").toLowerCase().includes(browseSearch.trim().toLowerCase())
-  // );
-
-  const installed = installedPlugins;
-  const available = plugins;
+  const installed = installedPlugins.filter(plugin => matchesPluginSearch(plugin, installedSearch));
+  const available = plugins.filter(plugin => matchesPluginSearch(plugin, browseSearch));
   const handleUpload = async () => {
     if (!uploadFile) return;
     setUploading(true);
@@ -322,8 +327,8 @@ export function PluginManager({
                   No plugins installed
                 </div>
               )}
-              {installed.map((p) => (
-                <div key={p.id} className="px-5 py-4 border-b border-border">
+              {installed.map((p, index) => (
+                <div key={`${p.id}:${p.packageName ?? ""}:${p.assembly ?? ""}:${index}`} className="px-5 py-4 border-b border-border">
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex-1 min-w-0">
                       {/* Header */}
@@ -419,8 +424,8 @@ export function PluginManager({
                   No packages available
                 </div>
               )}
-              {available.map(p => (
-                <div key={p.id} className="px-5 py-4 border-b border-border">
+              {available.map((p, index) => (
+                <div key={`${p.id}:${p.packageName ?? ""}:${p.version ?? ""}:${index}`} className="px-5 py-4 border-b border-border">
                   <div className="flex items-start justify-between">
                     <div>
                       <div className="flex items-center gap-2 mb-1">
@@ -525,4 +530,3 @@ export function ContextMenu({ menu, onAction, onClose }: { menu: CtxMenu; onActi
     </div>
   );
 }
-
