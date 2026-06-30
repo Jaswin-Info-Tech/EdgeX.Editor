@@ -90,29 +90,35 @@ export function useEditorController() {
       return fallback;
     };
 
-    const normalizePackagePlugin = (item: any, fallbackInstalled: boolean): Plugin => {
+    const normalizePackagePlugin = (item: any, fallbackInstalled: boolean, index: number): Plugin => {
       const statusInstalled = String(item.status ?? "").trim().toLowerCase() === "installed";
       const isInstalled = item.isInstalled === undefined
         ? fallbackInstalled || statusInstalled
         : asBool(item.isInstalled, fallbackInstalled || statusInstalled);
       const name = String(item.name ?? item.packageName ?? item.pluginName ?? "Untitled Plugin");
+      const packageName = item.packageName === undefined ? undefined : String(item.packageName);
+      const pluginName = item.pluginName === undefined ? undefined : String(item.pluginName);
+      const version = String(item.version ?? "");
+      const id = String(item.id ?? packageName ?? pluginName ?? `${name}:${version}:${index}`);
       return {
         ...item,
-        id: String(item.id ?? item.name ?? item.packageName ?? item.pluginName ?? ""),
+        id,
         name,
-        version: String(item.version ?? ""),
+        version,
         author: String(item.author ?? item.publisher ?? ""),
         description: String(item.description ?? ""),
         state: isInstalled ? "installed" : "available",
         isInstalled,
-        uninstallName: String(item.pluginName ?? item.packageName ?? name),
+        packageName,
+        pluginName,
+        uninstallName: String(pluginName ?? packageName ?? name),
         updateAvailable: asBool(item.updateAvailable),
         status: String(item.status ?? (isInstalled ? "Installed" : "Available")),
         steps: Array.isArray(item.steps) ? item.steps : [],
       };
     };
 
-    const availableCatalog = toArray(availablePackagesData).map((item: any) => normalizePackagePlugin(item, false));
+    const availableCatalog = toArray(availablePackagesData).map((item: any, index) => normalizePackagePlugin(item, false, index));
     setPlugins(availableCatalog);
   }, [availablePackagesData]);
 
