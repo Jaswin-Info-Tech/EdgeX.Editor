@@ -234,6 +234,7 @@ export function PluginManager({
 }) {
   const [tab, setTab] = useState<"installed" | "browse" | "upload">("installed");
   const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [uploadError, setUploadError] = useState("");
   const [uploading, setUploading] = useState(false);
   const [installingId, setInstallingId] = useState<string | null>(null);
   const [uninstallingId, setUninstallingId] = useState<string | null>(null);

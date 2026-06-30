@@ -9,6 +9,7 @@ import { getStepSchema } from "../../api/plugin";
 
 // ─── Shared styles ────────────────────────────────────────────────────────────
 const inputCls =
+  "w-full bg-background border border-border px-2 py-1.5 text-[12px] font-mono text-foreground outline-none focus:border-primary disabled:cursor-not-allowed disabled:opacity-60 disabled:bg-muted/30";
   "w-full bg-background border border-border px-2 py-1.5 text-[12px] font-mono text-foreground outline-none focus:border-primary";
 const labelCls =
   "block text-[11px] font-mono text-muted-foreground mb-1.5 uppercase tracking-wide";
@@ -506,6 +507,8 @@ function renderEditor(
   context: EditorContext
 ) {
   const value = schemaPropertyValues[prop.name];
+  if (prop.isEditable === false) return <ReadonlyEditor key={prop.name} prop={prop} value={value} />;
+
   const onChange = (val: any) =>
     setSchemaPropertyValues(prev => ({ ...prev, [prop.name]: val }));
   const editorType = normalizeEditorType(prop.editorType);
@@ -562,7 +565,7 @@ function renderEditor(
 interface PropertiesPanelProps {
   selectedStep: any;
   selectedId: any;
-  plan: any[];
+  plan: any;
   instruments: any[];
   testSteps: any[];
   setPlan: any;
@@ -592,13 +595,21 @@ export function PropertiesPanel({
   const schemaProperties = useMemo(() => schemaRecords[0]?.properties ?? [], [schemaRecords]);
   // console.log(schemaRecords,"qqqqq")
 
-  const editorContext = useMemo<EditorContext>(() => ({
-    instrumentOptions: instruments
-      .filter((instrument: any) => instrument?.canCreateInstance !== false && instrument?.isBrowsable !== false)
+const editorContext = useMemo<EditorContext>(
+  () => ({
+    instrumentOptions: (instruments ?? [])
+      .filter(
+        (instrument: any) =>
+          instrument?.canCreateInstance !== false &&
+          instrument?.isBrowsable !== false,
+      )
       .filter((instrument: any) => instrument?.name)
       .map(toBackendRecordOption),
-    testStepOptions: testSteps
-      .filter((step: any) => step?.canCreateInstance !== false && step?.isBrowsable !== false)
+    testStepOptions: (testSteps ?? [])
+      .filter(
+        (step: any) =>
+          step?.canCreateInstance !== false && step?.isBrowsable !== false,
+      )
       .filter((step: any) => step?.name)
       .map(toBackendRecordOption),
     planStepOptions: flatAll(plan || [])
@@ -608,7 +619,9 @@ export function PropertiesPanel({
         value: step.id,
         description: step.type,
       })),
-  }), [instruments, testSteps, plan, selectedStep?.id]);
+  }),
+  [instruments, testSteps, plan, selectedStep?.id],
+);
 
   useEffect(() => {
     if (!selectedStep) {
@@ -622,11 +635,12 @@ export function PropertiesPanel({
     setSchemaError(null);
     const fetchSchema = async () => {
       try {
-        const stepTypeName = selectedStep.stepTypeName
-          ?? selectedStep.typeName
-          ?? selectedStep.fullName
-          ?? selectedStep.className
-          ?? selectedStep.name;
+        const stepTypeName =
+          selectedStep.stepTypeName ??
+          selectedStep.typeName ??
+          selectedStep.fullName ??
+          selectedStep.className ??
+          selectedStep.name;
         const data = await getStepSchema(stepTypeName);
         if (cancelled) return;
         setSchemaResponse(data);
@@ -643,12 +657,18 @@ export function PropertiesPanel({
   }, [selectedStep?.name]);
 
   useEffect(() => {
-    if (!selectedStep) { setSchemaPropertyValues({}); return; }
+    if (!selectedStep) {
+      setSchemaPropertyValues({});
+      return;
+    }
     const values: Record<string, any> = {};
     schemaProperties.forEach((prop: any) => {
       const key = getSchemaPropertyKey(prop);
-      const existing = selectedStep.properties?.find((item: any) => item.key === key);
-      values[prop.name] = existing?.value ?? (prop.editorType === "checkbox" ? false : "");
+      const existing = selectedStep.properties?.find(
+        (item: any) => item.key === key,
+      );
+      values[prop.name] =
+        existing?.value ?? (prop.editorType === "checkbox" ? false : "");
     });
     setSchemaPropertyValues(values);
   }, [selectedStep, schemaProperties]);
@@ -659,41 +679,66 @@ export function PropertiesPanel({
     // Pull metadata from the first schema record
     const meta = schemaRecords[0];
 
-    setPlan((prev: any) => updateIn(prev, selectedStep.id, (step: any) => {
-      const existingProps = step.properties || [];
+    setPlan((prev: any) =>
+      updateIn(prev, selectedStep.id, (step: any) => {
+        const existingProps = step.properties || [];
 
-      const newProps = schemaProperties.map((prop: any) => {
-        const key = getSchemaPropertyKey(prop);
+        const newProps = schemaProperties.map((prop: any) => {
+          const key = getSchemaPropertyKey(prop);
+          return {
+            key,
+            label: prop.displayName || prop.name,
+            type:
+              prop.editorType === "checkbox"
+                ? "boolean"
+                : prop.editorType === "number"
+                  ? "number"
+                  : "string",
+            value: schemaPropertyValues[prop.name],
+            group: "Schema Properties",
+            isEditable: prop.isEditable !== false,
+          };
+        });
+
+        const keepProps = existingProps.filter(
+          (item: any) => item.group !== "Schema Properties",
+        );
+
         return {
           key,
           label:  prop.name || prop.displayName,
           type: prop.editorType === "checkbox" ? "boolean" : prop.editorType === "number" ? "number" : "string",
           value: schemaPropertyValues[prop.name],
           group: "Schema Properties",
+          ...step,
+          properties: [...keepProps, ...newProps],
+          // ✅ Persist schema metadata onto the step
+          stepTypeName: meta?.fullName ?? step.stepTypeName,
+          assembly: meta?.assembly ?? step.assembly,
+          baseType: meta?.baseType ?? step.baseType,
+          fullName: meta?.fullName ?? step.fullName,
         };
-      });
-
-      const keepProps = existingProps.filter((item: any) => item.group !== "Schema Properties");
-
-      return {
-        ...step,
-        properties: [...keepProps, ...newProps],
-        // ✅ Persist schema metadata onto the step
-        stepTypeName: meta?.fullName ?? step.stepTypeName,
-        assembly: meta?.assembly ?? step.assembly,
-        baseType: meta?.baseType ?? step.baseType,
-        fullName: meta?.fullName ?? step.fullName,
-      };
-    }));
+      }),
+    );
   };
 
   const renderProperties = () => {
-    if (!selectedStep) return (
-      <div className="flex flex-col items-center justify-center h-full gap-3 text-muted-foreground">
-        <Sliders size={24} className="opacity-20" />
-        <span className="text-[12px] font-mono">Select a step to inspect</span>
-      </div>
-    );
+    if (!selectedStep)
+      return (
+        <div className="flex flex-col items-center justify-center h-full gap-3 text-muted-foreground">
+          <Sliders size={24} className="opacity-20" />
+          <span className="text-[12px] font-mono">
+            Select a step to inspect
+          </span>
+        </div>
+      );
+
+    const groups: string[] = Array.from(
+      new Set(
+        (selectedStep.properties || []).map((p: any) => p.group as string),
+      ),
+    ).filter((group): group is string => group !== "Schema Properties");
+    const hasDisplayedProperties = groups.length > 0;
 
     const groups: string[] = Array.from(
       new Set((selectedStep.properties || []).map((p: any) => p.group as string))
@@ -704,16 +749,27 @@ export function PropertiesPanel({
     return (
       <div className="overflow-y-auto h-full">
         {/* Step identity */}
-        <div className="border-b border-border" style={{ borderLeft: `3px solid ${stripe}` }}>
+        <div
+          className="border-b border-border"
+          style={{ borderLeft: `3px solid ${stripe}` }}
+        >
           <div className="px-3 py-3">
             <div className="flex items-center gap-2 mb-1.5">
               <TypeIcon type={selectedStep.type} size={14} />
-              <span className="text-[13px] font-semibold text-foreground font-mono leading-tight">{selectedStep.name}</span>
+              <span className="text-[13px] font-semibold text-foreground font-mono leading-tight">
+                {selectedStep.name}
+              </span>
             </div>
             <div className="flex items-center gap-2">
               <StatusPill status={selectedStep.status} />
-              <span className="text-[11px] font-mono text-muted-foreground">{(selectedStep.id || "unknown").toUpperCase()}</span>
-              {selectedStep.description && <span className="text-[11px] text-muted-foreground">· {selectedStep.description}</span>}
+              <span className="text-[11px] font-mono text-muted-foreground">
+                {(selectedStep.type || "unknown").toUpperCase()}
+              </span>
+              {selectedStep.description && (
+                <span className="text-[11px] text-muted-foreground">
+                  · {selectedStep.description}
+                </span>
+              )}
             </div>
           </div>
         </div>
@@ -725,58 +781,159 @@ export function PropertiesPanel({
             <Toggle value={selectedStep.enabled} onChange={() => setPlan((prev: any) => updateIn(prev, selectedStep.id, s => ({ ...s, enabled: !s.enabled })))} />
           </div> */}
           <div className="flex items-center justify-between px-3 py-2">
-            <span className="text-[11px] font-mono text-muted-foreground uppercase tracking-wider">Breakpoint</span>
-            <Toggle value={!!selectedStep.breakpoint} onChange={() => setPlan((prev: any) => updateIn(prev, selectedStep.id, s => ({ ...s, breakpoint: !s.breakpoint })))} />
+            <span className="text-[11px] font-mono text-muted-foreground uppercase tracking-wider">
+              Breakpoint
+            </span>
+            <Toggle
+              value={!!selectedStep.breakpoint}
+              onChange={() =>
+                setPlan((prev: any) =>
+                  updateIn(prev, selectedStep.id, (s) => ({
+                    ...s,
+                    breakpoint: !s.breakpoint,
+                  })),
+                )
+              }
+            />
           </div>
         </div>
 
         {/* Properties by group */}
-        {groups.map(group => (
+        {groups.map((group) => (
           <div key={group}>
             <div className="flex items-center gap-2 px-3 py-2 bg-muted/30 border-b border-border">
               <div className="w-[3px] h-3" style={{ background: stripe }} />
-              <span className="text-[10px] font-mono font-bold text-muted-foreground uppercase tracking-widest">{group}</span>
+              <span className="text-[10px] font-mono font-bold text-muted-foreground uppercase tracking-widest">
+                {group}
+              </span>
             </div>
-            {(selectedStep.properties || []).filter((p: any) => p.group === group).map((prop: any) => (
-              <div key={prop.key} className="px-3 py-2.5 border-b border-border/40">
-                <label className={labelCls}>{prop.label}</label>
-                {prop.type === "boolean" ? (
-                  <div className="flex items-center justify-between">
-                    <span className="text-[12px] font-mono text-foreground">{prop.value ? "True" : "False"}</span>
-                    <Toggle value={prop.value as boolean} onChange={() => updateProperty(selectedStep.id, prop.key, String(!prop.value))} />
+            {(selectedStep.properties || [])
+              .filter((p: any) => p.group === group)
+              .map((prop: any) => {
+                const isReadOnly = prop.isEditable === false;
+                return (
+                  <div
+                    key={prop.key}
+                    className="px-3 py-2.5 border-b border-border/40"
+                  >
+                    <div className="flex items-center gap-2 mb-1.5">
+                      <label className="block text-[11px] font-mono text-muted-foreground uppercase tracking-wide">
+                        {prop.label}
+                      </label>
+                      {isReadOnly && (
+                        <span className="ml-auto text-[9px] font-mono text-muted-foreground border border-border px-1.5">
+                          read only
+                        </span>
+                      )}
+                    </div>
+                    {prop.type === "boolean" ? (
+                      <div className="flex items-center justify-between">
+                        <span
+                          className={`text-[12px] font-mono ${isReadOnly ? "text-muted-foreground" : "text-foreground"}`}
+                        >
+                          {prop.value ? "True" : "False"}
+                        </span>
+                        {isReadOnly ? (
+                          <span
+                            className={`w-9 h-5 relative border opacity-60 ${prop.value ? "bg-primary border-primary" : "bg-muted border-border"}`}
+                          >
+                            <span
+                              className={`absolute top-0.5 w-3.5 h-3.5 bg-white ${prop.value ? "left-[19px]" : "left-0.5"}`}
+                            />
+                          </span>
+                        ) : (
+                          <Toggle
+                            value={prop.value as boolean}
+                            onChange={() =>
+                              updateProperty(
+                                selectedStep.id,
+                                prop.key,
+                                String(!prop.value),
+                              )
+                            }
+                          />
+                        )}
+                      </div>
+                    ) : prop.type === "enum" ? (
+                      <select
+                        value={String(prop.value)}
+                        disabled={isReadOnly}
+                        onChange={(e) =>
+                          updateProperty(
+                            selectedStep.id,
+                            prop.key,
+                            e.target.value,
+                          )
+                        }
+                        className={inputCls}
+                      >
+                        {prop.options?.map((o: any) => (
+                          <option key={o} value={o}>
+                            {o}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <input
+                          key={`${selectedStep.id}-${prop.key}`}
+                          defaultValue={
+                            prop.type === "frequency"
+                              ? formatFreq(prop.value as number)
+                              : String(prop.value)
+                          }
+                          readOnly={isReadOnly}
+                          disabled={isReadOnly}
+                          onBlur={(e) => {
+                            if (!isReadOnly)
+                              updateProperty(
+                                selectedStep.id,
+                                prop.key,
+                                e.target.value,
+                              );
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter")
+                              (e.target as HTMLInputElement).blur();
+                          }}
+                          className={`flex-1 ${inputCls} min-w-0`}
+                        />
+                        {prop.unit && prop.type !== "frequency" && (
+                          <span className="text-[11px] text-muted-foreground font-mono shrink-0">
+                            {prop.unit}
+                          </span>
+                        )}
+                      </div>
+                    )}
                   </div>
-                ) : prop.type === "enum" ? (
-                  <select value={String(prop.value)} onChange={e => updateProperty(selectedStep.id, prop.key, e.target.value)} className={inputCls}>
-                    {prop.options?.map((o: any) => <option key={o} value={o}>{o}</option>)}
-                  </select>
-                ) : (
-                  <div className="flex items-center gap-2">
-                    <input
-                      key={`${selectedStep.id}-${prop.key}`}
-                      defaultValue={prop.type === "frequency" ? formatFreq(prop.value as number) : String(prop.value)}
-                      onBlur={e => updateProperty(selectedStep.id, prop.key, e.target.value)}
-                      onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
-                      className={`flex-1 ${inputCls} min-w-0`}
-                    />
-                    {prop.unit && prop.type !== "frequency" && <span className="text-[11px] text-muted-foreground font-mono shrink-0">{prop.unit}</span>}
-                  </div>
-                )}
-              </div>
-            ))}
+                );
+              })}
           </div>
         ))}
 
-        {/* Dynamic Schema Properties */}
-        <div>
-          <div className="flex items-center gap-2 px-3 py-2 bg-muted/30 border-b border-border">
-            <div className="w-[3px] h-3" style={{ background: stripe }} />
-            <span className="text-[10px] font-mono font-bold text-muted-foreground uppercase tracking-widest">Properties</span>
-          </div>
-          {schemaProperties.length > 0
-            ? schemaProperties.map((prop: any) => renderEditor(prop, schemaPropertyValues, setSchemaPropertyValues, editorContext))
-            : (
+        {/* Schema properties (when no groups exist) */}
+        {!hasDisplayedProperties && (
+          <>
+            <div className="flex items-center gap-2 px-3 py-2 bg-muted/30 border-b border-border">
+              <div className="w-[3px] h-3" style={{ background: stripe }} />
+              <span className="text-[10px] font-mono font-bold text-muted-foreground uppercase tracking-widest">
+                Properties
+              </span>
+            </div>
+            {schemaProperties.length > 0 ? (
+              schemaProperties.map((prop: any) =>
+                renderEditor(
+                  prop,
+                  schemaPropertyValues,
+                  setSchemaPropertyValues,
+                  editorContext,
+                ),
+              )
+            ) : (
               <div className="px-3 py-4 text-[12px] text-muted-foreground font-mono">
-                {schemaError ? `Unable to load schema: ${schemaError}` : "No configurable properties."}
+                {schemaError
+                  ? `Unable to load schema: ${schemaError}`
+                  : "No configurable properties."}
               </div>
             )
           }
@@ -793,13 +950,21 @@ export function PropertiesPanel({
         {/* Footer actions */}
         {/* <div className="px-3 py-3 border-t border-border flex gap-2 mt-1">
           <button
-            onClick={() => { setAddStepParentId(null); setShowAddStep(true); }}
+            onClick={() => {
+              setAddStepParentId(null);
+              setShowAddStep(true);
+            }}
             className="flex-1 h-8 text-[12px] font-mono bg-secondary hover:bg-secondary/80 text-foreground flex items-center justify-center gap-1.5 border border-border transition-colors"
           >
             <Plus size={11} /> Add Step
           </button>
           <button
-            onClick={() => { if (selectedId) { setPlan((prev: any) => deleteIn(prev, selectedId)); setSelectedId(null); } }}
+            onClick={() => {
+              if (selectedId) {
+                setPlan((prev: any) => deleteIn(prev, selectedId));
+                setSelectedId(null);
+              }
+            }}
             className="flex-1 h-8 text-[12px] font-mono text-red-500 hover:bg-red-500/10 border border-red-500/30 flex items-center justify-center gap-1.5 transition-colors"
           >
             <Trash2 size={11} /> Delete

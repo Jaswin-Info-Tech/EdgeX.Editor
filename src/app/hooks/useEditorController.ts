@@ -15,7 +15,7 @@ import { useDebounce } from "./useDebounce";
 
 import { usePackages } from "./usePackage";
 import { usePackageUpload } from "./usePackageUpload";
-import { composeTestPlan, createTestPlan } from "../api/plugin";
+import { composeTestPlan, createTestPlan,runTestPlan } from "../api/plugin";
 
 
 
@@ -286,6 +286,7 @@ export function useEditorController() {
       ...step,
       properties: step.properties.map(prop => {
         if (prop.key !== key) return prop;
+        if (prop.isEditable === false) return prop;
         if (prop.type === "number") return { ...prop, value: parseFloat(raw) || 0 };
         if (prop.type === "boolean") return { ...prop, value: raw === "true" };
         if (prop.type === "frequency") return { ...prop, value: parseFreq(raw) };
@@ -294,12 +295,47 @@ export function useEditorController() {
     })));
   };
 
-  const handleRun = () => {
+const handleRun = async () => {
     if (runState === "running" || plan.length === 0) return;
     runTimers.current.forEach(clearTimeout);
     setPlan(resetAll);
     setLogs([]);
     setRunState("running");
+
+    // ✅ Step 1: Compose first
+    const jsonData = {
+      outputPath: "D:\\plans\\SamplePlan.TapPlan",
+      overwrite: true,
+      steps: plan.map(formatStepForCompose),
+    };
+
+    console.log(JSON.stringify(jsonData, null, 2));
+
+    try {
+      await composeTestPlan(jsonData);
+      addLog("INFO", "TestPlans", `Composed: ${jsonData.outputPath}`);
+    } catch (error) {
+      console.error("Failed to compose test plan:", error);
+      addLog("ERROR", "TestPlans", "Failed to compose test plan. Aborting run.");
+      setRunState("idle");
+      return; // ✅ Stop if compose fails
+    }
+
+    // ✅ Step 2: Run after compose succeeds
+    try {
+      await runTestPlan({
+        path: "D:\\plans\\SamplePlan.TapPlan",
+        cacheXml: true,
+      });
+      addLog("INFO", "TestPlans", `Run started: D:\\plans\\SamplePlan.TapPlan`);
+    } catch (error) {
+      console.error("Failed to run test plan:", error);
+      addLog("ERROR", "TestPlans", "Failed to start test plan run.");
+      setRunState("idle");
+      return;
+    }
+
+    // ✅ Step 3: Animate UI steps after both API calls succeed
     const leaves = flatAll(plan).filter(step => !step.children && step.enabled);
     addLog("INFO", "EdgeX", `=== Run started - "${planMeta.name}" ===`);
     addLog("INFO", "EdgeX", `${leaves.length} enabled steps`);
@@ -309,16 +345,18 @@ export function useEditorController() {
       const start = offset + 200 + Math.random() * 150;
       const duration = 500 + Math.random() * 1500;
       offset = start + duration;
+      const stepType = (step.type ?? step.stepTypeName ?? "STEP").toUpperCase();
+
       runTimers.current.push(setTimeout(() => {
         setPlan(prev => setStatusIn(prev, step.id, "running"));
-        addLog("INFO", step.type.toUpperCase(), `-> ${step.name}`);
+        addLog("INFO", stepType, `-> ${step.name}`);
       }, start));
 
       const verdict: StepStatus = Math.random() > 0.1 ? "passed" : "failed";
       runTimers.current.push(setTimeout(() => {
         setPlan(prev => setStatusIn(prev, step.id, verdict));
-        addLog(verdict === "passed" ? "PASS" : "FAIL", step.type.toUpperCase(), `  ${step.name}: ${verdict.toUpperCase()} (${duration.toFixed(0)}ms)`);
-        if (verdict === "failed") addLog("ERROR", step.type.toUpperCase(), "  Out-of-limits condition detected");
+        addLog(verdict === "passed" ? "PASS" : "FAIL", stepType, `  ${step.name}: ${verdict.toUpperCase()} (${duration.toFixed(0)}ms)`);
+        if (verdict === "failed") addLog("ERROR", stepType, "  Out-of-limits condition detected");
       }, start + duration));
     });
 
@@ -326,6 +364,7 @@ export function useEditorController() {
       setRunState("completed");
       addLog("INFO", "EdgeX", `=== Run complete - ${(offset / 1000).toFixed(2)}s ===`);
     }, offset + 300);
+
     runTimers.current.push(finishTimer);
   };
 
@@ -407,8 +446,13 @@ export function useEditorController() {
       ));
       addLog("INFO", "Plugins", `Removed: ${pluginName}`);
       toast.success(`${pluginName} removed successfully`, { id: toastId });
+
       refreshPluginData();
       setTimeout(refreshPluginData, 1500);
+
+      setTimeout(() => {
+        window.location.reload();
+      }, 1500);
     } catch (err) {
       console.error("Uninstall API error:", err);
       addLog("ERROR", "Plugins", `Unable to uninstall: ${pluginName}`);
@@ -459,6 +503,9 @@ export function useEditorController() {
 
   };
 
+
+
+
   const formatStepForCompose = (step: TestStep): any => {
     const props = (step.properties || []).reduce((acc: Record<string, any>, prop: any) => {
       acc[prop.label] = prop.value;
@@ -475,7 +522,6 @@ export function useEditorController() {
       stepTypeName,
       ...(step.name && { name: step.name }),
       properties: props,
-
     };
 
     if (step.children?.length) {
@@ -535,6 +581,8 @@ export function useEditorController() {
     setDropIdx,
     handleSeqDrop,
     setPlan,
+    setPlanMeta,
+    setHasPlan,
     selectedStep,
     setAddStepParentId,
     setAddStepIdx,
