@@ -28,8 +28,16 @@ export function useEditorController() {
   const debouncedInstalledSearch = useDebounce(installedSearch);
   const debouncedBrowseSearch = useDebounce(browseSearch);
 
-  const { data: installedPluginsData, refetch: refetchInstalledPlugins } = useInstalledPlugins(debouncedInstalledSearch);
-  const { data: availablePackagesData, refetch: refetchAvailablePackages } = useAvailablePackages(debouncedBrowseSearch)
+  const {
+    data: installedPluginsData,
+    refetch: refetchInstalledPlugins,
+    isFetching: isInstalledPluginsFetching,
+  } = useInstalledPlugins(debouncedInstalledSearch);
+  const {
+    data: availablePackagesData,
+    refetch: refetchAvailablePackages,
+    isFetching: isAvailablePackagesFetching,
+  } = useAvailablePackages(debouncedBrowseSearch);
   const [plan, setPlan] = useState<TestStep[]>([]);
   const [planMeta, setPlanMeta] = useState<PlanMeta>({ name: "Untitled Test Plan", description: "", author: "", version: "1.0.0", dutName: "", dutSerial: "", dutModel: "", dutFirmware: "" });
   const [hasPlan, setHasPlan] = useState(false);
@@ -591,6 +599,8 @@ const handleRun = async () => {
     handleAddStep,
     plugins,
     installedPlugins,
+    isInstalledPluginsFetching,
+    isAvailablePackagesFetching,
     installedSearch,
     setInstalledSearch,
     browseSearch,

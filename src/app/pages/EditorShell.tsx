@@ -51,6 +51,8 @@ interface EditorShellProps {
   handleAddStep: any;
   plugins: any;
   installedPlugins: any;
+  isInstalledPluginsFetching: boolean;
+  isAvailablePackagesFetching: boolean;
   handleInstallPlugin: any;
   handleUninstallPlugin: any;
   handleUninstallPackage: any;
@@ -146,6 +148,8 @@ export function EditorShell(props: EditorShellProps) {
     handleAddStep,
     plugins,
     installedPlugins,
+    isInstalledPluginsFetching,
+    isAvailablePackagesFetching,
     handleInstallPlugin,
     handleUninstallPlugin,
     handleUninstallPackage,
@@ -636,6 +640,8 @@ export function EditorShell(props: EditorShellProps) {
         setShowPluginMgr={setShowPluginMgr}
         plugins={plugins}
         installedPlugins={installedPlugins}
+        isInstalledLoading={isInstalledPluginsFetching}
+        isAvailableLoading={isAvailablePackagesFetching}
         handleInstallPlugin={handleInstallPlugin}
         handleUninstallPlugin={handleUninstallPlugin}
         handleUninstallPackage={handleUninstallPackage}
