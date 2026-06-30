@@ -51,6 +51,10 @@ export const composeTestPlan = async (payload: any) => {
   const { data } = await axiosClient.post("/testplans/compose", payload); // ✅ send directly
   return data;
 };
+export const createTestPlan = async (payload: any) => {
+  const { data } = await axiosClient.post("/testplans/create", payload); // ✅ send directly
+  return data;
+};
 
 export const runTestPlan = async (payload: any) => {
   const { data } = await axiosClient.post("/testplans/run", payload); // ✅ send directly

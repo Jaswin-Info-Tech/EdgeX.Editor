@@ -15,7 +15,8 @@ import { useDebounce } from "./useDebounce";
 
 import { usePackages } from "./usePackage";
 import { usePackageUpload } from "./usePackageUpload";
-import { composeTestPlan, runTestPlan } from "../api/plugin";
+import { composeTestPlan, createTestPlan,runTestPlan } from "../api/plugin";
+
 
 
 export function useEditorController() {
@@ -502,30 +503,7 @@ const handleRun = async () => {
 
   };
 
-  const formatStepForCompose = (step: TestStep): any => {
-    const props = (step.properties || []).reduce((acc: Record<string, any>, prop: any) => {
-      acc[prop.label] = prop.value;
-      return acc;
-    }, {});
 
-    const stepTypeName = step.stepTypeName
-      ?? step.typeName
-      ?? step.fullName
-      ?? step.className
-      ?? step.name;
-
-    const formattedStep: any = {
-      stepTypeName,
-      ...(step.name && { name: step.name }),
-      properties: props,
-    };
-
-    if (step.children?.length) {
-      formattedStep.children = step.children.map(formatStepForCompose);
-    }
-
-    return formattedStep;
-  };
 
 
   const formatStepForCompose = (step: TestStep): any => {
@@ -558,11 +536,19 @@ const handleRun = async () => {
     const jsonData = {
       outputPath: "D:\\plans\\SamplePlan.TapPlan",
       overwrite: true,
-      steps: plan.map(formatStepForCompose),
+      // steps: plan.map(formatStepForCompose),
     };
 
     console.log(JSON.stringify(jsonData, null, 2));
 
+    try {
+      const response = await createTestPlan(jsonData);
+      addLog("INFO", "TestPlans", `Saved: ${jsonData.outputPath}`);
+      return response;
+    } catch (error) {
+      console.error("Failed to compose test plan:", error);
+      addLog("ERROR", "TestPlans", "Failed to save test plan.");
+    }
   };
 
   const handleSeqDrop = (event: DragEvent, parentId: string | null, idx: number) => {

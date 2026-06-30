@@ -63,7 +63,7 @@ const getSchemaRecords = (response: any) => {
 
 // ─── text ─────────────────────────────────────────────────────────────────────
 function TextEditor({ prop, value, onChange }: EditorProps) {
-  const label = prop.displayName || prop.name;
+  const label = prop.name || prop.displayName;
   return (
     <FieldWrap>
       <FieldLabel>{label}</FieldLabel>
@@ -79,7 +79,7 @@ function TextEditor({ prop, value, onChange }: EditorProps) {
 
 // ─── textarea ─────────────────────────────────────────────────────────────────
 function TextareaEditor({ prop, value, onChange }: EditorProps) {
-  const label = prop.displayName || prop.name;
+  const label = prop.name || prop.displayName;
   return (
     <FieldWrap>
       <FieldLabel>{label}</FieldLabel>
@@ -96,7 +96,7 @@ function TextareaEditor({ prop, value, onChange }: EditorProps) {
 
 // ─── number (decimal) ─────────────────────────────────────────────────────────
 function NumberEditor({ prop, value, onChange }: EditorProps) {
-  const label = prop.displayName || prop.name;
+  const label = prop.name || prop.displayName;
   return (
     <FieldWrap>
       <FieldLabel>{label}</FieldLabel>
@@ -113,7 +113,7 @@ function NumberEditor({ prop, value, onChange }: EditorProps) {
 
 // ─── integer ──────────────────────────────────────────────────────────────────
 function IntegerEditor({ prop, value, onChange }: EditorProps) {
-  const label = prop.displayName || prop.name;
+  const label = prop.name || prop.displayName;
   return (
     <FieldWrap>
       <FieldLabel>{label}</FieldLabel>
@@ -130,7 +130,7 @@ function IntegerEditor({ prop, value, onChange }: EditorProps) {
 
 // ─── checkbox ─────────────────────────────────────────────────────────────────
 function CheckboxEditor({ prop, value, onChange }: EditorProps) {
-  const label = prop.displayName || prop.name;
+  const label = prop.name || prop.displayName;
   return (
     <FieldWrap>
       <div className="flex items-center justify-between">
@@ -143,7 +143,7 @@ function CheckboxEditor({ prop, value, onChange }: EditorProps) {
 
 // ─── select (dropdown / instrument-selector / dut-selector / result-listener/test-step) ─
 function SelectEditor({ prop, value, onChange }: EditorProps) {
-  const label = prop.displayName || prop.name;
+  const label = prop.name || prop.displayName;
   const options = getSelectOptions(prop);
   return (
     <FieldWrap>
@@ -169,7 +169,7 @@ function SelectEditor({ prop, value, onChange }: EditorProps) {
 
 // ─── multiselect ──────────────────────────────────────────────────────────────
 function MultiselectEditor({ prop, value, onChange }: EditorProps) {
-  const label = prop.displayName || prop.name;
+  const label = prop.name || prop.displayName;
   const options = getSelectOptions(prop);
   const selected: string[] = Array.isArray(value) ? value : [];
 
@@ -206,7 +206,7 @@ function MultiselectEditor({ prop, value, onChange }: EditorProps) {
 
 // ─── datetime ─────────────────────────────────────────────────────────────────
 function DateTimeEditor({ prop, value, onChange }: EditorProps) {
-  const label = prop.displayName || prop.name;
+  const label = prop.name || prop.displayName;
   return (
     <FieldWrap>
       <FieldLabel>{label}</FieldLabel>
@@ -222,7 +222,7 @@ function DateTimeEditor({ prop, value, onChange }: EditorProps) {
 
 // ─── date ─────────────────────────────────────────────────────────────────────
 function DateEditor({ prop, value, onChange }: EditorProps) {
-  const label = prop.displayName || prop.name;
+  const label = prop.name || prop.displayName;
   return (
     <FieldWrap>
       <FieldLabel>{label}</FieldLabel>
@@ -238,7 +238,7 @@ function DateEditor({ prop, value, onChange }: EditorProps) {
 
 // ─── time ─────────────────────────────────────────────────────────────────────
 function TimeEditor({ prop, value, onChange }: EditorProps) {
-  const label = prop.displayName || prop.name;
+  const label = prop.name || prop.displayName;
   return (
     <FieldWrap>
       <FieldLabel>{label}</FieldLabel>
@@ -254,7 +254,7 @@ function TimeEditor({ prop, value, onChange }: EditorProps) {
 
 // ─── duration (HH:MM:SS) ──────────────────────────────────────────────────────
 function DurationEditor({ prop, value, onChange }: EditorProps) {
-  const label = prop.displayName || prop.name;
+  const label = prop.name || prop.displayName;
   return (
     <FieldWrap>
       <FieldLabel>{label}</FieldLabel>
@@ -273,7 +273,7 @@ function DurationEditor({ prop, value, onChange }: EditorProps) {
 
 // ─── array (dynamic list) ─────────────────────────────────────────────────────
 function ArrayEditor({ prop, value, onChange }: EditorProps) {
-  const label = prop.displayName || prop.name;
+  const label = prop.name || prop.displayName;
   const items: string[] = Array.isArray(value) ? value : [];
 
   const updateItem = (idx: number, val: string) => {
@@ -313,7 +313,7 @@ function ArrayEditor({ prop, value, onChange }: EditorProps) {
 
 // ─── keyvalue (dictionary) ────────────────────────────────────────────────────
 function KeyValueEditor({ prop, value, onChange }: EditorProps) {
-  const label = prop.displayName || prop.name;
+  const label = prop.name || prop.displayName;
   const pairs: { k: string; v: string }[] = Array.isArray(value) ? value : [];
 
   const updatePair = (idx: number, field: "k" | "v", val: string) => {
@@ -362,7 +362,7 @@ function KeyValueEditor({ prop, value, onChange }: EditorProps) {
 
 // ─── object (expandable) ──────────────────────────────────────────────────────
 function ObjectEditor({ prop, value, onChange }: EditorProps) {
-  const label = prop.displayName || prop.name;
+  const label = prop.name || prop.displayName;
   const [open, setOpen] = useState(false);
   const str = typeof value === "object" ? JSON.stringify(value, null, 2) : (value ?? "{}");
 
@@ -390,7 +390,7 @@ function ObjectEditor({ prop, value, onChange }: EditorProps) {
 
 // ─── file ─────────────────────────────────────────────────────────────────────
 function FileEditor({ prop, value, onChange }: EditorProps) {
-  const label = prop.displayName || prop.name;
+  const label = prop.name || prop.displayName;
   return (
     <FieldWrap>
       <FieldLabel>{label}</FieldLabel>
@@ -417,7 +417,7 @@ function FileEditor({ prop, value, onChange }: EditorProps) {
 
 // ─── folder ───────────────────────────────────────────────────────────────────
 function FolderEditor({ prop, value, onChange }: EditorProps) {
-  const label = prop.displayName || prop.name;
+  const label = prop.name || prop.displayName;
   return (
     <FieldWrap>
       <FieldLabel>{label}</FieldLabel>
@@ -449,7 +449,7 @@ function FolderEditor({ prop, value, onChange }: EditorProps) {
 
 // ─── step-selector ────────────────────────────────────────────────────────────
 function StepSelectorEditor({ prop, value, onChange }: EditorProps) {
-  const label = prop.displayName || prop.name;
+  const label = prop.name || prop.displayName;
   const steps = getSelectOptions(prop);
   return (
     <FieldWrap>
@@ -471,7 +471,7 @@ function StepSelectorEditor({ prop, value, onChange }: EditorProps) {
 
 // ─── readonly ─────────────────────────────────────────────────────────────────
 function ReadonlyEditor({ prop, value }: Omit<EditorProps, "onChange">) {
-  const label = prop.displayName || prop.name;
+  const label = prop.name || prop.displayName;
   return (
     <FieldWrap>
       <FieldLabel>{label}</FieldLabel>
@@ -482,7 +482,7 @@ function ReadonlyEditor({ prop, value }: Omit<EditorProps, "onChange">) {
 
 // ─── unknown / fallback ───────────────────────────────────────────────────────
 function UnknownEditor({ prop, value, onChange }: EditorProps) {
-  const label = prop.displayName || prop.name;
+  const label = prop.name || prop.displayName;
   return (
     <FieldWrap>
       <FieldLabel>
@@ -589,19 +589,10 @@ export function PropertiesPanel({
 }: PropertiesPanelProps) {
   const [schemaResponse, setSchemaResponse] = useState<any>(null);
   const [schemaError, setSchemaError] = useState<string | null>(null);
-  const [schemaPropertyValues, setSchemaPropertyValues] = useState<
-    Record<string, any>
-  >({});
-  const getSchemaPropertyKey = (prop: any) =>
-    `${prop.displayName || prop.name} || ${prop.name}`;
-  const schemaRecords = useMemo(
-    () => getSchemaRecords(schemaResponse),
-    [schemaResponse],
-  );
-  const schemaProperties = useMemo(
-    () => schemaRecords[0]?.properties ?? [],
-    [schemaRecords],
-  );
+  const [schemaPropertyValues, setSchemaPropertyValues] = useState<Record<string, any>>({});
+  const getSchemaPropertyKey = (prop: any) => `${prop.name || prop.displayName} || ${prop.name}`;
+  const schemaRecords = useMemo(() => getSchemaRecords(schemaResponse), [schemaResponse]);
+  const schemaProperties = useMemo(() => schemaRecords[0]?.properties ?? [], [schemaRecords]);
   // console.log(schemaRecords,"qqqqq")
 
 const editorContext = useMemo<EditorContext>(
@@ -714,6 +705,11 @@ const editorContext = useMemo<EditorContext>(
         );
 
         return {
+          key,
+          label:  prop.name || prop.displayName,
+          type: prop.editorType === "checkbox" ? "boolean" : prop.editorType === "number" ? "number" : "string",
+          value: schemaPropertyValues[prop.name],
+          group: "Schema Properties",
           ...step,
           properties: [...keepProps, ...newProps],
           // ✅ Persist schema metadata onto the step
@@ -780,22 +776,10 @@ const editorContext = useMemo<EditorContext>(
 
         {/* Toggles */}
         <div className="border-b border-border">
-          <div className="flex items-center justify-between px-3 py-2 border-b border-border/50">
-            <span className="text-[11px] font-mono text-muted-foreground uppercase tracking-wider">
-              Enabled
-            </span>
-            <Toggle
-              value={selectedStep.enabled}
-              onChange={() =>
-                setPlan((prev: any) =>
-                  updateIn(prev, selectedStep.id, (s) => ({
-                    ...s,
-                    enabled: !s.enabled,
-                  })),
-                )
-              }
-            />
-          </div>
+          {/* <div className="flex items-center justify-between px-3 py-2 border-b border-border/50">
+            <span className="text-[11px] font-mono text-muted-foreground uppercase tracking-wider">Enabled</span>
+            <Toggle value={selectedStep.enabled} onChange={() => setPlan((prev: any) => updateIn(prev, selectedStep.id, s => ({ ...s, enabled: !s.enabled })))} />
+          </div> */}
           <div className="flex items-center justify-between px-3 py-2">
             <span className="text-[11px] font-mono text-muted-foreground uppercase tracking-wider">
               Breakpoint
@@ -951,20 +935,20 @@ const editorContext = useMemo<EditorContext>(
                   ? `Unable to load schema: ${schemaError}`
                   : "No configurable properties."}
               </div>
-            )}
-            <div className="px-3 py-3 border-t border-border mt-1">
-              <button
-                onClick={commitSchemaProperties}
-                className="w-full h-8 text-[12px] font-mono bg-info hover:bg-secondary/80 text-foreground flex items-center justify-center gap-1.5 border border-border transition-colors"
-              >
-                <Plug size={11} /> Add Properties
-              </button>
-            </div>
-          </>
-        )}
+            )
+          }
+          <div className="px-3 py-3 border-t border-border mt-1">
+            <button
+              onClick={commitSchemaProperties}
+              className="w-full h-8 text-[12px] font-mono bg-info hover:bg-secondary/80 text-foreground flex items-center justify-center gap-1.5 border border-border transition-colors"
+            >
+              <Plug size={11} /> Save Properties
+            </button>
+          </div>
+        </div>
 
         {/* Footer actions */}
-        <div className="px-3 py-3 border-t border-border flex gap-2 mt-1">
+        {/* <div className="px-3 py-3 border-t border-border flex gap-2 mt-1">
           <button
             onClick={() => {
               setAddStepParentId(null);
@@ -985,7 +969,7 @@ const editorContext = useMemo<EditorContext>(
           >
             <Trash2 size={11} /> Delete
           </button>
-        </div>
+        </div> */}
       </div>
     );
   };
