@@ -461,10 +461,6 @@ export function useEditorController() {
       stepTypeName,
       ...(step.name && { name: step.name }),
       properties: props,
-      // ✅ Include schema metadata in the composed output
-      // ...(step.assembly && { assembly: step.assembly }),
-      // ...(step.baseType && { baseType: step.baseType }),
-      // ...(step.fullName && { fullName: step.fullName }),
     };
 
     if (step.children?.length) {
@@ -491,10 +487,6 @@ export function useEditorController() {
       stepTypeName,
       ...(step.name && { name: step.name }),
       properties: props,
-      // ✅ Include schema metadata in the composed output
-      // ...(step.assembly && { assembly: step.assembly }),
-      // ...(step.baseType && { baseType: step.baseType }),
-      // ...(step.fullName && { fullName: step.fullName }),
     };
 
     if (step.children?.length) {
@@ -514,14 +506,6 @@ export function useEditorController() {
 
     console.log(JSON.stringify(jsonData, null, 2));
 
-    // try {
-    //   const response = await composeTestPlan(jsonData);
-    //   addLog("INFO", "TestPlans", `Saved: ${jsonData.outputPath}`);
-    //   return response;
-    // } catch (error) {
-    //   console.error("Failed to compose test plan:", error);
-    //   addLog("ERROR", "TestPlans", "Failed to save test plan.");
-    // }
   };
 
   const handleSeqDrop = (event: DragEvent, parentId: string | null, idx: number) => {
