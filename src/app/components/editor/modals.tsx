@@ -208,11 +208,12 @@ export function AddStepModal({ library, instruments, duts, onAdd, onClose }: { l
 export function PluginManager({
   plugins, installedPlugins, onInstall, onUninstall, onUninstallPackage, onUpload, onClose,
   installedSearch, setInstalledSearch, browseSearch, setBrowseSearch,
+  isInstalledLoading, isAvailableLoading,
 }: {
   plugins: Plugin[]; installedPlugins: Plugin[]; onInstall: (id: string) => Promise<void>; onUninstall: (id: string) => Promise<void>; onUninstallPackage: (id: string) => Promise<void>; onUpload: (file: File) => Promise<void>; onClose: () => void;
   installedSearch: string; setInstalledSearch: (v: string) => void;
   browseSearch: string; setBrowseSearch: (v: string) => void;
-
+  isInstalledLoading?: boolean; isAvailableLoading?: boolean;
 }) {
   const [tab, setTab] = useState<"installed" | "browse" | "upload">("installed");
   const [uploadFile, setUploadFile] = useState<File | null>(null);
@@ -297,23 +298,25 @@ export function PluginManager({
         <div className="flex-1 overflow-y-auto overflow-x-hidden">
           {tab === "installed" && (
             <div>
-              <div className="sticky top-0 z-10 flex items-center gap-2 px-5 py-2.5 border-b border-border bg-card">
-                <Search size={12} className="text-muted-foreground shrink-0" />
-                <input
-                  value={installedSearch}
-                  onChange={e => setInstalledSearch(e.target.value)}
-                  placeholder="Search installed plugins..."
-                  className="flex-1 bg-transparent text-[12px] font-mono text-foreground placeholder:text-muted-foreground outline-none"
-                />
-                {installedSearch && (
-                  <button
-                    onClick={() => setInstalledSearch("")}
-                    className="text-muted-foreground hover:text-foreground shrink-0"
-                    title="Clear search"
-                  >
-                    <X size={12} />
-                  </button>
-                )}
+              <div className="sticky top-0 z-10 bg-card px-5 py-2.5">
+                <div className="flex items-center gap-2 border border-border px-2 py-1.5 bg-background">
+                  <Search size={12} className="text-muted-foreground shrink-0" />
+                  <input
+                    value={installedSearch}
+                    onChange={e => setInstalledSearch(e.target.value)}
+                    placeholder="Search installed plugins..."
+                    className="flex-1 bg-transparent text-[12px] font-mono text-foreground placeholder:text-muted-foreground outline-none"
+                  />
+                  {installedSearch && (
+                    <button
+                      onClick={() => setInstalledSearch("")}
+                      className="text-muted-foreground hover:text-foreground shrink-0"
+                      title="Clear search"
+                    >
+                      <X size={12} />
+                    </button>
+                  )}
+                </div>
               </div>
               {installed.length === 0 && (
                 <div className="py-12 text-center text-[12px] text-muted-foreground font-mono">
@@ -392,23 +395,25 @@ export function PluginManager({
           )}
           {tab === "browse" && (
             <div>
-              <div className="sticky top-0 z-10 flex items-center gap-2 px-5 py-2.5 border-b border-border bg-card">
-                <Search size={12} className="text-muted-foreground shrink-0" />
-                <input
-                  value={browseSearch}
-                  onChange={e => setBrowseSearch(e.target.value)}
-                  placeholder="Search available plugins..."
-                  className="flex-1 bg-transparent text-[12px] font-mono text-foreground placeholder:text-muted-foreground outline-none"
-                />
-                {browseSearch && (
-                  <button
-                    onClick={() => setBrowseSearch("")}
-                    className="text-muted-foreground hover:text-foreground shrink-0"
-                    title="Clear search"
-                  >
-                    <X size={12} />
-                  </button>
-                )}
+              <div className="sticky top-0 z-10 bg-card px-5 py-2.5">
+                <div className="flex items-center gap-2 border border-border px-2 py-1.5 bg-background">
+                  <Search size={12} className="text-muted-foreground shrink-0" />
+                  <input
+                    value={browseSearch}
+                    onChange={e => setBrowseSearch(e.target.value)}
+                    placeholder="Search available plugins..."
+                    className="flex-1 bg-transparent text-[12px] font-mono text-foreground placeholder:text-muted-foreground outline-none"
+                  />
+                  {browseSearch && (
+                    <button
+                      onClick={() => setBrowseSearch("")}
+                      className="text-muted-foreground hover:text-foreground shrink-0"
+                      title="Clear search"
+                    >
+                      <X size={12} />
+                    </button>
+                  )}
+                </div>
               </div>
               {available.length === 0 && (
                 <div className="py-12 text-center text-[12px] text-muted-foreground font-mono">
