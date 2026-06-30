@@ -720,10 +720,10 @@ export function PropertiesPanel({
 
         {/* Toggles */}
         <div className="border-b border-border">
-          <div className="flex items-center justify-between px-3 py-2 border-b border-border/50">
+          {/* <div className="flex items-center justify-between px-3 py-2 border-b border-border/50">
             <span className="text-[11px] font-mono text-muted-foreground uppercase tracking-wider">Enabled</span>
             <Toggle value={selectedStep.enabled} onChange={() => setPlan((prev: any) => updateIn(prev, selectedStep.id, s => ({ ...s, enabled: !s.enabled })))} />
-          </div>
+          </div> */}
           <div className="flex items-center justify-between px-3 py-2">
             <span className="text-[11px] font-mono text-muted-foreground uppercase tracking-wider">Breakpoint</span>
             <Toggle value={!!selectedStep.breakpoint} onChange={() => setPlan((prev: any) => updateIn(prev, selectedStep.id, s => ({ ...s, breakpoint: !s.breakpoint })))} />
@@ -785,13 +785,13 @@ export function PropertiesPanel({
               onClick={commitSchemaProperties}
               className="w-full h-8 text-[12px] font-mono bg-info hover:bg-secondary/80 text-foreground flex items-center justify-center gap-1.5 border border-border transition-colors"
             >
-              <Plug size={11} /> Add Properties
+              <Plug size={11} /> Save Properties
             </button>
           </div>
         </div>
 
         {/* Footer actions */}
-        <div className="px-3 py-3 border-t border-border flex gap-2 mt-1">
+        {/* <div className="px-3 py-3 border-t border-border flex gap-2 mt-1">
           <button
             onClick={() => { setAddStepParentId(null); setShowAddStep(true); }}
             className="flex-1 h-8 text-[12px] font-mono bg-secondary hover:bg-secondary/80 text-foreground flex items-center justify-center gap-1.5 border border-border transition-colors"
@@ -804,7 +804,7 @@ export function PropertiesPanel({
           >
             <Trash2 size={11} /> Delete
           </button>
-        </div>
+        </div> */}
       </div>
     );
   };

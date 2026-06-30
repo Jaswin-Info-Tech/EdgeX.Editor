@@ -20,7 +20,7 @@ export function NewPlanModal({ onClose, onCreate }: { onClose: () => void; onCre
   const [step, setStep] = useState(0);
   const [meta, setMeta] = useState<PlanMeta>({ name: "Untitled Test Plan", description: "", author: "", version: "1.0.0", dutName: "", dutSerial: "", dutModel: "", dutFirmware: "" });
   const upd = (k: keyof PlanMeta) => (e: any) => setMeta(m => ({ ...m, [k]: e.target.value }));
-  const STEPS = ["Plan Details", "DUT Configuration", "Review"];
+  const STEPS = ["Plan Details"];
 
   return (
     <div className="fixed inset-0 bg-black/75 flex items-center justify-center z-50" onClick={onClose}>
@@ -41,15 +41,15 @@ export function NewPlanModal({ onClose, onCreate }: { onClose: () => void; onCre
           ))}
         </div>
         <div className="px-5 py-5 space-y-4">
-          {step === 0 && <>
+          {/* {step === 0 && <> */}
             <Field label="Plan Name *" value={meta.name} onChange={upd("name")} placeholder="e.g. RF Board Validation v3" />
             <Field label="Description" value={meta.description} onChange={upd("description")} placeholder="What does this plan verify?" textarea />
             <div className="grid grid-cols-2 gap-3">
               <Field label="Author" value={meta.author} onChange={upd("author")} placeholder="Engineer name" />
               <Field label="Version" value={meta.version} onChange={upd("version")} placeholder="1.0.0" />
             </div>
-          </>}
-          {step === 1 && <>
+          {/* </>} */}
+          {/* {step === 1 && <>
             <div className="text-[12px] text-muted-foreground font-mono mb-2">Configure the Device Under Test for traceability.</div>
             <Field label="DUT Name" value={meta.dutName} onChange={upd("dutName")} placeholder="e.g. RF Transceiver Module" />
             <div className="grid grid-cols-2 gap-3">
@@ -69,26 +69,26 @@ export function NewPlanModal({ onClose, onCreate }: { onClose: () => void; onCre
                 </div>
               ))}
             </div>
-          )}
+          )} */}
         </div>
         <div className="flex justify-between items-center px-5 py-3 border-t border-border bg-muted/20">
           <button onClick={onClose} className="text-[12px] text-muted-foreground hover:text-foreground font-mono">Cancel</button>
           <div className="flex gap-2">
-            {step > 0 && (
+            {/* {step > 0 && (
               <button onClick={() => setStep(s => s - 1)} className="flex items-center gap-1 px-3 h-8 border border-border text-[12px] font-mono text-foreground hover:bg-secondary">
                 <ChevronLeft size={12} /> Back
               </button>
-            )}
-            {step < 2 ? (
+            )} */}
+            {/* {step < 2 ? (
               <button onClick={() => setStep(s => s + 1)} disabled={step === 0 && !meta.name.trim()}
                 className="flex items-center gap-1 px-4 h-8 bg-primary text-primary-foreground text-[12px] font-mono font-semibold hover:bg-primary/90 disabled:opacity-40">
                 Next <ChevronRight size={12} />
               </button>
-            ) : (
+            ) : ( */}
               <button onClick={() => onCreate(meta)} className="flex items-center gap-1 px-4 h-8 bg-emerald-600 text-white text-[12px] font-mono font-semibold hover:bg-emerald-600/90">
                 <Check size={12} /> Create Plan
               </button>
-            )}
+            {/* )} */}
           </div>
         </div>
       </div>
@@ -100,7 +100,7 @@ export function NewPlanModal({ onClose, onCreate }: { onClose: () => void; onCre
 
 export function AddStepModal({ library, instruments, duts, onAdd, onClose }: { library: LibraryItem[]; instruments: InstrumentItem[]; duts: DutItem[]; onAdd: (i: LibraryItem) => void; onClose: () => void }) {
   const [search, setSearch] = useState("");
-  const [section, setSection] = useState<"all" | "steps" | "instruments" | "duts">("all");
+  const [section, setSection] = useState< "steps" | "all" | "instruments" | "duts">("steps");
 
   const instrumentItems = instruments.map((instrument): LibraryItem => ({
     id: `instrument:${instrument.name}:${instrument.assembly}`,
@@ -150,16 +150,16 @@ export function AddStepModal({ library, instruments, duts, onAdd, onClose }: { l
     <div className="fixed inset-0 bg-black/75 flex items-center justify-center z-50" onClick={onClose}>
       <div className="bg-card border border-border w-[620px] h-[480px] flex flex-col shadow-2xl" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-muted/30">
-          <div className="flex items-center gap-2"><Plus size={15} className="text-primary" /><span className="text-[13px] font-semibold text-foreground">Add Item</span></div>
+          <div className="flex items-center gap-2"><Plus size={15} className="text-primary" /><span className="text-[13px] font-semibold text-foreground">Add Step</span></div>
           <button onClick={onClose} className="text-muted-foreground hover:text-foreground"><X size={14} /></button>
         </div>
         <div className="flex flex-1 overflow-hidden">
           <div className="w-40 border-r border-border overflow-y-auto shrink-0">
             {[
-              ["all", "All"],
+              // ["all", "All"],
               ["steps", "Test Steps"],
-              ["instruments", "Instruments"],
-              ["duts", "DUTs"],
+              // ["instruments", "Instruments"],
+              // ["duts", "DUTs"],
             ].map(([value, label]) => (
               <button key={value} onClick={() => setSection(value as "all" | "steps" | "instruments" | "duts")}
                 className={`w-full text-left px-3 py-2 text-[12px] font-mono transition-colors border-l-2
