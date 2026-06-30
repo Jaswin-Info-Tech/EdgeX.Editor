@@ -16,6 +16,8 @@ interface ModalsHostProps {
   setShowPluginMgr: (value: boolean) => void;
   plugins: any[];
   installedPlugins: any[];
+  isInstalledLoading: boolean;
+  isAvailableLoading: boolean;
   handleInstallPlugin: (id: string) => Promise<void>;
   handleUninstallPlugin: (id: string) => Promise<void>;
   handleUninstallPackage: (id: string) => Promise<void>;
@@ -45,6 +47,8 @@ export function ModalsHost({
   setShowPluginMgr,
   plugins,
   installedPlugins,
+  isInstalledLoading,
+  isAvailableLoading,
   handleInstallPlugin,
   handleUninstallPlugin,
   handleUninstallPackage,
@@ -80,6 +84,8 @@ export function ModalsHost({
         <PluginManager
           plugins={plugins}
           installedPlugins={installedPlugins}
+          isInstalledLoading={isInstalledLoading}
+          isAvailableLoading={isAvailableLoading}
           onInstall={handleInstallPlugin}
           onUninstall={handleUninstallPlugin}
           onUninstallPackage={handleUninstallPackage}
