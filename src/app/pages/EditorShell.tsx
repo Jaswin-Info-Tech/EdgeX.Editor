@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, ChevronLeft, ChevronRight, Database, Pencil, Plus, Save, Search, Trash2, X } from "lucide-react";
 import { getTestPlanEditorModel } from "../api/testplans";
-// import { getStepSchema } from "../api/plugin";
+import { getStepSchema } from "../api/plugin";
 import { ConsolePanel } from "../components/editor/ConsolePanel";
 import { EditorToolbar } from "../components/editor/EditorToolbar";
 import { LeftPanel } from "../components/editor/LeftPanel";
@@ -231,7 +231,6 @@ export function EditorShell(props: EditorShellProps) {
     { id: "rp3", name: "Resource Plan 3", instrument: "Oscilloscope", status: "Active" },
     { id: "rp4", name: "Resource Plan 4", instrument: "Multimeter", status: "Active" },
     { id: "rp5", name: "Resource Plan 5", instrument: "Oscilloscope", status: "Active" },
-
   ]);
   const [testPlanQuery, setTestPlanQuery] = useState("D:\\");
   const [submittedTestPlanQuery, setSubmittedTestPlanQuery] = useState("");
@@ -318,21 +317,18 @@ export function EditorShell(props: EditorShellProps) {
     [resourcePlans, resourceSearch],
   );
 
-  const dummyResourceInstruments = useMemo(
-    () => [
-      { name: "Oscilloscope", baseType: "Scope", assembly: "Dummy.Instruments", fullName: "Dummy.Instruments.Oscilloscope", typeName: "Oscilloscope" },
-      { name: "Multimeter", baseType: "DMM", assembly: "Dummy.Instruments", fullName: "Dummy.Instruments.Multimeter", typeName: "Multimeter" },
-      { name: "Power Supply", baseType: "PSU", assembly: "Dummy.Instruments", fullName: "Dummy.Instruments.PowerSupply", typeName: "PowerSupply" },
-      { name: "Function Generator", baseType: "FuncGen", assembly: "Dummy.Instruments", fullName: "Dummy.Instruments.FunctionGenerator", typeName: "FunctionGenerator" },
-      { name: "Spectrum Analyzer", baseType: "SpecAn", assembly: "Dummy.Instruments", fullName: "Dummy.Instruments.SpectrumAnalyzer", typeName: "SpectrumAnalyzer" },
-    ],
-    [],
+  const browsableResourceInstruments = useMemo(
+    () =>
+      (instruments ?? [])
+        .filter(
+          (instrument: any) =>
+            instrument?.canCreateInstance !== false &&
+            instrument?.isBrowsable !== false,
+        )
+        .filter((instrument: any) => instrument?.name),
+    [instruments],
   );
 
-  const browsableResourceInstruments = useMemo(
-    () => dummyResourceInstruments,
-    [dummyResourceInstruments],
-  );
   const selectedResourceInstrumentRecord = useMemo(
     () =>
       browsableResourceInstruments.find(
@@ -402,12 +398,36 @@ export function EditorShell(props: EditorShellProps) {
       return;
     }
 
-    setIsResourceSchemaLoading(true);
-    setResourceSchemaError("");
-    setResourceSchema(fallbackResourceSchema);
-    setIsResourceSchemaLoading(false);
+    let cancelled = false;
+    const fetchResourceSchema = async () => {
+      setIsResourceSchemaLoading(true);
+      setResourceSchemaError("");
+      const schemaTypeName =
+        selectedResourceInstrumentRecord.fullName ??
+        selectedResourceInstrumentRecord.typeName ??
+        selectedResourceInstrumentRecord.baseType ??
+        selectedResourceInstrumentRecord.name;
+
+      try {
+        const schema = await getStepSchema(schemaTypeName);
+        if (cancelled) return;
+        const records = getResourceSchemaRecords(schema);
+        setResourceSchema(records.length > 0 ? schema : fallbackResourceSchema);
+      } catch (error) {
+        if (cancelled) return;
+        setResourceSchema(fallbackResourceSchema);
+        setResourceSchemaError("Using default resource fields.");
+      } finally {
+        if (!cancelled) setIsResourceSchemaLoading(false);
+      }
+    };
+
+    fetchResourceSchema();
+    return () => {
+      cancelled = true;
+    };
   }, [fallbackResourceSchema, selectedResourceInstrumentRecord, showCreateResource]);
-  
+
   useEffect(() => {
     const nextValues: Record<string, any> = {};
     resourceSchemaProperties.forEach((property: any) => {
