@@ -9,6 +9,7 @@ import {
   getSchemaRecords,
   inputCls,
   labelCls,
+  normalizeEditorType,
   renderEditor,
   toBackendRecordOption,
 } from "./PropertyEditors";
@@ -46,6 +47,10 @@ export function PropertiesPanel({
   const getSchemaPropertyKey = (prop: any) => `${prop.name || prop.displayName} || ${prop.name}`;
   const schemaRecords = useMemo(() => getSchemaRecords(schemaResponse), [schemaResponse]);
   const schemaProperties = useMemo(() => schemaRecords[0]?.properties ?? [], [schemaRecords]);
+  const isObjectLikeEditor = (prop: any) => {
+    const type = normalizeEditorType(prop.editorType);
+    return type === "object" || type === "json";
+  };
 
   const editorContext = useMemo<EditorContext>(() => ({
     instrumentOptions: instruments
@@ -104,21 +109,57 @@ export function PropertiesPanel({
     schemaProperties.forEach((prop: any) => {
       const key = getSchemaPropertyKey(prop);
       const existing = selectedStep.properties?.find((item: any) => item.key === key);
-      values[prop.name] = existing?.value ?? (prop.editorType === "checkbox" ? false : "");
+      const value = existing?.value;
+
+      const isEnabledWrapper =
+        prop.propertyType?.includes("OpenTap.Enabled") ||
+        prop.fullTypeName?.includes("OpenTap.Enabled");
+
+      if (isEnabledWrapper && value && typeof value === "object") {
+        // Unwrap for editing — show just the inner Value in the text input
+        values[prop.name] = value.Value ?? "";
+      } else if (
+        prop.editorType === "instrument-selector" &&
+        value &&
+        typeof value === "object"
+      ) {
+        values[prop.name] = value.Name ?? "";
+      } else if (prop.name === "CommandType") {
+        values[prop.name] = Array.isArray(value) ? value : [];
+      } else if (isObjectLikeEditor(prop)) {
+        values[prop.name] = value ?? null;
+      } else {
+        values[prop.name] = value ?? (prop.editorType === "checkbox" ? false : "");
+      }
     });
     setSchemaPropertyValues(values);
   }, [selectedStep, schemaProperties]);
+  
 
   const getTypedValue = (prop: any, value: any) => {
-    const type = (prop.editorType || "").toLowerCase();
+    const type = normalizeEditorType(prop.editorType);
+    const isBlank = value == null || (typeof value === "string" && value.trim() === "");
 
-    // Handle CommandType explicitly
     if (prop.name === "CommandType") {
-      return Array.isArray(value)
-        ? value
-        : value
-          ? [value]
-          : [];
+      return Array.isArray(value) ? value : value ? [value] : [];
+    }
+
+    if (prop.name === "MaxCount" && isBlank) {
+      return {};
+    }
+
+    // NEW: Enabled<T> wrapper properties
+    const isEnabledWrapper =
+      prop.propertyType?.includes("OpenTap.Enabled") ||
+      prop.fullTypeName?.includes("OpenTap.Enabled");
+
+    if (isEnabledWrapper) {
+      if (value == null || String(value).trim() === "") return null;
+
+      return {
+        IsEnabled: value !== "" && value != null,
+        Value: value ?? "",
+      };
     }
 
     switch (type) {
@@ -132,15 +173,14 @@ export function PropertiesPanel({
         return Boolean(value);
 
       case "multiselect":
-        return Array.isArray(value)
-          ? value
-          : value
-            ? [value]
-            : [];
+        return Array.isArray(value) ? value : value ? [value] : [];
+
+      case "select":
+      case "dropdown":
+        return value == null || String(value).trim() === "" ? undefined : value;
 
       case "instrument-selector":
         if (!value) return null;
-
         return {
           $type:
             prop.propertyType ??
@@ -149,6 +189,20 @@ export function PropertiesPanel({
             "Keysight.OpenTap.Plugins.ScpiNetInstrument.Ag33210_1_04v4.Ag33210_1_04v4",
           Name: value,
         };
+
+      case "object":
+      case "json":
+        if (value == null) return null;
+        if (typeof value === "string" && value.trim() === "") return null;
+        if (
+          typeof value === "object" &&
+          !Array.isArray(value) &&
+          Object.getPrototypeOf(value) === Object.prototype &&
+          Object.keys(value).length === 0
+        ) {
+          return null;
+        }
+        return value;
 
       default:
         return value;
@@ -162,16 +216,19 @@ export function PropertiesPanel({
     setPlan((prev: any) => updateIn(prev, selectedStep.id, (step: any) => {
       const existingProps = step.properties || [];
 
-      const newProps = schemaProperties.map((prop: any) => {
-        const key = getSchemaPropertyKey(prop);
-        return {
-          key,
-          label: prop.name || prop.displayName,
-          type: prop.editorType === "checkbox" ? "boolean" : prop.editorType === "number" ? "number" : "string",
-          value: getTypedValue(prop, schemaPropertyValues[prop.name]),
-          group: "Schema Properties",
-        };
-      });
+      const newProps = schemaProperties
+        .map((prop: any) => {
+          const key = getSchemaPropertyKey(prop);
+          const typedValue = getTypedValue(prop, schemaPropertyValues[prop.name]);
+          return {
+            key,
+            label: prop.name || prop.displayName,
+            type: prop.editorType === "checkbox" ? "boolean" : prop.editorType === "number" ? "number" : "string",
+            value: typedValue,
+            group: "Schema Properties",
+          };
+        })
+        .filter((p: any) => p.value !== undefined);
 
       const keepProps = existingProps.filter((item: any) => item.group !== "Schema Properties");
 

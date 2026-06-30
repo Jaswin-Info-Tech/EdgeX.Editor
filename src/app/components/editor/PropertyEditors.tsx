@@ -359,7 +359,7 @@ export function KeyValueEditor({ prop, value, onChange }: EditorProps) {
 export function ObjectEditor({ prop, value, onChange }: EditorProps) {
   const label = prop.displayName || prop.name;
   const [open, setOpen] = useState(false);
-  const str = typeof value === "object" ? JSON.stringify(value, null, 2) : (value ?? "{}");
+  const str = value == null ? "" : typeof value === "object" ? JSON.stringify(value, null, 2) : String(value);
 
   return (
     <FieldWrap>
@@ -374,7 +374,13 @@ export function ObjectEditor({ prop, value, onChange }: EditorProps) {
           className={`${inputCls} mt-1`}
           placeholder="{}"
           onChange={e => {
-            try { onChange(JSON.parse(e.target.value)); }
+            const raw = e.target.value;
+            if (raw.trim() === "") {
+              onChange(null);
+              return;
+            }
+
+            try { onChange(JSON.parse(raw)); }
             catch { onChange(e.target.value); }
           }}
         />
@@ -535,7 +541,8 @@ export function renderEditor(
     case "duration":           return <DurationEditor     key={prop.name} prop={propWithContext} value={value} onChange={onChange} />;
     case "array":              return <ArrayEditor        key={prop.name} prop={propWithContext} value={value} onChange={onChange} />;
     case "keyvalue":           return <KeyValueEditor     key={prop.name} prop={propWithContext} value={value} onChange={onChange} />;
-    case "object":             return <ObjectEditor       key={prop.name} prop={propWithContext} value={value} onChange={onChange} />;
+    case "object":
+    case "json":               return <ObjectEditor       key={prop.name} prop={propWithContext} value={value} onChange={onChange} />;
     case "step-selector":      return <StepSelectorEditor key={prop.name} prop={propWithContext} value={value} onChange={onChange} />;
     case "file":               return <FileEditor         key={prop.name} prop={propWithContext} value={value} onChange={onChange} />;
     case "folder":             return <FolderEditor       key={prop.name} prop={propWithContext} value={value} onChange={onChange} />;
