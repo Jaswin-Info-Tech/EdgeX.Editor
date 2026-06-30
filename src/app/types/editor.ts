@@ -4,7 +4,7 @@ export type RunState = "idle" | "running" | "paused" | "completed";
 export interface Property {
   key: string; label: string;
   type: "string" | "number" | "boolean" | "enum" | "frequency";
-  value: string | number | boolean; unit?: string; options?: string[]; group: string;
+  value: string | number | boolean; unit?: string; options?: string[]; group: string; isEditable?: boolean;
 }
 
 export interface TestStep {

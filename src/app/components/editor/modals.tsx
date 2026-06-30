@@ -4,6 +4,23 @@ import type { CtxMenu, DutItem, InstrumentItem, LibraryItem, PlanMeta, Plugin } 
 import { TYPE_LABEL, TYPE_STRIPE } from "../../constants/editor";
 import { TypeIcon } from "./atoms";
 
+const matchesPluginSearch = (plugin: Plugin, query: string) => {
+  const search = query.trim().toLowerCase();
+  if (!search) return true;
+
+  const values = [
+    plugin.name,
+    plugin.description,
+    plugin.author,
+    plugin.version,
+    plugin.packageName,
+    plugin.pluginName,
+    ...(plugin.steps ?? []).flatMap(step => [step.name, step.description, step.category]),
+  ];
+
+  return values.some(value => String(value ?? "").toLowerCase().includes(search));
+};
+
 function Field({ label, value, onChange, placeholder, textarea }: any) {
   const cls = "w-full bg-background border border-border px-3 py-2 text-[13px] font-mono text-foreground placeholder:text-muted-foreground outline-none focus:border-primary transition-colors";
   return (
@@ -208,34 +225,24 @@ export function AddStepModal({ library, instruments, duts, onAdd, onClose }: { l
 export function PluginManager({
   plugins, installedPlugins, onInstall, onUninstall, onUninstallPackage, onUpload, onClose,
   installedSearch, setInstalledSearch, browseSearch, setBrowseSearch,
+  isInstalledLoading, isAvailableLoading,
 }: {
   plugins: Plugin[]; installedPlugins: Plugin[]; onInstall: (id: string) => Promise<void>; onUninstall: (id: string) => Promise<void>; onUninstallPackage: (id: string) => Promise<void>; onUpload: (file: File) => Promise<void>; onClose: () => void;
   installedSearch: string; setInstalledSearch: (v: string) => void;
   browseSearch: string; setBrowseSearch: (v: string) => void;
-
+  isInstalledLoading?: boolean; isAvailableLoading?: boolean;
 }) {
   const [tab, setTab] = useState<"installed" | "browse" | "upload">("installed");
   const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [uploadError, setUploadError] = useState("");
   const [uploading, setUploading] = useState(false);
   const [installingId, setInstallingId] = useState<string | null>(null);
   const [uninstallingId, setUninstallingId] = useState<string | null>(null);
   // const [installedSearch, setInstalledSearch] = useState("");
   // const [browseSearch, setBrowseSearch] = useState("");
 
-  // const filteredInstalled = installed.filter(p =>
-  //   installedSearch.trim() === ""
-  //     ? true
-  //     : (p.name ?? "").toLowerCase().includes(installedSearch.trim().toLowerCase())
-  // );
-
-  // const filteredAvailable = available.filter(p =>
-  //   browseSearch.trim() === ""
-  //     ? true
-  //     : (p.name ?? "").toLowerCase().includes(browseSearch.trim().toLowerCase())
-  // );
-
-  const installed = installedPlugins;
-  const available = plugins;
+  const installed = installedPlugins.filter(plugin => matchesPluginSearch(plugin, installedSearch));
+  const available = plugins.filter(plugin => matchesPluginSearch(plugin, browseSearch));
   const handleUpload = async () => {
     if (!uploadFile) return;
     setUploading(true);
@@ -296,31 +303,37 @@ export function PluginManager({
         <div className="flex-1 overflow-y-auto overflow-x-hidden">
           {tab === "installed" && (
             <div>
-              <div className="sticky top-0 z-10 flex items-center gap-2 px-5 py-2.5 border-b border-border bg-card">
-                <Search size={12} className="text-muted-foreground shrink-0" />
-                <input
-                  value={installedSearch}
-                  onChange={e => setInstalledSearch(e.target.value)}
-                  placeholder="Search installed plugins..."
-                  className="flex-1 bg-transparent text-[12px] font-mono text-foreground placeholder:text-muted-foreground outline-none"
-                />
-                {installedSearch && (
-                  <button
-                    onClick={() => setInstalledSearch("")}
-                    className="text-muted-foreground hover:text-foreground shrink-0"
-                    title="Clear search"
-                  >
-                    <X size={12} />
-                  </button>
-                )}
+              <div className="sticky top-0 z-10 bg-card px-5 py-2.5">
+                <div className="flex items-center gap-2 border border-border px-2 py-1.5 bg-background">
+                  <Search size={12} className="text-muted-foreground shrink-0" />
+                  <input
+                    value={installedSearch}
+                    onChange={e => setInstalledSearch(e.target.value)}
+                    placeholder="Search installed plugins..."
+                    className="flex-1 bg-transparent text-[12px] font-mono text-foreground placeholder:text-muted-foreground outline-none"
+                  />
+                  {installedSearch && (
+                    <button
+                      onClick={() => setInstalledSearch("")}
+                      className="text-muted-foreground hover:text-foreground shrink-0"
+                      title="Clear search"
+                    >
+                      <X size={12} />
+                    </button>
+                  )}
+                </div>
               </div>
-              {installed.length === 0 && (
+              {isInstalledLoading ? (
                 <div className="py-12 text-center text-[12px] text-muted-foreground font-mono">
-                  No plugins installed
+                  Loading installed plugins...
+                </div>
+              ) : installed.length === 0 && (
+                <div className="py-12 text-center text-[12px] text-muted-foreground font-mono">
+                  {installedSearch ? "No matching plugins" : "No plugins installed"}
                 </div>
               )}
-              {installed.map((p) => (
-                <div key={p.id} className="px-5 py-4 border-b border-border">
+              {!isInstalledLoading && installed.map((p, index) => (
+                <div key={`${p.id}:${p.packageName ?? ""}:${p.assembly ?? ""}:${index}`} className="px-5 py-4 border-b border-border">
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex-1 min-w-0">
                       {/* Header */}
@@ -391,31 +404,37 @@ export function PluginManager({
           )}
           {tab === "browse" && (
             <div>
-              <div className="sticky top-0 z-10 flex items-center gap-2 px-5 py-2.5 border-b border-border bg-card">
-                <Search size={12} className="text-muted-foreground shrink-0" />
-                <input
-                  value={browseSearch}
-                  onChange={e => setBrowseSearch(e.target.value)}
-                  placeholder="Search available plugins..."
-                  className="flex-1 bg-transparent text-[12px] font-mono text-foreground placeholder:text-muted-foreground outline-none"
-                />
-                {browseSearch && (
-                  <button
-                    onClick={() => setBrowseSearch("")}
-                    className="text-muted-foreground hover:text-foreground shrink-0"
-                    title="Clear search"
-                  >
-                    <X size={12} />
-                  </button>
-                )}
+              <div className="sticky top-0 z-10 bg-card px-5 py-2.5">
+                <div className="flex items-center gap-2 border border-border px-2 py-1.5 bg-background">
+                  <Search size={12} className="text-muted-foreground shrink-0" />
+                  <input
+                    value={browseSearch}
+                    onChange={e => setBrowseSearch(e.target.value)}
+                    placeholder="Search available plugins..."
+                    className="flex-1 bg-transparent text-[12px] font-mono text-foreground placeholder:text-muted-foreground outline-none"
+                  />
+                  {browseSearch && (
+                    <button
+                      onClick={() => setBrowseSearch("")}
+                      className="text-muted-foreground hover:text-foreground shrink-0"
+                      title="Clear search"
+                    >
+                      <X size={12} />
+                    </button>
+                  )}
+                </div>
               </div>
-              {available.length === 0 && (
+              {isAvailableLoading ? (
                 <div className="py-12 text-center text-[12px] text-muted-foreground font-mono">
-                  No packages available
+                  Loading packages...
+                </div>
+              ) : available.length === 0 && (
+                <div className="py-12 text-center text-[12px] text-muted-foreground font-mono">
+                  {browseSearch ? "No matching packages" : "No packages available"}
                 </div>
               )}
-              {available.map(p => (
-                <div key={p.id} className="px-5 py-4 border-b border-border">
+              {!isAvailableLoading && available.map((p, index) => (
+                <div key={`${p.id}:${p.packageName ?? ""}:${p.version ?? ""}:${index}`} className="px-5 py-4 border-b border-border">
                   <div className="flex items-start justify-between">
                     <div>
                       <div className="flex items-center gap-2 mb-1">
@@ -520,4 +539,3 @@ export function ContextMenu({ menu, onAction, onClose }: { menu: CtxMenu; onActi
     </div>
   );
 }
-

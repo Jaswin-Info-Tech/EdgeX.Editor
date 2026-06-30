@@ -74,9 +74,10 @@ export const useDuts = () => {
   });
 };
 
-export const useTestPlans = (rootPath?: string) => {
+export const useTestPlans = (rootPath?: string, enabled = true) => {
   return useQuery<TestPlanItem[]>({
     queryKey: ["testplans", rootPath ?? ""],
+    enabled,
     queryFn: async () => {
       const data = await getTestPlans(rootPath);
       if (Array.isArray(data)) {
