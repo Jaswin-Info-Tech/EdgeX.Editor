@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Cpu, FilePlus, FolderOpen, FolderPlus, Package, Pause, Play, Plus, RotateCcw, Save, Square } from "lucide-react";
 import { ToolBtn } from "./atoms";
 
@@ -46,6 +47,14 @@ export function EditorToolbar({
   handleReset,
   handleAddGroup,
 }: EditorToolbarProps) {
+  const [showBenchMenu, setShowBenchMenu] = useState(false);
+
+  const handleBenchAction = (target: "instruments" | "duts") => {
+    setShowBenchMenu(false);
+    if (target === "instruments") setShowInstrumentsPanel(true);
+    else setShowDutsPanel(true);
+  };
+
   return (
     <div className="flex items-center bg-card border-b border-border h-10 px-2 shrink-0 gap-1">
       <div className="flex items-center gap-0.5">
@@ -93,12 +102,27 @@ export function EditorToolbar({
       <ToolBtn onClick={() => setShowPluginMgr(true)} title="Plugin Manager">
         <Package size={14} />{!isTablet && "Plugins"}
       </ToolBtn>
-      <ToolBtn onClick={() => setShowInstrumentsPanel(true)} title="Instruments">
-        <Package size={14} />{!isTablet && "Instruments"}
-      </ToolBtn>
-      <ToolBtn onClick={() => setShowDutsPanel(true)} title="DUTs">
-        <Cpu size={14} />{!isTablet && "DUTs"}
-      </ToolBtn>
+      <div className="relative">
+        <ToolBtn onClick={() => setShowBenchMenu((value) => !value)} title="Bench">
+          <Cpu size={14} />{!isTablet && "Bench"}
+        </ToolBtn>
+        {showBenchMenu && (
+          <div className="absolute top-full left-0 mt-1 z-50 min-w-[140px] border border-border bg-popover shadow-xl">
+            <button
+              onClick={() => handleBenchAction("instruments")}
+              className="flex w-full items-center px-3 py-2 text-left text-[12px] text-muted-foreground hover:bg-secondary hover:text-foreground"
+            >
+              Instruments
+            </button>
+            <button
+              onClick={() => handleBenchAction("duts")}
+              className="flex w-full items-center px-3 py-2 text-left text-[12px] text-muted-foreground hover:bg-secondary hover:text-foreground"
+            >
+              DUTs
+            </button>
+          </div>
+        )}
+      </div>
       <ToolBtn onClick={() => setShowTestPlansPanel(true)} title="Test Plans">
         <FolderPlus size={14} />{!isTablet && "Test Plans"}
       </ToolBtn>

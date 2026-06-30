@@ -624,6 +624,8 @@ export function EditorShell(props: EditorShellProps) {
         setIsDark={setIsDark}
         setShowNewPlan={setShowNewPlan}
         setShowPluginMgr={setShowPluginMgr}
+        setShowInstrumentsPanel={setShowInstrumentsPanel}
+        setShowDutsPanel={setShowDutsPanel}
         handleSave={handleSaveAndMarkClean}
         handleRun={handleRun}
         handleStop={handleStop}
