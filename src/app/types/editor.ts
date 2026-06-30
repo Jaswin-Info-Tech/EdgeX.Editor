@@ -88,3 +88,32 @@ export interface PlanMeta {
 }
 
 export interface CtxMenu { x: number; y: number; stepId: string; }
+
+export interface SequenceStepProps {
+  step: TestStep;
+  parentId: string | null;
+  idx: number;
+  selectedId: any;
+  expanded: any;
+  renaming: any;
+  renameRef: any;
+  renameVal: any;
+  setRenameVal: any;
+  commitRename: any;
+  setRenaming: any;
+  setSelectedId: any;
+  setContextMenu: any;
+  toggleExpand: any;
+  isTablet: any;
+  setRightOpen: any;
+  dragLibItem: any;
+  dropIdx: any;
+  setDropIdx: any;
+  dragOverSequenceId: string | null;
+  setDragOverSequenceId: (id: string | null) => void;
+  handleSeqDrop: any;
+  setPlan: any;
+  setAddStepParentId: any;
+  setAddStepIdx: any;
+  setShowAddStep: any;
+}

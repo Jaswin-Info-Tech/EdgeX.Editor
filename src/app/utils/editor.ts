@@ -103,3 +103,64 @@ export function toArray<T = any>(data: unknown): T[] {
   if (Array.isArray((data as any)?.value)) return (data as any).value;
   return [];
 }
+
+
+export function moveStepToPosition(
+  steps: TestStep[],
+  stepId: string,
+  newParentId: string | null,
+  newIdx: number
+): TestStep[] {
+  let movedStep: TestStep | null = null;
+
+  // Remove the step from wherever it currently lives, tracking it
+  const removeStep = (list: TestStep[]): TestStep[] =>
+    list
+      .filter(step => {
+        if (step.id === stepId) {
+          movedStep = step;
+          return false;
+        }
+        return true;
+      })
+      .map(step =>
+        step.children
+          ? { ...step, children: removeStep(step.children) }
+          : step
+      );
+
+  const withoutMoved = removeStep(steps);
+  if (!movedStep) return steps; // not found, no-op
+
+  // Guard: don't allow dropping a sequence into its own descendant
+  const isDescendant = (parentCandidateId: string | null, node: TestStep): boolean => {
+    if (!parentCandidateId) return false;
+    if (node.id === parentCandidateId) return true;
+    return (node.children ?? []).some(child => isDescendant(parentCandidateId, child));
+  };
+  // Guard against cycles: don't allow a step into its own subtree
+  if (movedStep && isDescendant(newParentId, movedStep)) {
+    return steps; // would create a cycle, reject
+  }
+
+  const insertAt = (list: TestStep[]): TestStep[] => {
+    if (newParentId === null) {
+      const next = [...list];
+      next.splice(newIdx, 0, movedStep!);
+      return next;
+    }
+    return list.map(step => {
+      if (step.id === newParentId) {
+        const children = [...(step.children ?? [])];
+        children.splice(newIdx, 0, movedStep!);
+        return { ...step, children };
+      }
+      if (step.children) {
+        return { ...step, children: insertAt(step.children) };
+      }
+      return step;
+    });
+  };
+
+  return insertAt(withoutMoved);
+}

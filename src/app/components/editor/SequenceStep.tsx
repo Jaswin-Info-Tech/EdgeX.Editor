@@ -5,6 +5,7 @@ import { TYPE_LABEL, TYPE_STRIPE } from "../../constants/editor";
 import { deleteIn, formatFreq, moveIn, updateIn } from "../../utils/editor";
 import { StatusIcon, StatusPill, TypeIcon } from "./atoms";
 
+
 interface SequenceStepProps {
   step: TestStep;
   parentId: string | null;
@@ -25,12 +26,18 @@ interface SequenceStepProps {
   dragLibItem: any;
   dropIdx: any;
   setDropIdx: any;
+  dragOverSequenceId: string | null;
+  setDragOverSequenceId: (id: string | null) => void;
   handleSeqDrop: any;
   setPlan: any;
   setAddStepParentId: any;
   setAddStepIdx: any;
   setShowAddStep: any;
+  draggedStepId: string | null;
+  setDraggedStepId: (id: string | null) => void;
+  handleStepReorder: (stepId: string, newParentId: string | null, newIdx: number) => void;
 }
+
 
 export function SequenceStep(props: SequenceStepProps) {
   const {
@@ -53,52 +60,114 @@ export function SequenceStep(props: SequenceStepProps) {
     dragLibItem,
     dropIdx,
     setDropIdx,
+    dragOverSequenceId,
+    setDragOverSequenceId,
     handleSeqDrop,
     setPlan,
     setAddStepParentId,
     setAddStepIdx,
     setShowAddStep,
+    draggedStepId,
+    setDraggedStepId,
+    handleStepReorder,
   } = props;
+
   const renderSeqStep = (step: TestStep, parentId: string | null, idx: number): ReactNode => {
     const isSel = selectedId === step.id;
     const hasKids = !!step.children?.length;
     const isExp = expanded.has(step.id);
     const stripe = TYPE_STRIPE[step.type] || "#64748b";
+    const isSequence = step.type === "sequence";
+    const isBeingDragged = draggedStepId === step.id;
+    const isAnyDragActive = !!dragLibItem || !!draggedStepId;
+    const isDropTargetRow = isSequence && isAnyDragActive && dragOverSequenceId === step.id;
 
     const summaryProp = step.properties.find(p => p.type === "frequency" || p.type === "number" || p.type === "string");
     const summary = summaryProp ? (summaryProp.type === "frequency" ? formatFreq(summaryProp.value as number) : `${summaryProp.value}${summaryProp.unit ? " " + summaryProp.unit : ""}`) : "";
 
+    const onAnyDrop = (e: any, targetParentId: string | null, targetIdx: number) => {
+      e.stopPropagation();
+      if (draggedStepId) {
+        if (draggedStepId === step.id) return; // dropping on self, ignore
+        handleStepReorder(draggedStepId, targetParentId, targetIdx);
+      } else if (dragLibItem) {
+        handleSeqDrop(e, targetParentId, targetIdx);
+      }
+    };
+
     return (
       <div key={step.id}>
-        {dragLibItem && (
-          <div onDragOver={e => { e.preventDefault(); e.stopPropagation(); setDropIdx(idx); }} onDrop={e => { e.stopPropagation(); handleSeqDrop(e, parentId, idx); }}
-            className={`h-1 transition-colors mx-1 mb-0.5 ${dropIdx === idx ? "bg-primary" : "bg-transparent"}`} />
+        {isAnyDragActive && !isBeingDragged && (
+          <div onDragOver={e => { e.preventDefault(); e.stopPropagation(); setDropIdx(idx); setDragOverSequenceId(null); }} onDrop={e => onAnyDrop(e, parentId, idx)}
+            className={`h-1 transition-colors mx-1 mb-0.5 ${dropIdx === idx && !dragOverSequenceId ? "bg-primary" : "bg-transparent"}`} />
         )}
         <div
           onClick={e => {
             e.stopPropagation();
-            console.log("SequenceStep click", step.id, step.name); setSelectedId(step.id); if (isTablet) setRightOpen(true);
+            setSelectedId((prev: string | null) => (prev === step.id ? null : step.id));
+            if (isTablet) setRightOpen(true);
           }}
           onContextMenu={e => { e.preventDefault(); e.stopPropagation(); setContextMenu({ x: e.clientX, y: e.clientY, stepId: step.id }); setSelectedId(step.id); }}
+          onDragOver={e => {
+            if (isSequence && isAnyDragActive && !isBeingDragged) {
+              e.preventDefault();
+              e.stopPropagation();
+              setDragOverSequenceId(step.id);
+            }
+          }}
+          onDragLeave={e => {
+            if (isSequence && dragOverSequenceId === step.id) {
+              e.stopPropagation();
+              setDragOverSequenceId(null);
+            }
+          }}
+          onDrop={e => {
+            if (isSequence && isAnyDragActive && !isBeingDragged) {
+              e.preventDefault();
+              onAnyDrop(e, step.id, step.children?.length ?? 0);
+              setDragOverSequenceId(null);
+              setDropIdx(null);
+            }
+          }}
           className={`flex items-stretch border-b border-border cursor-pointer group transition-colors
             ${isSel ? "bg-primary/8" : "hover:bg-secondary/60"}
+            ${isDropTargetRow ? "bg-primary/15 ring-1 ring-inset ring-primary" : ""}
+            ${isBeingDragged ? "opacity-30" : ""}
             ${step.status === "running" ? "bg-yellow-500/5" : ""}
             ${step.status === "passed" ? "bg-emerald-500/5" : ""}
             ${step.status === "failed" ? "bg-red-500/5" : ""}
             ${!step.enabled ? "opacity-40" : ""}`}
         >
-          {/* Left type stripe */}
           <div className="w-[3px] shrink-0 transition-colors" style={{ background: isSel || step.status === "running" ? stripe : step.status === "passed" ? "#10b981" : step.status === "failed" ? "#ef4444" : stripe + "60" }} />
 
-          {/* Content */}
           <div className="flex-1 flex items-center gap-2.5 px-3 py-2.5 min-w-0">
             {hasKids && (
               <button onClick={e => { e.stopPropagation(); toggleExpand(step.id); }} className="shrink-0 text-muted-foreground hover:text-foreground">
                 {isExp ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
               </button>
             )}
-            <GripVertical size={12} className="text-muted-foreground/30 group-hover:text-muted-foreground/60 shrink-0 cursor-grab" />
+            <div
+              draggable
+              onDragStart={e => {
+                e.stopPropagation();
+                e.dataTransfer.effectAllowed = "move";
+                setDraggedStepId(step.id);
+                setSelectedId(step.id);
+              }}
+              onDragEnd={e => { e.stopPropagation(); setDraggedStepId(null); setDragOverSequenceId(null); setDropIdx(null); }}
+              className="cursor-grab active:cursor-grabbing"
+            >
+              <GripVertical
+                size={12}
+                className="text-muted-foreground/30 group-hover:text-muted-foreground/60 shrink-0"
+              />
+            </div>
             <TypeIcon type={step.type} size={13} />
+
+
+
+
+
             {step.breakpoint && <span className="w-2 h-2 bg-red-500 shrink-0" title="Breakpoint" />}
 
             {renaming === step.id ? (
@@ -140,10 +209,10 @@ export function SequenceStep(props: SequenceStepProps) {
         {hasKids && isExp && (
           <div className="border-l-2 border-primary/20 ml-6">
             {step.children!.map((c, ci) => <SequenceStep key={c.id} {...props} step={c} parentId={step.id} idx={ci} />)}
-            {dragLibItem && (
-              <div onDragOver={e => { e.preventDefault(); e.stopPropagation(); setDropIdx(-1); }} onDrop={e => { e.stopPropagation(); handleSeqDrop(e, step.id, step.children!.length); }}
+            {isAnyDragActive && !isBeingDragged && (
+              <div onDragOver={e => { e.preventDefault(); e.stopPropagation(); setDropIdx(-1); setDragOverSequenceId(null); }} onDrop={e => onAnyDrop(e, step.id, step.children!.length)}
                 className={`h-8 flex items-center justify-center text-[11px] font-mono border border-dashed transition-colors m-1
-                  ${dropIdx === -1 ? "border-primary text-primary bg-primary/5" : "border-border/50 text-muted-foreground/40"}`}>
+                  ${dropIdx === -1 && !dragOverSequenceId ? "border-primary text-primary bg-primary/5" : "border-border/50 text-muted-foreground/40"}`}>
                 + Drop into {step.name}
               </div>
             )}
@@ -158,5 +227,4 @@ export function SequenceStep(props: SequenceStepProps) {
   };
 
   return renderSeqStep(step, parentId, idx);
-
 }
