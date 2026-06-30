@@ -71,7 +71,7 @@ export function EditorToolbar({
 
       <div className="w-px h-6 bg-border mx-1.5 shrink-0" />
 
-      <div className="flex items-center gap-0.5">
+      {/* <div className="flex items-center gap-0.5">
         <ToolBtn onClick={handleAddGroup} disabled={!hasPlan} title="Add Sequence">
           <FolderPlus size={14} />{!isTablet && "Sequence"}
         </ToolBtn>
@@ -86,9 +86,9 @@ export function EditorToolbar({
         >
           <Plus size={14} />{!isTablet && "Step"}
         </ToolBtn>
-      </div>
+      </div> */}
 
-      <div className="w-px h-6 bg-border mx-1.5 shrink-0" />
+      {/* <div className="w-px h-6 bg-border mx-1.5 shrink-0" /> */}
 
       <ToolBtn onClick={() => setShowPluginMgr(true)} title="Plugin Manager">
         <Package size={14} />{!isTablet && "Plugins"}
