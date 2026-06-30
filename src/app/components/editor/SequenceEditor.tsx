@@ -116,7 +116,7 @@ export function SequenceEditor({
               <div className="text-[13px] text-muted-foreground font-mono mb-4">
                 Plan is empty - Drag and Drop a step to begin
               </div>{" "}
-              {/* <div className="flex gap-3 justify-center"> <button onClick={handleAddGroup} className="px-4 py-2 bg-primary text-primary-foreground text-[12px] font-mono font-semibold hover:bg-primary/90 flex items-center gap-2"> <FolderPlus size={13} /> Add Sequence </button> <button onClick={() => { setAddStepParentId(null); setShowAddStep(true); }} className="px-4 py-2 border border-border text-[12px] font-mono text-foreground hover:bg-secondary flex items-center gap-2"> <Plus size={13} /> Add Step </button> </div> */}{" "}
+              {" "}
             </div>
           </div>
         ) : (
