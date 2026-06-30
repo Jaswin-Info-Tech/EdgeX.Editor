@@ -1,5 +1,4 @@
-import { useState } from "react";
-import { Cpu, FilePlus, FolderOpen, FolderPlus, Package, Pause, Play, Plus, RotateCcw, Save, Square } from "lucide-react";
+import { Database, FilePlus, FolderOpen, FolderPlus, Package, Pause, Play, Plus, RotateCcw, Save, Square } from "lucide-react";
 import { ToolBtn } from "./atoms";
 
 interface EditorToolbarProps {
@@ -9,10 +8,8 @@ interface EditorToolbarProps {
   stats: any;
   runState: string;
   setShowNewPlan: (value: boolean) => void;
-  setLeftTab: (value: "plan" | "library" | "plugins" | "instruments") => void;
   setShowPluginMgr: (value: boolean) => void;
-  setShowInstrumentsPanel: (value: boolean) => void;
-  setShowDutsPanel: (value: boolean) => void;
+  setShowResourcesPanel: (value: boolean) => void;
   setShowTestPlansPanel: (value: boolean) => void;
   setAddStepParentId: (value: string | null) => void;
   setAddStepIdx: (value: number | undefined) => void;
@@ -32,10 +29,8 @@ export function EditorToolbar({
   stats,
   runState,
   setShowNewPlan,
-  setLeftTab,
   setShowPluginMgr,
-  setShowInstrumentsPanel,
-  setShowDutsPanel,
+  setShowResourcesPanel,
   setShowTestPlansPanel,
   setAddStepParentId,
   setAddStepIdx,
@@ -47,14 +42,6 @@ export function EditorToolbar({
   handleReset,
   handleAddGroup,
 }: EditorToolbarProps) {
-  const [showBenchMenu, setShowBenchMenu] = useState(false);
-
-  const handleBenchAction = (target: "instruments" | "duts") => {
-    setShowBenchMenu(false);
-    if (target === "instruments") setShowInstrumentsPanel(true);
-    else setShowDutsPanel(true);
-  };
-
   return (
     <div className="flex items-center bg-card border-b border-border h-10 px-2 shrink-0 gap-1">
       <div className="flex items-center gap-0.5">
@@ -102,29 +89,11 @@ export function EditorToolbar({
       <ToolBtn onClick={() => setShowPluginMgr(true)} title="Plugin Manager">
         <Package size={14} />{!isTablet && "Plugins"}
       </ToolBtn>
-      <div className="relative">
-        <ToolBtn onClick={() => setShowBenchMenu((value) => !value)} title="Bench">
-          <Cpu size={14} />{!isTablet && "Bench"}
-        </ToolBtn>
-        {showBenchMenu && (
-          <div className="absolute top-full left-0 mt-1 z-50 min-w-[140px] border border-border bg-popover shadow-xl">
-            <button
-              onClick={() => handleBenchAction("instruments")}
-              className="flex w-full items-center px-3 py-2 text-left text-[12px] text-muted-foreground hover:bg-secondary hover:text-foreground"
-            >
-              Instruments
-            </button>
-            <button
-              onClick={() => handleBenchAction("duts")}
-              className="flex w-full items-center px-3 py-2 text-left text-[12px] text-muted-foreground hover:bg-secondary hover:text-foreground"
-            >
-              DUTs
-            </button>
-          </div>
-        )}
-      </div>
       <ToolBtn onClick={() => setShowTestPlansPanel(true)} title="Test Plans">
         <FolderPlus size={14} />{!isTablet && "Test Plans"}
+      </ToolBtn>
+      <ToolBtn onClick={() => setShowResourcesPanel(true)} title="Resources">
+        <Database size={14} />{!isTablet && "Resources"}
       </ToolBtn>
 
       <div className="ml-auto flex items-center gap-3 font-mono text-[12px] text-muted-foreground shrink-0">
