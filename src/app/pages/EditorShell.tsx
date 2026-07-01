@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, ChevronLeft, ChevronRight, Database, Pencil, Plus, Save, Search, Trash2, X,Loader2 } from "lucide-react";
+import { AlertTriangle, ChevronLeft, ChevronRight, Database, Loader2, Pencil, Plus, Save, Search, Trash2, X } from "lucide-react";
 import { getTestPlanEditorModel } from "../api/testplans";
 import { getStepSchema } from "../api/plugin";
+import { getResources, getResourceSchema } from "../api/resources";
+import { Toggle } from "../components/editor/atoms";
 import { ConsolePanel } from "../components/editor/ConsolePanel";
 import { EditorToolbar } from "../components/editor/EditorToolbar";
 import { LeftPanel } from "../components/editor/LeftPanel";
@@ -82,6 +84,8 @@ interface EditorShellProps {
   activeMenu: any;
   setActiveMenu: any;
   handleSave: any;
+  handleExportPlan: any;
+  handleImportPlan: any;
   handleRun: any;
   handleStop: any;
   handlePause: any;
@@ -191,6 +195,8 @@ export function EditorShell(props: EditorShellProps) {
     activeMenu,
     setActiveMenu,
     handleSave,
+    handleExportPlan,
+    handleImportPlan,
     handleRun,
     handleStop,
     handlePause,
@@ -237,17 +243,14 @@ export function EditorShell(props: EditorShellProps) {
   const [showCreateResource, setShowCreateResource] = useState(false);
   const [resourcePlanName, setResourcePlanName] = useState("");
   const [selectedResourceInstrument, setSelectedResourceInstrument] = useState("");
+  const [selectedResourceInstrumentType, setSelectedResourceInstrumentType] = useState("");
   const [resourceSchema, setResourceSchema] = useState<any>(null);
   const [resourceSchemaValues, setResourceSchemaValues] = useState<Record<string, any>>({});
   const [isResourceSchemaLoading, setIsResourceSchemaLoading] = useState(false);
   const [resourceSchemaError, setResourceSchemaError] = useState("");
-  const [resourcePlans, setResourcePlans] = useState([
-    { id: "rp1", name: "Resource Plan 1", instrument: "Oscilloscope", status: "Active" },
-    { id: "rp2", name: "Resource Plan 2", instrument: "Multimeter", status: "Active" },
-    { id: "rp3", name: "Resource Plan 3", instrument: "Oscilloscope", status: "Active" },
-    { id: "rp4", name: "Resource Plan 4", instrument: "Multimeter", status: "Active" },
-    { id: "rp5", name: "Resource Plan 5", instrument: "Oscilloscope", status: "Active" },
-  ]);
+  const [resourcePlans, setResourcePlans] = useState<any[]>([]);
+  const [isResourcesLoading, setIsResourcesLoading] = useState(false);
+  const [isResourcesError, setIsResourcesError] = useState(false);
   const [testPlanQuery, setTestPlanQuery] = useState("D:\\");
   const [submittedTestPlanQuery, setSubmittedTestPlanQuery] = useState("");
   const [hasSearchedTestPlans, setHasSearchedTestPlans] = useState(false);
@@ -353,88 +356,101 @@ export function EditorShell(props: EditorShellProps) {
     [browsableResourceInstruments, selectedResourceInstrument],
   );
 
-  const fallbackResourceSchema = useMemo(
-    () => ({
-      name: selectedResourceInstrument || "Generic SCPI Instrument",
-      properties: [
-        { name: "Address", editorType: "text", value: "" },
-        { name: "I/O Timeout", editorType: "integer", value: 2000 },
-        { name: "Lock Hold Off", editorType: "number", value: 0.1 },
-        { name: "Lock Queries", editorType: "checkbox", value: false },
-        { name: "Name", editorType: "text", value: "SCPI" },
-        { name: "Error Checking", editorType: "checkbox", value: false },
-        { name: "IsConnected", editorType: "checkbox", value: false },
-        { name: "Lock Instrument", editorType: "checkbox", value: false },
-        { name: "Lock Retries", editorType: "integer", value: 5 },
-        { name: "Send *CLS on Connect", editorType: "checkbox", value: true },
-        { name: "Send *IDN? on Connect", editorType: "checkbox", value: true },
-        { name: "Send VIClear on Connect", editorType: "checkbox", value: true },
-        { name: "Verbose SCPI Logging", editorType: "checkbox", value: true },
-      ],
-    }),
-    [selectedResourceInstrument],
-  );
-
-  const getResourceSchemaRecords = (response: any) => {
-    if (Array.isArray(response?.schemas)) return response.schemas;
-    if (Array.isArray(response)) return response;
-    if (response?.properties) return [response];
-    return [];
-  };
-
-  const resourceSchemaRecord = useMemo(
-    () => getResourceSchemaRecords(resourceSchema)[0] ?? null,
-    [resourceSchema],
-  );
+  // Update the instrument type when selection changes
+  useEffect(() => {
+    if (!selectedResourceInstrumentRecord) {
+      setSelectedResourceInstrumentType("");
+      return;
+    }
+    // Use fullName or fullTypeName first (most reliable), fall back to name as last resort
+    const typeToUse = selectedResourceInstrumentRecord.fullName ||
+      selectedResourceInstrumentRecord.fullTypeName ||
+      selectedResourceInstrumentRecord.type ||
+      selectedResourceInstrumentRecord.typeName ||
+      selectedResourceInstrumentRecord.name;
+    
+    setSelectedResourceInstrumentType(typeToUse);
+  }, [selectedResourceInstrumentRecord]);
 
   const resourceSchemaProperties = useMemo(
-    () => resourceSchemaRecord?.properties ?? [],
-    [resourceSchemaRecord],
+    () => (resourceSchema as any)?.properties ?? [],
+    [resourceSchema],
   );
 
   const getResourcePropertyDefaultValue = (property: any) => {
     if (property.value !== undefined) return property.value;
     if (property.defaultValue !== undefined) return property.defaultValue;
-    const editorType = String(property.editorType ?? "").toLowerCase();
-    if (editorType === "checkbox" || editorType === "boolean") return false;
-    if (editorType === "integer" || editorType === "number") return "";
+    const type = String(property.type ?? "").toLowerCase();
+    if (type.includes("boolean")) return false;
+    if (type.includes("int") || type.includes("double") || type.includes("float")) return "";
     return "";
   };
 
   useEffect(() => {
     if (!showCreateResource || selectedResourceInstrument || browsableResourceInstruments.length === 0) return;
-    setSelectedResourceInstrument(browsableResourceInstruments[0].name);
+    const firstInstrument = browsableResourceInstruments[0];
+    setSelectedResourceInstrument(firstInstrument.name);
+    // Type will be extracted automatically by useEffect
   }, [browsableResourceInstruments, selectedResourceInstrument, showCreateResource]);
 
   useEffect(() => {
-    if (!showCreateResource || !selectedResourceInstrumentRecord) {
+    if (!showCreateResource || !selectedResourceInstrumentRecord || !selectedResourceInstrument) {
       setResourceSchema(null);
       setResourceSchemaValues({});
       setResourceSchemaError("");
       return;
     }
+    
+    // Clear schema when instrument selection changes (before fetching new one)
+    setResourceSchema(null);
+    setResourceSchemaValues({});
+    setResourceSchemaError("");
 
     let cancelled = false;
     const fetchResourceSchema = async () => {
       setIsResourceSchemaLoading(true);
-      setResourceSchemaError("");
-      const schemaTypeName =
-        selectedResourceInstrumentRecord.fullName ??
-        selectedResourceInstrumentRecord.typeName ??
-        selectedResourceInstrumentRecord.baseType ??
-        selectedResourceInstrumentRecord.name;
+      
+      // Capture the current instrument name to validate response matches
+      const currentInstrumentName = selectedResourceInstrument;
+      
+      // Use instrument name directly as pluginTypeName
+      // The instrument name is the specific type we want to query
+      const pluginTypeName = currentInstrumentName?.trim();
+      
+      if (!pluginTypeName) {
+        setResourceSchemaError("Invalid instrument selection.");
+        setIsResourceSchemaLoading(false);
+        return;
+      }
 
       try {
-        const schema = await getStepSchema(schemaTypeName);
-        if (cancelled) return;
-        const records = getResourceSchemaRecords(schema);
-        setResourceSchema(records.length > 0 ? schema : fallbackResourceSchema);
+        const schema = await getResourceSchema(pluginTypeName);
+        
+        // Check if request was cancelled or if user switched instruments
+        if (cancelled) {
+          return;
+        }
+        
+        // CRITICAL: Validate that the response matches the currently selected instrument
+        if (currentInstrumentName !== selectedResourceInstrument) {
+          return;
+        }
+        
+        setResourceSchema(schema);
       } catch (error) {
         if (cancelled) return;
-        setResourceSchema(fallbackResourceSchema);
-        setResourceSchemaError("Using default resource fields.");
+        
+        // Only show error if this is still the selected instrument
+        if (currentInstrumentName === selectedResourceInstrument) {
+          setResourceSchema(null);
+          setResourceSchemaError(
+            error instanceof Error ? error.message : "Unable to load resource schema."
+          );
+        }
       } finally {
-        if (!cancelled) setIsResourceSchemaLoading(false);
+        if (!cancelled && currentInstrumentName === selectedResourceInstrument) {
+          setIsResourceSchemaLoading(false);
+        }
       }
     };
 
@@ -442,7 +458,7 @@ export function EditorShell(props: EditorShellProps) {
     return () => {
       cancelled = true;
     };
-  }, [fallbackResourceSchema, selectedResourceInstrumentRecord, showCreateResource]);
+  }, [selectedResourceInstrumentRecord, selectedResourceInstrument, showCreateResource]);
 
   useEffect(() => {
     const nextValues: Record<string, any> = {};
@@ -452,6 +468,31 @@ export function EditorShell(props: EditorShellProps) {
     });
     setResourceSchemaValues(nextValues);
   }, [resourceSchemaProperties]);
+
+  useEffect(() => {
+    if (!showResourcesPanel) return;
+
+    let cancelled = false;
+    const fetchResources = async () => {
+      setIsResourcesLoading(true);
+      setIsResourcesError(false);
+      try {
+        const data = await getResources();
+        if (cancelled) return;
+        setResourcePlans(data);
+      } catch (error) {
+        if (cancelled) return;
+        setIsResourcesError(true);
+      } finally {
+        if (!cancelled) setIsResourcesLoading(false);
+      }
+    };
+
+    fetchResources();
+    return () => {
+      cancelled = true;
+    };
+  }, [showResourcesPanel]);
 
   const closeCreateResourceModal = () => {
     setShowCreateResource(false);
@@ -475,41 +516,54 @@ export function EditorShell(props: EditorShellProps) {
     closeCreateResourceModal();
   };
 
+  const handleDeleteResource = (resourceId: string) => {
+    setResourcePlans((items) => items.filter((item) => item.id !== resourceId));
+  };
+
+  const handleEditResource = (resource: any) => {
+    setResourcePlanName(resource.name);
+    setSelectedResourceInstrument(resource.instrument);
+    setShowCreateResource(true);
+  };
+
   const renderResourceSchemaField = (property: any) => {
-    const key = String(property.name ?? property.displayName ?? "");
+    if (!property.isEditable) return null;
+    
+    const key = String(property.name ?? "");
     const label = String(property.displayName ?? property.name ?? "");
-    const editorType = String(property.editorType ?? "").trim().toLowerCase();
+    const type = String(property.type ?? "").toLowerCase();
     const value = resourceSchemaValues[key];
-    const options = property.enumValues ?? property.options ?? [];
+    const options = property.enumValues ?? [];
+    
     const updateValue = (nextValue: any) =>
       setResourceSchemaValues((values) => ({ ...values, [key]: nextValue }));
+    
     const labelNode = (
       <label className="block text-[11px] font-mono font-semibold text-muted-foreground mb-1 uppercase tracking-wider">
         {label}
       </label>
     );
+    
     const inputClass =
       "w-full bg-background border border-border px-2.5 py-2 text-[12px] font-mono text-foreground placeholder:text-muted-foreground outline-none focus:border-primary transition-colors";
 
-    if (editorType === "hidden") return null;
-
-    if (editorType === "checkbox" || editorType === "boolean" || typeof value === "boolean") {
+    // Boolean type
+    if (type.includes("boolean")) {
       return (
         <div key={key} className="flex items-center justify-between gap-3">
           <label className="text-[11px] font-mono font-semibold text-muted-foreground uppercase tracking-wider">
             {label}
           </label>
-          <input
-            type="checkbox"
-            checked={Boolean(value)}
-            onChange={(event) => updateValue(event.target.checked)}
-            className="accent-primary"
+          <Toggle
+            value={Boolean(value)}
+            onChange={() => updateValue(!Boolean(value))}
           />
         </div>
       );
     }
 
-    if (options.length > 0 || editorType === "select" || editorType === "dropdown") {
+    // Enum/Select type
+    if (options.length > 0) {
       return (
         <div key={key}>
           {labelNode}
@@ -519,12 +573,11 @@ export function EditorShell(props: EditorShellProps) {
             className={inputClass}
           >
             <option value="">Select one</option>
-            {options.map((option: any) => {
-              const optionValue = String(option?.value ?? option);
-              const optionLabel = String(option?.label ?? option);
+            {options.map((option: any, index: number) => {
+              const optionValue = String(option);
               return (
-                <option key={optionValue} value={optionValue}>
-                  {optionLabel}
+                <option key={index} value={optionValue}>
+                  {optionValue}
                 </option>
               );
             })}
@@ -533,13 +586,14 @@ export function EditorShell(props: EditorShellProps) {
       );
     }
 
-    if (editorType === "number" || editorType === "integer") {
+    // Integer type
+    if (type.includes("int")) {
       return (
         <div key={key}>
           {labelNode}
           <input
             type="number"
-            step={editorType === "integer" ? "1" : "any"}
+            step="1"
             value={value ?? ""}
             onChange={(event) =>
               updateValue(event.target.value === "" ? "" : Number(event.target.value))
@@ -550,6 +604,25 @@ export function EditorShell(props: EditorShellProps) {
       );
     }
 
+    // Number/Float type
+    if (type.includes("float") || type.includes("double")) {
+      return (
+        <div key={key}>
+          {labelNode}
+          <input
+            type="number"
+            step="any"
+            value={value ?? ""}
+            onChange={(event) =>
+              updateValue(event.target.value === "" ? "" : Number(event.target.value))
+            }
+            className={inputClass}
+          />
+        </div>
+      );
+    }
+
+    // String type (default)
     return (
       <div key={key}>
         {labelNode}
@@ -912,6 +985,8 @@ export function EditorShell(props: EditorShellProps) {
         handleStop={handleStop}
         handlePause={handlePause}
         handleReset={handleReset}
+        handleExportPlan={handleExportPlan}
+        handleImportPlan={handleImportPlan}
       />
 
       <EditorToolbar
@@ -1274,7 +1349,15 @@ export function EditorShell(props: EditorShellProps) {
                 <div>Status</div>
                 <div>Actions</div>
               </div>
-              {filteredResourcePlans.length === 0 ? (
+              {isResourcesLoading ? (
+                <div className="px-5 py-8 text-center text-[12px] font-mono text-muted-foreground">
+                  Loading resources...
+                </div>
+              ) : isResourcesError ? (
+                <div className="px-5 py-8 text-center text-[12px] font-mono text-destructive">
+                  Unable to load resources.
+                </div>
+              ) : filteredResourcePlans.length === 0 ? (
                 <div className="px-5 py-8 text-center text-[12px] font-mono text-muted-foreground">
                   {resourceSearch
                     ? "No matching resources."
@@ -1292,17 +1375,19 @@ export function EditorShell(props: EditorShellProps) {
                     <div className="text-muted-foreground">
                       {resource.instrument}
                     </div>
-                    <div className="text-emerald-500 font-semibold">
+                    <div className={`font-semibold ${resource.status === "Error" ? "text-red-500" : "text-emerald-500"}`} title={resource.error}>
                       {resource.status}
                     </div>
                     <div className="flex items-center gap-3">
                       <button
+                        onClick={() => handleEditResource(resource)}
                         className="text-primary hover:text-primary/80"
                         title="Edit resource"
                       >
                         <Pencil size={13} />
                       </button>
                       <button
+                        onClick={() => handleDeleteResource(resource.id)}
                         className="text-red-500 hover:text-red-400"
                         title="Delete resource"
                       >
@@ -1332,11 +1417,11 @@ export function EditorShell(props: EditorShellProps) {
 
       {showCreateResource && (
         <div
-          className="fixed inset-0 bg-black/75 flex items-center justify-center z-[60]"
+          className="fixed inset-0 bg-background-200/75 flex items-center justify-center z-[60]"
           onClick={closeCreateResourceModal}
         >
           <div
-            className="bg-card border border-border w-[520px] max-w-[92vw] max-h-[88vh] flex flex-col shadow-2xl"
+            className="bg-card border border-border w-[760px] max-w-[92vw]  h-[540px] max-h-[88vh] flex flex-col shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between px-5 py-3 border-b border-border bg-muted/30">
@@ -1358,7 +1443,15 @@ export function EditorShell(props: EditorShellProps) {
                 </label>
                 <select
                   value={selectedResourceInstrument}
-                  onChange={(event) => setSelectedResourceInstrument(event.target.value)}
+                  onChange={(event) => {
+                    const selected = browsableResourceInstruments.find(
+                      (inst: any) => inst.name === event.target.value
+                    );
+                    if (selected) {
+                      setSelectedResourceInstrument(selected.name);
+                      // Type will be extracted automatically by useEffect
+                    }
+                  }}
                   className="w-full bg-background border border-border px-2.5 py-2 text-[12px] font-mono text-foreground outline-none focus:border-primary transition-colors"
                 >
                   <option value="">Select instrument</option>
