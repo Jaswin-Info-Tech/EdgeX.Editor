@@ -1,571 +1,24 @@
-// PropertiesPanel.tsx
-import { Plus, Sliders, Trash2, Plug, Key } from "lucide-react";
+import { Plus, Sliders, Trash2, Plug } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import type { Dispatch, ReactNode, SetStateAction } from "react";
 import { TYPE_STRIPE } from "../../constants/editor";
 import { deleteIn, flatAll, formatFreq, updateIn } from "../../utils/editor";
 import { StatusPill, Toggle, TypeIcon } from "./atoms";
 import { getStepSchema } from "../../api/plugin";
-
-// ─── Shared styles ────────────────────────────────────────────────────────────
-const inputCls =
-  "w-full bg-background border border-border px-2 py-1.5 text-[12px] font-mono text-foreground outline-none focus:border-primary disabled:cursor-not-allowed disabled:opacity-60 disabled:bg-muted/30";
-  "w-full bg-background border border-border px-2 py-1.5 text-[12px] font-mono text-foreground outline-none focus:border-primary";
-const labelCls =
-  "block text-[11px] font-mono text-muted-foreground mb-1.5 uppercase tracking-wide";
-const wrapCls = "px-3 py-2.5 border-b border-border/40";
-
-// ─── Shared sub-components ────────────────────────────────────────────────────
-function FieldLabel({ children }: { children: ReactNode }) {
-  return <label className={labelCls}>{children}</label>;
-}
-
-function FieldWrap({ children }: { children: ReactNode }) {
-  return <div className={wrapCls}>{children}</div>;
-}
-
-// ─── Editor props type ────────────────────────────────────────────────────────
-interface EditorProps {
-  prop: any;
-  value: any;
-  onChange: (val: any) => void;
-}
-
-type SelectOption = string | { label: string; value: string; description?: string };
-
-interface EditorContext {
-  instrumentOptions: SelectOption[];
-  testStepOptions: SelectOption[];
-  planStepOptions: SelectOption[];
-}
-
-const normalizeOption = (item: SelectOption) =>
-  typeof item === "string" ? { label: item, value: item } : item;
-
-const getSelectOptions = (prop: any): SelectOption[] =>
-  (prop.enumValues?.length ?? 0) > 0 ? prop.enumValues : prop.options ?? [];
-
-const normalizeEditorType = (editorType: string = "") =>
-  editorType.trim().toLowerCase().replace(/[\s_]+/g, "-");
-
-const toBackendRecordOption = (item: any): SelectOption => ({
-  label: String(item?.name ?? ""),
-  value: String(item?.name ?? ""),
-  description: [item?.baseType, item?.assembly].filter(Boolean).join(" | "),
-});
-
-const getSchemaRecords = (response: any) => {
-  if (Array.isArray(response?.schemas)) return response.schemas;
-  if (Array.isArray(response)) return response;
-  if (response?.properties) return [response];
-  return [];
-};
-
-// ─── text ─────────────────────────────────────────────────────────────────────
-function TextEditor({ prop, value, onChange }: EditorProps) {
-  const label = prop.name || prop.displayName;
-  return (
-    <FieldWrap>
-      <FieldLabel>{label}</FieldLabel>
-      <input
-        type="text"
-        value={value ?? ""}
-        className={inputCls}
-        onChange={e => onChange(e.target.value)}
-      />
-    </FieldWrap>
-  );
-}
-
-// ─── textarea ─────────────────────────────────────────────────────────────────
-function TextareaEditor({ prop, value, onChange }: EditorProps) {
-  const label = prop.name || prop.displayName;
-  return (
-    <FieldWrap>
-      <FieldLabel>{label}</FieldLabel>
-      <textarea
-        rows={4}
-        value={value ?? ""}
-        className={inputCls}
-        placeholder="Enter text..."
-        onChange={e => onChange(e.target.value)}
-      />
-    </FieldWrap>
-  );
-}
-
-// ─── number (decimal) ─────────────────────────────────────────────────────────
-function NumberEditor({ prop, value, onChange }: EditorProps) {
-  const label = prop.name || prop.displayName;
-  return (
-    <FieldWrap>
-      <FieldLabel>{label}</FieldLabel>
-      <input
-        type="number"
-        step="any"
-        value={value ?? ""}
-        className={inputCls}
-        onChange={e => onChange(e.target.value === "" ? "" : Number(e.target.value))}
-      />
-    </FieldWrap>
-  );
-}
-
-// ─── integer ──────────────────────────────────────────────────────────────────
-function IntegerEditor({ prop, value, onChange }: EditorProps) {
-  const label = prop.name || prop.displayName;
-  return (
-    <FieldWrap>
-      <FieldLabel>{label}</FieldLabel>
-      <input
-        type="number"
-        step="1"
-        value={value ?? ""}
-        className={inputCls}
-        onChange={e => onChange(e.target.value === "" ? "" : parseInt(e.target.value, 10))}
-      />
-    </FieldWrap>
-  );
-}
-
-// ─── checkbox ─────────────────────────────────────────────────────────────────
-function CheckboxEditor({ prop, value, onChange }: EditorProps) {
-  const label = prop.name || prop.displayName;
-  return (
-    <FieldWrap>
-      <div className="flex items-center justify-between">
-        <FieldLabel>{label}</FieldLabel>
-        <Toggle value={Boolean(value)} onChange={() => onChange(!Boolean(value))} />
-      </div>
-    </FieldWrap>
-  );
-}
-
-// ─── select (dropdown / instrument-selector / dut-selector / result-listener/test-step) ─
-function SelectEditor({ prop, value, onChange }: EditorProps) {
-  const label = prop.name || prop.displayName;
-  const options = getSelectOptions(prop);
-  return (
-    <FieldWrap>
-      <FieldLabel>{label}</FieldLabel>
-      <select
-        value={value ?? ""}
-        className={inputCls}
-        onChange={e => onChange(e.target.value)}
-      >
-        <option value="">Select one</option>
-        {options.map(item => {
-          const option = normalizeOption(item);
-          return (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          );
-        })}
-      </select>
-    </FieldWrap>
-  );
-}
-
-// ─── multiselect ──────────────────────────────────────────────────────────────
-function MultiselectEditor({ prop, value, onChange }: EditorProps) {
-  const label = prop.name || prop.displayName;
-  const options = getSelectOptions(prop);
-  const selected: string[] = Array.isArray(value) ? value : [];
-
-  const toggle = (item: SelectOption) => {
-    const option = normalizeOption(item);
-    const next = selected.includes(option.value)
-      ? selected.filter(s => s !== option.value)
-      : [...selected, option.value];
-    onChange(next);
-  };
-
-  return (
-    <FieldWrap>
-      <FieldLabel>{label}</FieldLabel>
-      <div className="flex flex-col gap-1 mt-1">
-        {options.map(item => {
-          const option = normalizeOption(item);
-          return (
-            <label key={option.value} className="flex items-center gap-2 text-[12px] font-mono text-foreground cursor-pointer">
-              <input
-                type="checkbox"
-                checked={selected.includes(option.value)}
-                onChange={() => toggle(item)}
-                className="accent-primary"
-              />
-              {option.label}
-            </label>
-          );
-        })}
-      </div>
-    </FieldWrap>
-  );
-}
-
-// ─── datetime ─────────────────────────────────────────────────────────────────
-function DateTimeEditor({ prop, value, onChange }: EditorProps) {
-  const label = prop.name || prop.displayName;
-  return (
-    <FieldWrap>
-      <FieldLabel>{label}</FieldLabel>
-      <input
-        type="datetime-local"
-        value={value ?? ""}
-        className={inputCls}
-        onChange={e => onChange(e.target.value)}
-      />
-    </FieldWrap>
-  );
-}
-
-// ─── date ─────────────────────────────────────────────────────────────────────
-function DateEditor({ prop, value, onChange }: EditorProps) {
-  const label = prop.name || prop.displayName;
-  return (
-    <FieldWrap>
-      <FieldLabel>{label}</FieldLabel>
-      <input
-        type="date"
-        value={value ?? ""}
-        className={inputCls}
-        onChange={e => onChange(e.target.value)}
-      />
-    </FieldWrap>
-  );
-}
-
-// ─── time ─────────────────────────────────────────────────────────────────────
-function TimeEditor({ prop, value, onChange }: EditorProps) {
-  const label = prop.name || prop.displayName;
-  return (
-    <FieldWrap>
-      <FieldLabel>{label}</FieldLabel>
-      <input
-        type="time"
-        value={value ?? ""}
-        className={inputCls}
-        onChange={e => onChange(e.target.value)}
-      />
-    </FieldWrap>
-  );
-}
-
-// ─── duration (HH:MM:SS) ──────────────────────────────────────────────────────
-function DurationEditor({ prop, value, onChange }: EditorProps) {
-  const label = prop.name || prop.displayName;
-  return (
-    <FieldWrap>
-      <FieldLabel>{label}</FieldLabel>
-      <input
-        type="text"
-        value={value ?? ""}
-        placeholder="HH:MM:SS"
-        pattern="\d{2}:\d{2}:\d{2}"
-        className={inputCls}
-        onChange={e => onChange(e.target.value)}
-      />
-      <span className="text-[10px] font-mono text-muted-foreground mt-1 block">Format: HH:MM:SS</span>
-    </FieldWrap>
-  );
-}
-
-// ─── array (dynamic list) ─────────────────────────────────────────────────────
-function ArrayEditor({ prop, value, onChange }: EditorProps) {
-  const label = prop.name || prop.displayName;
-  const items: string[] = Array.isArray(value) ? value : [];
-
-  const updateItem = (idx: number, val: string) => {
-    const next = [...items];
-    next[idx] = val;
-    onChange(next);
-  };
-  const addItem = () => onChange([...items, ""]);
-  const removeItem = (idx: number) => onChange(items.filter((_, i) => i !== idx));
-
-  return (
-    <FieldWrap>
-      <FieldLabel>{label}</FieldLabel>
-      <div className="flex flex-col gap-1 mt-1">
-        {items.map((item, idx) => (
-          <div key={idx} className="flex items-center gap-1">
-            <input
-              type="text"
-              value={item}
-              className={inputCls}
-              onChange={e => updateItem(idx, e.target.value)}
-            />
-            <button
-              onClick={() => removeItem(idx)}
-              className="text-red-400 hover:text-red-600 text-[11px] font-mono px-1"
-            >✕</button>
-          </div>
-        ))}
-        <button
-          onClick={addItem}
-          className="mt-1 text-[11px] font-mono text-primary hover:underline text-left"
-        >+ Add item</button>
-      </div>
-    </FieldWrap>
-  );
-}
-
-// ─── keyvalue (dictionary) ────────────────────────────────────────────────────
-function KeyValueEditor({ prop, value, onChange }: EditorProps) {
-  const label = prop.name || prop.displayName;
-  const pairs: { k: string; v: string }[] = Array.isArray(value) ? value : [];
-
-  const updatePair = (idx: number, field: "k" | "v", val: string) => {
-    const next = [...pairs];
-    next[idx] = { ...next[idx], [field]: val };
-    onChange(next);
-  };
-  const addPair = () => onChange([...pairs, { k: "", v: "" }]);
-  const removePair = (idx: number) => onChange(pairs.filter((_, i) => i !== idx));
-
-  return (
-    <FieldWrap>
-      <FieldLabel>{label}</FieldLabel>
-      <div className="flex flex-col gap-1 mt-1">
-        {pairs.map((pair, idx) => (
-          <div key={idx} className="flex items-center gap-1">
-            <input
-              type="text"
-              value={pair.k}
-              placeholder="Key"
-              className={inputCls}
-              onChange={e => updatePair(idx, "k", e.target.value)}
-            />
-            <span className="text-muted-foreground font-mono text-[11px]">:</span>
-            <input
-              type="text"
-              value={pair.v}
-              placeholder="Value"
-              className={inputCls}
-              onChange={e => updatePair(idx, "v", e.target.value)}
-            />
-            <button
-              onClick={() => removePair(idx)}
-              className="text-red-400 hover:text-red-600 text-[11px] font-mono px-1"
-            >✕</button>
-          </div>
-        ))}
-        <button
-          onClick={addPair}
-          className="mt-1 text-[11px] font-mono text-primary hover:underline text-left"
-        >+ Add pair</button>
-      </div>
-    </FieldWrap>
-  );
-}
-
-// ─── object (expandable) ──────────────────────────────────────────────────────
-function ObjectEditor({ prop, value, onChange }: EditorProps) {
-  const label = prop.name || prop.displayName;
-  const [open, setOpen] = useState(false);
-  const str = typeof value === "object" ? JSON.stringify(value, null, 2) : (value ?? "{}");
-
-  return (
-    <FieldWrap>
-      <div className="flex items-center justify-between cursor-pointer" onClick={() => setOpen(o => !o)}>
-        <FieldLabel>{label}</FieldLabel>
-        <span className="text-[10px] font-mono text-muted-foreground">{open ? "▲" : "▼"}</span>
-      </div>
-      {open && (
-        <textarea
-          rows={6}
-          value={str}
-          className={`${inputCls} mt-1`}
-          placeholder="{}"
-          onChange={e => {
-            try { onChange(JSON.parse(e.target.value)); }
-            catch { onChange(e.target.value); }
-          }}
-        />
-      )}
-    </FieldWrap>
-  );
-}
-
-// ─── file ─────────────────────────────────────────────────────────────────────
-function FileEditor({ prop, value, onChange }: EditorProps) {
-  const label = prop.name || prop.displayName;
-  return (
-    <FieldWrap>
-      <FieldLabel>{label}</FieldLabel>
-      <div className="flex gap-1">
-        <input
-          type="text"
-          value={value ?? ""}
-          placeholder="File path..."
-          className={inputCls}
-          onChange={e => onChange(e.target.value)}
-        />
-        <label className="shrink-0 px-2 py-1.5 border border-border text-[11px] font-mono text-muted-foreground hover:text-foreground cursor-pointer">
-          Browse
-          <input
-            type="file"
-            className="hidden"
-            onChange={e => { if (e.target.files?.[0]) onChange(e.target.files[0].name); }}
-          />
-        </label>
-      </div>
-    </FieldWrap>
-  );
-}
-
-// ─── folder ───────────────────────────────────────────────────────────────────
-function FolderEditor({ prop, value, onChange }: EditorProps) {
-  const label = prop.name || prop.displayName;
-  return (
-    <FieldWrap>
-      <FieldLabel>{label}</FieldLabel>
-      <div className="flex gap-1">
-        <input
-          type="text"
-          value={value ?? ""}
-          placeholder="Folder path..."
-          className={inputCls}
-          onChange={e => onChange(e.target.value)}
-        />
-        <label className="shrink-0 px-2 py-1.5 border border-border text-[11px] font-mono text-muted-foreground hover:text-foreground cursor-pointer">
-          Browse
-          <input
-            type="file"
-            // @ts-ignore – non-standard but widely supported
-            webkitdirectory="true"
-            className="hidden"
-            onChange={e => {
-              const f = e.target.files?.[0];
-              if (f) onChange((f as any).webkitRelativePath?.split("/")?.[0] ?? f.name);
-            }}
-          />
-        </label>
-      </div>
-    </FieldWrap>
-  );
-}
-
-// ─── step-selector ────────────────────────────────────────────────────────────
-function StepSelectorEditor({ prop, value, onChange }: EditorProps) {
-  const label = prop.name || prop.displayName;
-  const steps = getSelectOptions(prop);
-  return (
-    <FieldWrap>
-      <FieldLabel>{label}</FieldLabel>
-      <select value={value ?? ""} className={inputCls} onChange={e => onChange(e.target.value)}>
-        <option value="">Select step</option>
-        {steps.map(s => {
-          const option = normalizeOption(s);
-          return (
-            <option key={option.value} value={option.value}>
-              {option.description ? `${option.label} - ${option.description}` : option.label}
-            </option>
-          );
-        })}
-      </select>
-    </FieldWrap>
-  );
-}
-
-// ─── readonly ─────────────────────────────────────────────────────────────────
-function ReadonlyEditor({ prop, value }: Omit<EditorProps, "onChange">) {
-  const label = prop.name || prop.displayName;
-  return (
-    <FieldWrap>
-      <FieldLabel>{label}</FieldLabel>
-      <span className="text-[12px] font-mono text-muted-foreground">{String(value ?? "—")}</span>
-    </FieldWrap>
-  );
-}
-
-// ─── unknown / fallback ───────────────────────────────────────────────────────
-function UnknownEditor({ prop, value, onChange }: EditorProps) {
-  const label = prop.name || prop.displayName;
-  return (
-    <FieldWrap>
-      <FieldLabel>
-        {label}
-        <span className="ml-2 text-[10px] text-yellow-500 normal-case">[{prop.editorType}]</span>
-      </FieldLabel>
-      <input
-        type="text"
-        value={value ?? ""}
-        className={inputCls}
-        onChange={e => onChange(e.target.value)}
-      />
-    </FieldWrap>
-  );
-}
-
-// ─── Master renderer ──────────────────────────────────────────────────────────
-function renderEditor(
-  prop: any,
-  schemaPropertyValues: Record<string, any>,
-  setSchemaPropertyValues: Dispatch<SetStateAction<Record<string, any>>>,
-  context: EditorContext
-) {
-  const value = schemaPropertyValues[prop.name];
-  if (prop.isEditable === false) return <ReadonlyEditor key={prop.name} prop={prop} value={value} />;
-
-  const onChange = (val: any) =>
-    setSchemaPropertyValues(prev => ({ ...prev, [prop.name]: val }));
-  const editorType = normalizeEditorType(prop.editorType);
-  const propWithContext = (() => {
-    const hasStaticOptions = (prop.enumValues?.length ?? 0) > 0 || (prop.options?.length ?? 0) > 0;
-    if (hasStaticOptions) return prop;
-
-    if (editorType === "instrument-selector") {
-      return { ...prop, options: context.instrumentOptions };
-    }
-
-    if (editorType === "test-step") {
-      return { ...prop, options: context.testStepOptions };
-    }
-
-    if (editorType === "step-selector") {
-      return { ...prop, options: context.planStepOptions };
-    }
-
-    return prop;
-  })();
-
-  switch (editorType) {
-    case "text": return <TextEditor key={prop.name} prop={propWithContext} value={value} onChange={onChange} />;
-    case "textarea": return <TextareaEditor key={prop.name} prop={propWithContext} value={value} onChange={onChange} />;
-    case "number": return <NumberEditor key={prop.name} prop={propWithContext} value={value} onChange={onChange} />;
-    case "integer": return <IntegerEditor key={prop.name} prop={propWithContext} value={value} onChange={onChange} />;
-    case "checkbox": return <CheckboxEditor key={prop.name} prop={propWithContext} value={value} onChange={onChange} />;
-    case "select":
-    case "dropdown":
-    case "instrument-selector":
-    case "test-step":
-    case "dut-selector":
-    case "result-listener-selector":
-      return <SelectEditor key={prop.name} prop={propWithContext} value={value} onChange={onChange} />;
-    case "multiselect": return <MultiselectEditor key={prop.name} prop={propWithContext} value={value} onChange={onChange} />;
-    case "datetime": return <DateTimeEditor key={prop.name} prop={propWithContext} value={value} onChange={onChange} />;
-    case "date": return <DateEditor key={prop.name} prop={propWithContext} value={value} onChange={onChange} />;
-    case "time": return <TimeEditor key={prop.name} prop={propWithContext} value={value} onChange={onChange} />;
-    case "duration": return <DurationEditor key={prop.name} prop={propWithContext} value={value} onChange={onChange} />;
-    case "array": return <ArrayEditor key={prop.name} prop={propWithContext} value={value} onChange={onChange} />;
-    case "keyvalue": return <KeyValueEditor key={prop.name} prop={propWithContext} value={value} onChange={onChange} />;
-    case "object": return <ObjectEditor key={prop.name} prop={propWithContext} value={value} onChange={onChange} />;
-    case "step-selector": return <StepSelectorEditor key={prop.name} prop={propWithContext} value={value} onChange={onChange} />;
-    case "file": return <FileEditor key={prop.name} prop={propWithContext} value={value} onChange={onChange} />;
-    case "folder": return <FolderEditor key={prop.name} prop={propWithContext} value={value} onChange={onChange} />;
-    case "readonly": return <ReadonlyEditor key={prop.name} prop={propWithContext} value={value} />;
-    case "hidden": return null;
-    default: return <UnknownEditor key={prop.name} prop={propWithContext} value={value} onChange={onChange} />;
-  }
-}
+import {
+  EditorContext,
+  getSchemaRecords,
+  inputCls,
+  labelCls,
+  normalizeEditorType,
+  renderEditor,
+  toBackendRecordOption,
+} from "./PropertyEditors";
 
 // ─── PropertiesPanel ──────────────────────────────────────────────────────────
 interface PropertiesPanelProps {
   selectedStep: any;
   selectedId: any;
-  plan: any;
+  plan: any[];
   instruments: any[];
   testSteps: any[];
   setPlan: any;
@@ -590,26 +43,22 @@ export function PropertiesPanel({
   const [schemaResponse, setSchemaResponse] = useState<any>(null);
   const [schemaError, setSchemaError] = useState<string | null>(null);
   const [schemaPropertyValues, setSchemaPropertyValues] = useState<Record<string, any>>({});
+
   const getSchemaPropertyKey = (prop: any) => `${prop.name || prop.displayName} || ${prop.name}`;
   const schemaRecords = useMemo(() => getSchemaRecords(schemaResponse), [schemaResponse]);
   const schemaProperties = useMemo(() => schemaRecords[0]?.properties ?? [], [schemaRecords]);
-  // console.log(schemaRecords,"qqqqq")
+  const isObjectLikeEditor = (prop: any) => {
+    const type = normalizeEditorType(prop.editorType);
+    return type === "object" || type === "json";
+  };
 
-const editorContext = useMemo<EditorContext>(
-  () => ({
-    instrumentOptions: (instruments ?? [])
-      .filter(
-        (instrument: any) =>
-          instrument?.canCreateInstance !== false &&
-          instrument?.isBrowsable !== false,
-      )
+  const editorContext = useMemo<EditorContext>(() => ({
+    instrumentOptions: instruments
+      .filter((instrument: any) => instrument?.canCreateInstance !== false && instrument?.isBrowsable !== false)
       .filter((instrument: any) => instrument?.name)
       .map(toBackendRecordOption),
-    testStepOptions: (testSteps ?? [])
-      .filter(
-        (step: any) =>
-          step?.canCreateInstance !== false && step?.isBrowsable !== false,
-      )
+    testStepOptions: testSteps
+      .filter((step: any) => step?.canCreateInstance !== false && step?.isBrowsable !== false)
       .filter((step: any) => step?.name)
       .map(toBackendRecordOption),
     planStepOptions: flatAll(plan || [])
@@ -619,9 +68,7 @@ const editorContext = useMemo<EditorContext>(
         value: step.id,
         description: step.type,
       })),
-  }),
-  [instruments, testSteps, plan, selectedStep?.id],
-);
+  }), [instruments, testSteps, plan, selectedStep?.id]);
 
   useEffect(() => {
     if (!selectedStep) {
@@ -633,6 +80,7 @@ const editorContext = useMemo<EditorContext>(
     let cancelled = false;
     setSchemaResponse(null);
     setSchemaError(null);
+
     const fetchSchema = async () => {
       try {
         const stepTypeName =
@@ -650,79 +98,152 @@ const editorContext = useMemo<EditorContext>(
         setSchemaError(String(err));
       }
     };
+
     fetchSchema();
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [selectedStep?.name]);
 
   useEffect(() => {
-    if (!selectedStep) {
-      setSchemaPropertyValues({});
-      return;
-    }
+    if (!selectedStep) { setSchemaPropertyValues({}); return; }
     const values: Record<string, any> = {};
     schemaProperties.forEach((prop: any) => {
       const key = getSchemaPropertyKey(prop);
-      const existing = selectedStep.properties?.find(
-        (item: any) => item.key === key,
-      );
-      values[prop.name] =
-        existing?.value ?? (prop.editorType === "checkbox" ? false : "");
+      const existing = selectedStep.properties?.find((item: any) => item.key === key);
+      const value = existing?.value;
+
+      const isEnabledWrapper =
+        prop.propertyType?.includes("OpenTap.Enabled") ||
+        prop.fullTypeName?.includes("OpenTap.Enabled");
+
+      if (isEnabledWrapper && value && typeof value === "object") {
+        // Unwrap for editing — show just the inner Value in the text input
+        values[prop.name] = value.Value ?? "";
+      } else if (
+        prop.editorType === "instrument-selector" &&
+        value &&
+        typeof value === "object"
+      ) {
+        values[prop.name] = value.Name ?? "";
+      } else if (prop.name === "CommandType") {
+        values[prop.name] = Array.isArray(value) ? value : [];
+      } else if (isObjectLikeEditor(prop)) {
+        values[prop.name] = value ?? null;
+      } else {
+        values[prop.name] = value ?? (prop.editorType === "checkbox" ? false : "");
+      }
     });
     setSchemaPropertyValues(values);
   }, [selectedStep, schemaProperties]);
+  
+
+  const getTypedValue = (prop: any, value: any) => {
+    const type = normalizeEditorType(prop.editorType);
+    const isBlank = value == null || (typeof value === "string" && value.trim() === "");
+
+    if (prop.name === "CommandType") {
+      return Array.isArray(value) ? value : value ? [value] : [];
+    }
+
+    if (prop.name === "MaxCount" && isBlank) {
+      return {};
+    }
+
+    // NEW: Enabled<T> wrapper properties
+    const isEnabledWrapper =
+      prop.propertyType?.includes("OpenTap.Enabled") ||
+      prop.fullTypeName?.includes("OpenTap.Enabled");
+
+    if (isEnabledWrapper) {
+      if (value == null || String(value).trim() === "") return null;
+
+      return {
+        IsEnabled: value !== "" && value != null,
+        Value: value ?? "",
+      };
+    }
+
+    switch (type) {
+      case "integer":
+        return value === "" ? 0 : parseInt(value, 10);
+
+      case "number":
+        return value === "" ? 0 : Number(value);
+
+      case "checkbox":
+        return Boolean(value);
+
+      case "multiselect":
+        return Array.isArray(value) ? value : value ? [value] : [];
+
+      case "select":
+      case "dropdown":
+        return value == null || String(value).trim() === "" ? undefined : value;
+
+      case "instrument-selector":
+        if (!value) return null;
+        return {
+          $type:
+            prop.propertyType ??
+            prop.typeName ??
+            prop.fullTypeName ??
+            "Keysight.OpenTap.Plugins.ScpiNetInstrument.Ag33210_1_04v4.Ag33210_1_04v4",
+          Name: value,
+        };
+
+      case "object":
+      case "json":
+        if (value == null) return null;
+        if (typeof value === "string" && value.trim() === "") return null;
+        if (
+          typeof value === "object" &&
+          !Array.isArray(value) &&
+          Object.getPrototypeOf(value) === Object.prototype &&
+          Object.keys(value).length === 0
+        ) {
+          return null;
+        }
+        return value;
+
+      default:
+        return value;
+    }
+  };
 
   const commitSchemaProperties = () => {
     if (!selectedStep) return;
-
-    // Pull metadata from the first schema record
     const meta = schemaRecords[0];
 
-    setPlan((prev: any) =>
-      updateIn(prev, selectedStep.id, (step: any) => {
-        const existingProps = step.properties || [];
+    setPlan((prev: any) => updateIn(prev, selectedStep.id, (step: any) => {
+      const existingProps = step.properties || [];
 
-        const newProps = schemaProperties.map((prop: any) => {
+      const newProps = schemaProperties
+        .map((prop: any) => {
           const key = getSchemaPropertyKey(prop);
+          const typedValue = getTypedValue(prop, schemaPropertyValues[prop.name]);
           return {
             key,
-            label: prop.displayName || prop.name,
-            type:
-              prop.editorType === "checkbox"
-                ? "boolean"
-                : prop.editorType === "number"
-                  ? "number"
-                  : "string",
-            value: schemaPropertyValues[prop.name],
+            label: prop.name || prop.displayName,
+            type: prop.editorType === "checkbox" ? "boolean" : prop.editorType === "number" ? "number" : "string",
+            value: typedValue,
             group: "Schema Properties",
-            isEditable: prop.isEditable !== false,
           };
-        });
+        })
+        .filter((p: any) => p.value !== undefined);
 
-        const keepProps = existingProps.filter(
-          (item: any) => item.group !== "Schema Properties",
-        );
+      const keepProps = existingProps.filter((item: any) => item.group !== "Schema Properties");
 
-        return {
-          key,
-          label:  prop.name || prop.displayName,
-          type: prop.editorType === "checkbox" ? "boolean" : prop.editorType === "number" ? "number" : "string",
-          value: schemaPropertyValues[prop.name],
-          group: "Schema Properties",
-          ...step,
-          properties: [...keepProps, ...newProps],
-          // ✅ Persist schema metadata onto the step
-          stepTypeName: meta?.fullName ?? step.stepTypeName,
-          assembly: meta?.assembly ?? step.assembly,
-          baseType: meta?.baseType ?? step.baseType,
-          fullName: meta?.fullName ?? step.fullName,
-        };
-      }),
-    );
+      return {
+        ...step,
+        properties: [...keepProps, ...newProps],
+        stepTypeName: meta?.fullName ?? step.stepTypeName,
+        assembly: meta?.assembly ?? step.assembly,
+        baseType: meta?.baseType ?? step.baseType,
+        fullName: meta?.fullName ?? step.fullName,
+      };
+    }));
   };
 
-  const renderProperties = () => {
+const renderProperties = () => {
     if (!selectedStep)
       return (
         <div className="flex flex-col items-center justify-center h-full gap-3 text-muted-foreground">
@@ -740,9 +261,9 @@ const editorContext = useMemo<EditorContext>(
     ).filter((group): group is string => group !== "Schema Properties");
     const hasDisplayedProperties = groups.length > 0;
 
-    const groups: string[] = Array.from(
-      new Set((selectedStep.properties || []).map((p: any) => p.group as string))
-    ).filter((group): group is string => group !== "Schema Properties");
+    // const groups: string[] = Array.from(
+    //   new Set((selectedStep.properties || []).map((p: any) => p.group as string))
+    // ).filter((group): group is string => group !== "Schema Properties");
 
     const stripe = TYPE_STRIPE[selectedStep.type] || "#64748b";
 
@@ -935,17 +456,17 @@ const editorContext = useMemo<EditorContext>(
                   ? `Unable to load schema: ${schemaError}`
                   : "No configurable properties."}
               </div>
-            )
-          }
-          <div className="px-3 py-3 border-t border-border mt-1">
-            <button
-              onClick={commitSchemaProperties}
-              className="w-full h-8 text-[12px] font-mono bg-info hover:bg-secondary/80 text-foreground flex items-center justify-center gap-1.5 border border-border transition-colors"
-            >
-              <Plug size={11} /> Save Properties
-            </button>
-          </div>
-        </div>
+            )}
+            <div className="px-3 py-3 border-t border-border mt-1">
+              <button
+                onClick={commitSchemaProperties}
+                className="w-full h-8 text-[12px] font-mono bg-info hover:bg-secondary/80 text-foreground flex items-center justify-center gap-1.5 border border-border transition-colors"
+              >
+                <Plug size={11} /> Save Properties
+              </button>
+            </div>
+          </>
+        )}
 
         {/* Footer actions */}
         {/* <div className="px-3 py-3 border-t border-border flex gap-2 mt-1">
