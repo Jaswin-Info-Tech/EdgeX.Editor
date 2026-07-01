@@ -1,5 +1,7 @@
 import type { ReactNode } from "react";
 import { ArrowDown, ArrowUp, ChevronDown, ChevronRight, Edit3, Eye, EyeOff, GripVertical, Plus, Trash2 } from "lucide-react";
+import { useSortable } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import type { TestStep } from "../../types/editor";
 import { TYPE_LABEL, TYPE_STRIPE } from "../../constants/editor";
 import { deleteIn, formatFreq, moveIn, updateIn } from "../../utils/editor";
@@ -33,6 +35,9 @@ interface SequenceStepProps {
   setAddStepParentId: any;
   setAddStepIdx: any;
   setShowAddStep: any;
+  // Kept in the prop contract for backward compatibility with callers,
+  // but reorder-dragging itself is now handled by dnd-kit (useSortable)
+  // instead of these native-drag fields.
   draggedStepId: string | null;
   setDraggedStepId: (id: string | null) => void;
   handleStepReorder: (stepId: string, newParentId: string | null, newIdx: number) => void;
@@ -67,9 +72,6 @@ export function SequenceStep(props: SequenceStepProps) {
     setAddStepParentId,
     setAddStepIdx,
     setShowAddStep,
-    draggedStepId,
-    setDraggedStepId,
-    handleStepReorder,
   } = props;
 
   const renderSeqStep = (step: TestStep, parentId: string | null, idx: number): ReactNode => {
@@ -78,8 +80,28 @@ export function SequenceStep(props: SequenceStepProps) {
     const isExp = expanded.has(step.id);
     const stripe = TYPE_STRIPE[step.type] || "#64748b";
     const isSequence = step.type === "sequence";
-    const isBeingDragged = draggedStepId === step.id;
-    const isAnyDragActive = !!dragLibItem || !!draggedStepId;
+
+    // dnd-kit sortable wiring for step reordering. `data` carries the
+    // context this row lives in so the top-level DndContext can resolve
+    // the drop target (parentId / idx) in onDragEnd.
+    const {
+      attributes,
+      listeners,
+      setNodeRef,
+      transform,
+      transition,
+      isDragging,
+    } = useSortable({ id: step.id, data: { parentId, idx } });
+
+    const sortableStyle = {
+      transform: CSS.Transform.toString(transform),
+      transition,
+    };
+
+    const isBeingDragged = isDragging;
+    // isAnyDragActive now only reflects a library item being dragged in,
+    // since step reordering is visualized natively by dnd-kit (transform/opacity).
+    const isAnyDragActive = !!dragLibItem;
     const isDropTargetRow = isSequence && isAnyDragActive && dragOverSequenceId === step.id;
     const summaryProp =
       step.properties.find((p: any) => p.key?.includes("inst")) ??
@@ -99,22 +121,14 @@ export function SequenceStep(props: SequenceStepProps) {
           ? formatFreq(value as number)
           : `${value ?? ""}${summaryProp?.unit ? ` ${summaryProp.unit}` : ""}`;
 
-    const onAnyDrop = (e: any, targetParentId: string | null, targetIdx: number) => {
+    // Only handles library-item drops now (step reordering goes through dnd-kit).
+    const onLibDrop = (e: any, targetParentId: string | null, targetIdx: number) => {
       e.stopPropagation();
-      if (draggedStepId) {
-        if (draggedStepId === step.id) return; // dropping on self, ignore
-        handleStepReorder(draggedStepId, targetParentId, targetIdx);
-      } else if (dragLibItem) {
-        handleSeqDrop(e, targetParentId, targetIdx);
-      }
+      if (dragLibItem) handleSeqDrop(e, targetParentId, targetIdx);
     };
 
     return (
-      <div key={step.id}>
-        {isAnyDragActive && !isBeingDragged && (
-          <div onDragOver={e => { e.preventDefault(); e.stopPropagation(); setDropIdx(idx); setDragOverSequenceId(null); }} onDrop={e => onAnyDrop(e, parentId, idx)}
-            className={`h-1 transition-colors mx-1 mb-0.5 ${dropIdx === idx && !dragOverSequenceId ? "bg-primary" : "bg-transparent"}`} />
-        )}
+      <div key={step.id} ref={setNodeRef} style={sortableStyle}>
         <div
           onClick={e => {
             e.stopPropagation();
@@ -123,7 +137,7 @@ export function SequenceStep(props: SequenceStepProps) {
           }}
           onContextMenu={e => { e.preventDefault(); e.stopPropagation(); setContextMenu({ x: e.clientX, y: e.clientY, stepId: step.id }); setSelectedId(step.id); }}
           onDragOver={e => {
-            if (isSequence && isAnyDragActive && !isBeingDragged) {
+            if (isSequence && isAnyDragActive) {
               e.preventDefault();
               e.stopPropagation();
               setDragOverSequenceId(step.id);
@@ -136,9 +150,9 @@ export function SequenceStep(props: SequenceStepProps) {
             }
           }}
           onDrop={e => {
-            if (isSequence && isAnyDragActive && !isBeingDragged) {
+            if (isSequence && isAnyDragActive) {
               e.preventDefault();
-              onAnyDrop(e, step.id, step.children?.length ?? 0);
+              onLibDrop(e, step.id, step.children?.length ?? 0);
               setDragOverSequenceId(null);
               setDropIdx(null);
             }
@@ -161,15 +175,9 @@ export function SequenceStep(props: SequenceStepProps) {
               </button>
             )}
             <div
-              draggable
-              onDragStart={e => {
-                e.stopPropagation();
-                e.dataTransfer.effectAllowed = "move";
-                setDraggedStepId(step.id);
-                setSelectedId(step.id);
-              }}
-              onDragEnd={e => { e.stopPropagation(); setDraggedStepId(null); setDragOverSequenceId(null); setDropIdx(null); }}
-              className="cursor-grab active:cursor-grabbing"
+              {...attributes}
+              {...listeners}
+              className="cursor-grab active:cursor-grabbing touch-none"
             >
               <GripVertical
                 size={12}
@@ -223,8 +231,8 @@ export function SequenceStep(props: SequenceStepProps) {
         {hasKids && isExp && (
           <div className="border-l-2 border-primary/20 ml-6">
             {step.children!.map((c, ci) => <SequenceStep key={c.id} {...props} step={c} parentId={step.id} idx={ci} />)}
-            {isAnyDragActive && !isBeingDragged && (
-              <div onDragOver={e => { e.preventDefault(); e.stopPropagation(); setDropIdx(-1); setDragOverSequenceId(null); }} onDrop={e => onAnyDrop(e, step.id, step.children!.length)}
+            {isAnyDragActive && (
+              <div onDragOver={e => { e.preventDefault(); e.stopPropagation(); setDropIdx(-1); setDragOverSequenceId(null); }} onDrop={e => onLibDrop(e, step.id, step.children!.length)}
                 className={`h-8 flex items-center justify-center text-[11px] font-mono border border-dashed transition-colors m-1
                   ${dropIdx === -1 && !dragOverSequenceId ? "border-primary text-primary bg-primary/5" : "border-border/50 text-muted-foreground/40"}`}>
                 + Drop into {step.name}

@@ -260,10 +260,8 @@ const renderProperties = () => {
       ),
     ).filter((group): group is string => group !== "Schema Properties");
     const hasDisplayedProperties = groups.length > 0;
-
-    // const groups: string[] = Array.from(
-    //   new Set((selectedStep.properties || []).map((p: any) => p.group as string))
-    // ).filter((group): group is string => group !== "Schema Properties");
+    const hasSchemaProperties = schemaProperties.length > 0;
+    const showSchemaSection = hasSchemaProperties || Boolean(schemaError);
 
     const stripe = TYPE_STRIPE[selectedStep.type] || "#64748b";
 
@@ -297,10 +295,7 @@ const renderProperties = () => {
 
         {/* Toggles */}
         <div className="border-b border-border">
-          {/* <div className="flex items-center justify-between px-3 py-2 border-b border-border/50">
-            <span className="text-[11px] font-mono text-muted-foreground uppercase tracking-wider">Enabled</span>
-            <Toggle value={selectedStep.enabled} onChange={() => setPlan((prev: any) => updateIn(prev, selectedStep.id, s => ({ ...s, enabled: !s.enabled })))} />
-          </div> */}
+
           <div className="flex items-center justify-between px-3 py-2">
             <span className="text-[11px] font-mono text-muted-foreground uppercase tracking-wider">
               Breakpoint
@@ -432,16 +427,16 @@ const renderProperties = () => {
           </div>
         ))}
 
-        {/* Schema properties (when no groups exist) */}
-        {!hasDisplayedProperties && (
-          <>
+        {/* Schema properties */}
+        {showSchemaSection && (
+          <div>
             <div className="flex items-center gap-2 px-3 py-2 bg-muted/30 border-b border-border">
               <div className="w-[3px] h-3" style={{ background: stripe }} />
               <span className="text-[10px] font-mono font-bold text-muted-foreground uppercase tracking-widest">
-                Properties
+                {hasDisplayedProperties ? "Schema Properties" : "Properties"}
               </span>
             </div>
-            {schemaProperties.length > 0 ? (
+            {hasSchemaProperties ? (
               schemaProperties.map((prop: any) =>
                 renderEditor(
                   prop,
@@ -465,32 +460,10 @@ const renderProperties = () => {
                 <Plug size={11} /> Save Properties
               </button>
             </div>
-          </>
+          </div>
         )}
 
-        {/* Footer actions */}
-        {/* <div className="px-3 py-3 border-t border-border flex gap-2 mt-1">
-          <button
-            onClick={() => {
-              setAddStepParentId(null);
-              setShowAddStep(true);
-            }}
-            className="flex-1 h-8 text-[12px] font-mono bg-secondary hover:bg-secondary/80 text-foreground flex items-center justify-center gap-1.5 border border-border transition-colors"
-          >
-            <Plus size={11} /> Add Step
-          </button>
-          <button
-            onClick={() => {
-              if (selectedId) {
-                setPlan((prev: any) => deleteIn(prev, selectedId));
-                setSelectedId(null);
-              }
-            }}
-            className="flex-1 h-8 text-[12px] font-mono text-red-500 hover:bg-red-500/10 border border-red-500/30 flex items-center justify-center gap-1.5 transition-colors"
-          >
-            <Trash2 size={11} /> Delete
-          </button>
-        </div> */}
+
       </div>
     );
   };
