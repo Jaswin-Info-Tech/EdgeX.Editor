@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, Search, X } from "lucide-react";
+import { AlertTriangle, ChevronLeft, ChevronRight, Database, Pencil, Plus, Save, Search, Trash2, X } from "lucide-react";
 import { getTestPlanEditorModel } from "../api/testplans";
+import { getStepSchema } from "../api/plugin";
 import { ConsolePanel } from "../components/editor/ConsolePanel";
 import { EditorToolbar } from "../components/editor/EditorToolbar";
 import { LeftPanel } from "../components/editor/LeftPanel";
@@ -215,6 +216,22 @@ export function EditorShell(props: EditorShellProps) {
   const [showInstrumentsPanel, setShowInstrumentsPanel] = useState(false);
   const [dutSearch, setDutSearch] = useState("");
   const [showDutsPanel, setShowDutsPanel] = useState(false);
+  const [resourceSearch, setResourceSearch] = useState("");
+  const [showResourcesPanel, setShowResourcesPanel] = useState(false);
+  const [showCreateResource, setShowCreateResource] = useState(false);
+  const [resourcePlanName, setResourcePlanName] = useState("");
+  const [selectedResourceInstrument, setSelectedResourceInstrument] = useState("");
+  const [resourceSchema, setResourceSchema] = useState<any>(null);
+  const [resourceSchemaValues, setResourceSchemaValues] = useState<Record<string, any>>({});
+  const [isResourceSchemaLoading, setIsResourceSchemaLoading] = useState(false);
+  const [resourceSchemaError, setResourceSchemaError] = useState("");
+  const [resourcePlans, setResourcePlans] = useState([
+    { id: "rp1", name: "Resource Plan 1", instrument: "Oscilloscope", status: "Active" },
+    { id: "rp2", name: "Resource Plan 2", instrument: "Multimeter", status: "Active" },
+    { id: "rp3", name: "Resource Plan 3", instrument: "Oscilloscope", status: "Active" },
+    { id: "rp4", name: "Resource Plan 4", instrument: "Multimeter", status: "Active" },
+    { id: "rp5", name: "Resource Plan 5", instrument: "Oscilloscope", status: "Active" },
+  ]);
   const [testPlanQuery, setTestPlanQuery] = useState("D:\\");
   const [submittedTestPlanQuery, setSubmittedTestPlanQuery] = useState("");
   const [hasSearchedTestPlans, setHasSearchedTestPlans] = useState(false);
@@ -287,6 +304,249 @@ export function EditorShell(props: EditorShellProps) {
       }),
     [duts, dutSearch],
   );
+
+  const filteredResourcePlans = useMemo(
+    () =>
+      resourcePlans.filter((resource) => {
+        const search = resourceSearch.trim().toLowerCase();
+        if (!search) return true;
+        return [resource.name, resource.instrument, resource.status].some((value) =>
+          value.toLowerCase().includes(search),
+        );
+      }),
+    [resourcePlans, resourceSearch],
+  );
+
+  const browsableResourceInstruments = useMemo(
+    () =>
+      (instruments ?? [])
+        .filter(
+          (instrument: any) =>
+            instrument?.canCreateInstance !== false &&
+            instrument?.isBrowsable !== false,
+        )
+        .filter((instrument: any) => instrument?.name),
+    [instruments],
+  );
+
+  const selectedResourceInstrumentRecord = useMemo(
+    () =>
+      browsableResourceInstruments.find(
+        (instrument: any) => instrument.name === selectedResourceInstrument,
+      ),
+    [browsableResourceInstruments, selectedResourceInstrument],
+  );
+
+  const fallbackResourceSchema = useMemo(
+    () => ({
+      name: selectedResourceInstrument || "Generic SCPI Instrument",
+      properties: [
+        { name: "Address", editorType: "text", value: "" },
+        { name: "I/O Timeout", editorType: "integer", value: 2000 },
+        { name: "Lock Hold Off", editorType: "number", value: 0.1 },
+        { name: "Lock Queries", editorType: "checkbox", value: false },
+        { name: "Name", editorType: "text", value: "SCPI" },
+        { name: "Error Checking", editorType: "checkbox", value: false },
+        { name: "IsConnected", editorType: "checkbox", value: false },
+        { name: "Lock Instrument", editorType: "checkbox", value: false },
+        { name: "Lock Retries", editorType: "integer", value: 5 },
+        { name: "Send *CLS on Connect", editorType: "checkbox", value: true },
+        { name: "Send *IDN? on Connect", editorType: "checkbox", value: true },
+        { name: "Send VIClear on Connect", editorType: "checkbox", value: true },
+        { name: "Verbose SCPI Logging", editorType: "checkbox", value: true },
+      ],
+    }),
+    [selectedResourceInstrument],
+  );
+
+  const getResourceSchemaRecords = (response: any) => {
+    if (Array.isArray(response?.schemas)) return response.schemas;
+    if (Array.isArray(response)) return response;
+    if (response?.properties) return [response];
+    return [];
+  };
+
+  const resourceSchemaRecord = useMemo(
+    () => getResourceSchemaRecords(resourceSchema)[0] ?? null,
+    [resourceSchema],
+  );
+
+  const resourceSchemaProperties = useMemo(
+    () => resourceSchemaRecord?.properties ?? [],
+    [resourceSchemaRecord],
+  );
+
+  const getResourcePropertyDefaultValue = (property: any) => {
+    if (property.value !== undefined) return property.value;
+    if (property.defaultValue !== undefined) return property.defaultValue;
+    const editorType = String(property.editorType ?? "").toLowerCase();
+    if (editorType === "checkbox" || editorType === "boolean") return false;
+    if (editorType === "integer" || editorType === "number") return "";
+    return "";
+  };
+
+  useEffect(() => {
+    if (!showCreateResource || selectedResourceInstrument || browsableResourceInstruments.length === 0) return;
+    setSelectedResourceInstrument(browsableResourceInstruments[0].name);
+  }, [browsableResourceInstruments, selectedResourceInstrument, showCreateResource]);
+
+  useEffect(() => {
+    if (!showCreateResource || !selectedResourceInstrumentRecord) {
+      setResourceSchema(null);
+      setResourceSchemaValues({});
+      setResourceSchemaError("");
+      return;
+    }
+
+    let cancelled = false;
+    const fetchResourceSchema = async () => {
+      setIsResourceSchemaLoading(true);
+      setResourceSchemaError("");
+      const schemaTypeName =
+        selectedResourceInstrumentRecord.fullName ??
+        selectedResourceInstrumentRecord.typeName ??
+        selectedResourceInstrumentRecord.baseType ??
+        selectedResourceInstrumentRecord.name;
+
+      try {
+        const schema = await getStepSchema(schemaTypeName);
+        if (cancelled) return;
+        const records = getResourceSchemaRecords(schema);
+        setResourceSchema(records.length > 0 ? schema : fallbackResourceSchema);
+      } catch (error) {
+        if (cancelled) return;
+        setResourceSchema(fallbackResourceSchema);
+        setResourceSchemaError("Using default resource fields.");
+      } finally {
+        if (!cancelled) setIsResourceSchemaLoading(false);
+      }
+    };
+
+    fetchResourceSchema();
+    return () => {
+      cancelled = true;
+    };
+  }, [fallbackResourceSchema, selectedResourceInstrumentRecord, showCreateResource]);
+
+  useEffect(() => {
+    const nextValues: Record<string, any> = {};
+    resourceSchemaProperties.forEach((property: any) => {
+      const key = String(property.name ?? property.displayName ?? "");
+      nextValues[key] = getResourcePropertyDefaultValue(property);
+    });
+    setResourceSchemaValues(nextValues);
+  }, [resourceSchemaProperties]);
+
+  const closeCreateResourceModal = () => {
+    setShowCreateResource(false);
+    setResourcePlanName("");
+    setResourceSchema(null);
+    setResourceSchemaValues({});
+    setResourceSchemaError("");
+  };
+
+  const handleSaveResource = () => {
+    const instrumentName = selectedResourceInstrument || "Resource";
+    setResourcePlans((items) => [
+      ...items,
+      {
+        id: `rp${Date.now()}`,
+        name: resourcePlanName.trim() || `${instrumentName} Resource`,
+        instrument: instrumentName,
+        status: "Active",
+      },
+    ]);
+    closeCreateResourceModal();
+  };
+
+  const renderResourceSchemaField = (property: any) => {
+    const key = String(property.name ?? property.displayName ?? "");
+    const label = String(property.displayName ?? property.name ?? "");
+    const editorType = String(property.editorType ?? "").trim().toLowerCase();
+    const value = resourceSchemaValues[key];
+    const options = property.enumValues ?? property.options ?? [];
+    const updateValue = (nextValue: any) =>
+      setResourceSchemaValues((values) => ({ ...values, [key]: nextValue }));
+    const labelNode = (
+      <label className="block text-[11px] font-mono font-semibold text-muted-foreground mb-1 uppercase tracking-wider">
+        {label}
+      </label>
+    );
+    const inputClass =
+      "w-full bg-background border border-border px-2.5 py-2 text-[12px] font-mono text-foreground placeholder:text-muted-foreground outline-none focus:border-primary transition-colors";
+
+    if (editorType === "hidden") return null;
+
+    if (editorType === "checkbox" || editorType === "boolean" || typeof value === "boolean") {
+      return (
+        <div key={key} className="flex items-center justify-between gap-3">
+          <label className="text-[11px] font-mono font-semibold text-muted-foreground uppercase tracking-wider">
+            {label}
+          </label>
+          <input
+            type="checkbox"
+            checked={Boolean(value)}
+            onChange={(event) => updateValue(event.target.checked)}
+            className="accent-primary"
+          />
+        </div>
+      );
+    }
+
+    if (options.length > 0 || editorType === "select" || editorType === "dropdown") {
+      return (
+        <div key={key}>
+          {labelNode}
+          <select
+            value={value ?? ""}
+            onChange={(event) => updateValue(event.target.value)}
+            className={inputClass}
+          >
+            <option value="">Select one</option>
+            {options.map((option: any) => {
+              const optionValue = String(option?.value ?? option);
+              const optionLabel = String(option?.label ?? option);
+              return (
+                <option key={optionValue} value={optionValue}>
+                  {optionLabel}
+                </option>
+              );
+            })}
+          </select>
+        </div>
+      );
+    }
+
+    if (editorType === "number" || editorType === "integer") {
+      return (
+        <div key={key}>
+          {labelNode}
+          <input
+            type="number"
+            step={editorType === "integer" ? "1" : "any"}
+            value={value ?? ""}
+            onChange={(event) =>
+              updateValue(event.target.value === "" ? "" : Number(event.target.value))
+            }
+            className={inputClass}
+          />
+        </div>
+      );
+    }
+
+    return (
+      <div key={key}>
+        {labelNode}
+        <input
+          type="text"
+          value={value ?? ""}
+          onChange={(event) => updateValue(event.target.value)}
+          placeholder={`Enter ${label}`}
+          className={inputClass}
+        />
+      </div>
+    );
+  };
 
   const {
     data: testPlans = [],
@@ -624,6 +884,8 @@ export function EditorShell(props: EditorShellProps) {
         setIsDark={setIsDark}
         setShowNewPlan={setShowNewPlan}
         setShowPluginMgr={setShowPluginMgr}
+        setShowInstrumentsPanel={setShowInstrumentsPanel}
+        setShowDutsPanel={setShowDutsPanel}
         handleSave={handleSaveAndMarkClean}
         handleRun={handleRun}
         handleStop={handleStop}
@@ -638,10 +900,8 @@ export function EditorShell(props: EditorShellProps) {
         stats={stats}
         runState={runState}
         setShowNewPlan={setShowNewPlan}
-        setLeftTab={setLeftTab}
         setShowPluginMgr={setShowPluginMgr}
-        setShowInstrumentsPanel={setShowInstrumentsPanel}
-        setShowDutsPanel={setShowDutsPanel}
+        setShowResourcesPanel={setShowResourcesPanel}
         setShowTestPlansPanel={setShowTestPlansPanel}
         setAddStepParentId={setAddStepParentId}
         setAddStepIdx={setAddStepIdx}
@@ -914,6 +1174,224 @@ export function EditorShell(props: EditorShellProps) {
             </div>
             <div className="px-4 py-2 border-t border-border bg-muted/20 text-[11px] text-muted-foreground font-mono">
               {filteredDuts.length} DUTs
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showResourcesPanel && (
+        <div
+          className="fixed inset-0 bg-black/75 flex items-center justify-center z-50"
+          onClick={() => {
+            setShowResourcesPanel(false);
+            setShowCreateResource(false);
+            setResourceSearch("");
+          }}
+        >
+          <div
+            className="bg-card border border-border w-[760px] max-w-[92vw] h-[540px] max-h-[85vh] flex flex-col shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-5 py-3 border-b border-border bg-muted/30">
+              <div className="flex items-center gap-2">
+                <span className="text-[13px] font-semibold text-foreground">
+                  Resources
+                </span>
+              </div>
+              <button
+                onClick={() => {
+                  setShowResourcesPanel(false);
+                  setShowCreateResource(false);
+                  setResourceSearch("");
+                }}
+                className="text-muted-foreground hover:text-foreground"
+              >
+                <X size={14} />
+              </button>
+            </div>
+
+            <div className="px-5 py-3 border-b border-border shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="flex min-w-0 flex-1 items-center gap-2 border border-border px-2.5 py-2 bg-background">
+                  <Search
+                    size={13}
+                    className="text-muted-foreground shrink-0"
+                  />
+                  <input
+                    value={resourceSearch}
+                    onChange={(e) => setResourceSearch(e.target.value)}
+                    placeholder="Search resources..."
+                    className="flex-1 bg-transparent text-[12px] font-mono text-foreground placeholder:text-muted-foreground outline-none"
+                  />
+                  {resourceSearch && (
+                    <button
+                      onClick={() => setResourceSearch("")}
+                      className="text-muted-foreground hover:text-foreground shrink-0"
+                    >
+                      <X size={10} />
+                    </button>
+                  )}
+                </div>
+                <button
+                  onClick={() => setShowCreateResource(true)}
+                  className="flex h-[34px] items-center gap-2 px-3 bg-primary text-primary-foreground text-[12px] font-mono font-semibold hover:bg-primary/90 transition-colors"
+                >
+                  <Plus size={12} /> Create New Resource
+                </button>
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto">
+              <div className="grid grid-cols-[1.4fr_1fr_0.7fr_0.7fr] gap-3 px-5 py-3 border-b border-border bg-muted/20 text-[11px] font-mono font-semibold uppercase tracking-wider text-muted-foreground">
+                <div>Name</div>
+                <div>Instrument</div>
+                <div>Status</div>
+                <div>Actions</div>
+              </div>
+              {filteredResourcePlans.length === 0 ? (
+                <div className="px-5 py-8 text-center text-[12px] font-mono text-muted-foreground">
+                  {resourceSearch
+                    ? "No matching resources."
+                    : "No resources available."}
+                </div>
+              ) : (
+                filteredResourcePlans.map((resource) => (
+                  <div
+                    key={resource.id}
+                    className="grid grid-cols-[1.4fr_1fr_0.7fr_0.7fr] gap-3 px-5 py-4 border-b border-border text-[12px] font-mono"
+                  >
+                    <div className="font-semibold text-foreground">
+                      {resource.name}
+                    </div>
+                    <div className="text-muted-foreground">
+                      {resource.instrument}
+                    </div>
+                    <div className="text-emerald-500 font-semibold">
+                      {resource.status}
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <button
+                        className="text-primary hover:text-primary/80"
+                        title="Edit resource"
+                      >
+                        <Pencil size={13} />
+                      </button>
+                      <button
+                        className="text-red-500 hover:text-red-400"
+                        title="Delete resource"
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            <div className="px-4 py-2 border-t border-border bg-muted/20 text-[11px] text-muted-foreground font-mono flex items-center">
+              <span>{filteredResourcePlans.length} resources</span>
+              <div className="ml-auto flex items-center gap-3">
+                <button className="text-muted-foreground hover:text-foreground disabled:opacity-40" disabled>
+                  <ChevronLeft size={14} />
+                </button>
+                <span>1 / 1</span>
+                <button className="text-muted-foreground hover:text-foreground disabled:opacity-40" disabled>
+                  <ChevronRight size={14} />
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showCreateResource && (
+        <div
+          className="fixed inset-0 bg-black/75 flex items-center justify-center z-[60]"
+          onClick={closeCreateResourceModal}
+        >
+          <div
+            className="bg-card border border-border w-[520px] max-w-[92vw] max-h-[88vh] flex flex-col shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-5 py-3 border-b border-border bg-muted/30">
+              <span className="text-[13px] font-semibold text-foreground">
+                Create {selectedResourceInstrument || "Resource"}
+              </span>
+              <button
+                onClick={closeCreateResourceModal}
+                className="text-muted-foreground hover:text-foreground"
+              >
+                <X size={14} />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
+              <div>
+                <label className="block text-[11px] font-mono font-semibold text-muted-foreground mb-1 uppercase tracking-wider">
+                  Instrument
+                </label>
+                <select
+                  value={selectedResourceInstrument}
+                  onChange={(event) => setSelectedResourceInstrument(event.target.value)}
+                  className="w-full bg-background border border-border px-2.5 py-2 text-[12px] font-mono text-foreground outline-none focus:border-primary transition-colors"
+                >
+                  <option value="">Select instrument</option>
+                  {browsableResourceInstruments.map((instrument: any) => (
+                    <option key={`${instrument.name}:${instrument.assembly}`} value={instrument.name}>
+                      {instrument.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-mono font-semibold text-muted-foreground mb-1 uppercase tracking-wider">
+                  Plan Name
+                </label>
+                <input
+                  value={resourcePlanName}
+                  onChange={(event) => setResourcePlanName(event.target.value)}
+                  placeholder="Enter plan name"
+                  className="w-full bg-background border border-border px-2.5 py-2 text-[12px] font-mono text-foreground placeholder:text-muted-foreground outline-none focus:border-primary transition-colors"
+                />
+              </div>
+
+              {isResourceSchemaLoading ? (
+                <div className="py-8 text-center text-[12px] font-mono text-muted-foreground">
+                  Loading resource schema...
+                </div>
+              ) : selectedResourceInstrument ? (
+                <>
+                  {resourceSchemaError && (
+                    <div className="border border-yellow-500/30 bg-yellow-500/10 px-3 py-2 text-[12px] font-mono text-muted-foreground">
+                      {resourceSchemaError}
+                    </div>
+                  )}
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-4">
+                    {resourceSchemaProperties.map(renderResourceSchemaField)}
+                  </div>
+                </>
+              ) : (
+                <div className="py-8 text-center text-[12px] font-mono text-muted-foreground">
+                  Select an instrument to load resource fields.
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-end gap-2 px-5 py-3 border-t border-border bg-muted/20">
+              <button
+                onClick={closeCreateResourceModal}
+                className="h-8 px-4 border border-border text-[12px] font-mono font-semibold text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+              >
+                Close
+              </button>
+              <button
+                onClick={handleSaveResource}
+                disabled={!selectedResourceInstrument || isResourceSchemaLoading}
+                className="h-8 px-4 bg-primary text-primary-foreground text-[12px] font-mono font-semibold hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 transition-colors"
+              >
+                <Save size={12} /> Save
+              </button>
             </div>
           </div>
         </div>
