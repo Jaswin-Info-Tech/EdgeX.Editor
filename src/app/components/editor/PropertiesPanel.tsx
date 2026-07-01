@@ -251,6 +251,8 @@ const dispatch = useAppDispatch();
       ),
     ).filter((group): group is string => group !== "Schema Properties");
     const hasDisplayedProperties = groups.length > 0;
+    const hasSchemaProperties = schemaProperties.length > 0;
+    const showSchemaSection = hasSchemaProperties || Boolean(schemaError);
 
     const stripe = TYPE_STRIPE[selectedStep.type] || "#64748b";
 
@@ -282,6 +284,7 @@ const dispatch = useAppDispatch();
         </div>
 
         <div className="border-b border-border">
+
           <div className="flex items-center justify-between px-3 py-2">
             <span className="text-[11px] font-mono text-muted-foreground uppercase tracking-wider">
               Breakpoint
@@ -417,10 +420,10 @@ const dispatch = useAppDispatch();
             <div className="flex items-center gap-2 px-3 py-2 bg-muted/30 border-b border-border">
               <div className="w-[3px] h-3" style={{ background: stripe }} />
               <span className="text-[10px] font-mono font-bold text-muted-foreground uppercase tracking-widest">
-                Properties
+                {hasDisplayedProperties ? "Schema Properties" : "Properties"}
               </span>
             </div>
-            {schemaProperties.length > 0 ? (
+            {hasSchemaProperties ? (
               schemaProperties.map((prop: any) =>
                 renderEditor(
                   prop,
@@ -450,6 +453,7 @@ const dispatch = useAppDispatch();
                 </button>
               </div>
             )}
+
 
       </div>
     );

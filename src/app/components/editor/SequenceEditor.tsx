@@ -1,5 +1,16 @@
+import { useMemo, useState } from "react";
 import type { DragEvent } from "react";
-import { FilePlus, FolderPlus, Layers, Plus } from "lucide-react";
+import { FilePlus, FolderPlus, Layers, Plus, GripVertical } from "lucide-react";
+import {
+  DndContext,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  closestCenter,
+  DragOverlay,
+} from "@dnd-kit/core";
+import type { DragEndEvent, DragStartEvent } from "@dnd-kit/core";
+import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { SequenceStep } from "./SequenceStep";
 import { flatAll } from "../../utils/editor";
 
@@ -24,6 +35,24 @@ interface SequenceEditorProps {
   handleStepReorder: (stepId: string, newParentId: string | null, newIdx: number) => void;
 }
 
+// Flattens the plan into the currently *visible* rows (respecting which
+// groups are expanded), in the same top-to-bottom order they render in.
+// Each entry carries the parentId/idx a dropped step would land at.
+function flattenVisible(
+  steps: any[],
+  expanded: Set<string>,
+  parentId: string | null = null,
+  out: { id: string; parentId: string | null; idx: number }[] = []
+) {
+  steps.forEach((step, idx) => {
+    out.push({ id: step.id, parentId, idx });
+    if (step.children?.length && expanded.has(step.id)) {
+      flattenVisible(step.children, expanded, step.id, out);
+    }
+  });
+  return out;
+}
+
 export function SequenceEditor({
   hasPlan,
   plan,
@@ -40,20 +69,47 @@ export function SequenceEditor({
   setAddStepParentId,
   setAddStepIdx,
   setShowAddStep,
-  draggedStepId,
-  handleStepReorder,
   sequenceStepProps,
+  handleStepReorder,
 }: SequenceEditorProps) {
+  const [activeDragId, setActiveDragId] = useState<string | null>(null);
+
   const selectedStep = selectedId ? flatAll(plan).find(step => step.id === selectedId) : null;
   const targetParentId = selectedStep ? selectedId : null;
   const targetIdx = selectedStep ? (selectedStep.children?.length ?? 0) : plan.length;
-  const isAnyDragActive = !!dragLibItem || !!draggedStepId;
+  const isAnyDragActive = !!dragLibItem;
+
+  const expanded: Set<string> = sequenceStepProps.expanded;
+
+  const flatItems = useMemo(
+    () => flattenVisible(plan, expanded),
+    [plan, expanded]
+  );
+
+  const sortableIds = useMemo(() => flatItems.map(i => i.id), [flatItems]);
+
+  const activeStep = activeDragId ? flatAll(plan).find(s => s.id === activeDragId) : null;
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } })
+  );
+
+  const handleDragStart = (event: DragStartEvent) => {
+    setActiveDragId(String(event.active.id));
+  };
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    setActiveDragId(null);
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const target = flatItems.find(i => i.id === over.id);
+    if (!target) return;
+    handleStepReorder(String(active.id), target.parentId, target.idx);
+  };
 
   const handleBackgroundDrop = (e: any) => {
     e.stopPropagation();
-    if (draggedStepId) {
-      handleStepReorder(draggedStepId, targetParentId, targetIdx);
-    } else if (dragLibItem) {
+    if (dragLibItem) {
       handleSeqDrop(e, targetParentId, targetIdx);
     }
   };
@@ -82,104 +138,123 @@ export function SequenceEditor({
         )}
       </div>
 
-      <div
-        className="flex-1 overflow-y-auto"
-         onClick={() => setSelectedId(null)}
-        onDragOver={(e) => {
-          if (dragLibItem) {
-            e.preventDefault();
-            e.stopPropagation();
-            setDropIdx(targetIdx);
-          }
-        }}
-        onDrop={handleBackgroundDrop}
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragStart={handleDragStart}
+        onDragEnd={handleDragEnd}
+        onDragCancel={() => setActiveDragId(null)}
       >
-        {/* ...rest unchanged... */}
-        {!hasPlan ? (
-          <div className="flex flex-col items-center justify-center h-full gap-5 p-8">
-            <div className="border-2 border-dashed border-border p-10 text-center w-full max-w-md">
-              <FilePlus
-                size={40}
-                className="mx-auto text-muted-foreground/20 mb-4"
-              />
-              <div className="text-[14px] font-semibold text-foreground mb-1">
-                No Test Plan Open
-              </div>
-              <div className="text-[12px] text-muted-foreground font-mono mb-5">
-                Create a new plan or open an existing one.
-              </div>
-              <button
-                onClick={() => setShowNewPlan(true)}
-                className="px-6 py-2.5 bg-primary text-primary-foreground text-[13px] font-semibold hover:bg-primary/90 transition-colors"
-              >
-                Create New Test Plan
-              </button>
-            </div>
-          </div>
-        ) : plan.length === 0 ? (
-          <div
-            className="flex flex-col items-center justify-center h-full gap-4 p-8"
-            onDragOver={(e) => {
-              if (dragLibItem) {
-                e.preventDefault();
-                e.stopPropagation();
-              }
-            }}
-            onDrop={(e) => {
+        <div
+          className="flex-1 overflow-y-auto"
+           onClick={() => setSelectedId(null)}
+          onDragOver={(e) => {
+            if (dragLibItem) {
+              e.preventDefault();
               e.stopPropagation();
-              if (dragLibItem) handleSeqDrop(e, null, 0);
-            }}
-          >
-            <div className="border-2 border-dashed border-border p-10 text-center w-full max-w-lg">
-              {" "}
-              <Layers
-                size={32}
-                className="mx-auto text-muted-foreground/20 mb-4"
-              />{" "}
-              <div className="text-[13px] text-muted-foreground font-mono mb-4">
-                Plan is empty - Drag and Drop a step to begin
-              </div>{" "}
-              {" "}
+              setDropIdx(targetIdx);
+            }
+          }}
+          onDrop={handleBackgroundDrop}
+        >
+          {/* ...rest unchanged... */}
+          {!hasPlan ? (
+            <div className="flex flex-col items-center justify-center h-full gap-5 p-8">
+              <div className="border-2 border-dashed border-border p-10 text-center w-full max-w-md">
+                <FilePlus
+                  size={40}
+                  className="mx-auto text-muted-foreground/20 mb-4"
+                />
+                <div className="text-[14px] font-semibold text-foreground mb-1">
+                  No Test Plan Open
+                </div>
+                <div className="text-[12px] text-muted-foreground font-mono mb-5">
+                  Create a new plan or open an existing one.
+                </div>
+                <button
+                  onClick={() => setShowNewPlan(true)}
+                  className="px-6 py-2.5 bg-primary text-primary-foreground text-[13px] font-semibold hover:bg-primary/90 transition-colors"
+                >
+                  Create New Test Plan
+                </button>
+              </div>
             </div>
-          </div>
-        ) : (
-          <div>
-            {plan.map((step, index) => (
-              <SequenceStep
-                key={step.id}
-                {...sequenceStepProps}
-                step={step}
-                parentId={null}
-                idx={index}
-              />
-            ))}
-            {dragLibItem && (
-              <div
-                onDragOver={(e) => {
+          ) : plan.length === 0 ? (
+            <div
+              className="flex flex-col items-center justify-center h-full gap-4 p-8"
+              onDragOver={(e) => {
+                if (dragLibItem) {
                   e.preventDefault();
                   e.stopPropagation();
-                  setDropIdx(targetIdx);
-                }}
-                onDrop={e => { e.stopPropagation(); handleSeqDrop(e, targetParentId, targetIdx); }}
-                className={`h-12 flex items-center justify-center text-[12px] font-mono border border-dashed m-3 transition-colors
-                  ${dropIdx === targetIdx ? "border-primary text-primary bg-primary/5" : "border-border/40 text-muted-foreground/30"}`}
-              >
-                {selectedStep ? `+ Drop here to add into "${selectedStep.name}"` : "+ Drop here to append"}
-              </div>
-            )}
-            <button
-              onClick={() => {
-                setAddStepParentId(targetParentId);
-                setAddStepIdx(targetIdx);
-                setShowAddStep(true);
+                }
               }}
-              className="w-full py-2 border-t border-dashed border-border/40 text-[12px] font-mono text-muted-foreground/50 hover:text-primary hover:bg-primary/5 flex items-center justify-center gap-1.5 transition-colors"
+              onDrop={(e) => {
+                e.stopPropagation();
+                if (dragLibItem) handleSeqDrop(e, null, 0);
+              }}
             >
-              <Plus size={11} /> Add Test Step
-            </button>
-          </div>
-        )}
-      </div>
+              <div className="border-2 border-dashed border-border p-10 text-center w-full max-w-lg">
+                {" "}
+                <Layers
+                  size={32}
+                  className="mx-auto text-muted-foreground/20 mb-4"
+                />{" "}
+                <div className="text-[13px] text-muted-foreground font-mono mb-4">
+                  Plan is empty - Drag and Drop a step to begin
+                </div>{" "}
+                {" "}
+              </div>
+            </div>
+          ) : (
+            <SortableContext items={sortableIds} strategy={verticalListSortingStrategy}>
+              <div>
+                {plan.map((step, index) => (
+                  <SequenceStep
+                    key={step.id}
+                    {...sequenceStepProps}
+                    step={step}
+                    parentId={null}
+                    idx={index}
+                  />
+                ))}
+                {dragLibItem && (
+                  <div
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setDropIdx(targetIdx);
+                    }}
+                    onDrop={e => { e.stopPropagation(); handleSeqDrop(e, targetParentId, targetIdx); }}
+                    className={`h-12 flex items-center justify-center text-[12px] font-mono border border-dashed m-3 transition-colors
+                      ${dropIdx === targetIdx ? "border-primary text-primary bg-primary/5" : "border-border/40 text-muted-foreground/30"}`}
+                  >
+                    {selectedStep ? `+ Drop here to add into "${selectedStep.name}"` : "+ Drop here to append"}
+                  </div>
+                )}
+                <button
+                  onClick={() => {
+                    setAddStepParentId(targetParentId);
+                    setAddStepIdx(targetIdx);
+                    setShowAddStep(true);
+                  }}
+                  className="w-full py-2 border-t border-dashed border-border/40 text-[12px] font-mono text-muted-foreground/50 hover:text-primary hover:bg-primary/5 flex items-center justify-center gap-1.5 transition-colors"
+                >
+                  <Plus size={11} /> Add Test Step
+                </button>
+              </div>
+            </SortableContext>
+          )}
+        </div>
+
+        <DragOverlay>
+          {activeStep ? (
+            <div className="flex items-center gap-2 px-3 py-2.5 bg-card border border-primary shadow-lg text-[13px] font-mono text-foreground">
+              <GripVertical size={12} className="text-muted-foreground/50" />
+              {activeStep.name}
+            </div>
+          ) : null}
+        </DragOverlay>
+      </DndContext>
 
       {isAnyDragActive && (
         <div
