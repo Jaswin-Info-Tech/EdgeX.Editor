@@ -1,4 +1,13 @@
-import { Check, Database, Filter, FolderPlus, List, Search, X } from "lucide-react";
+import {
+  Check,
+  Database,
+  Filter,
+  FolderPlus,
+  List,
+  Search,
+  X,
+  ChevronUp,
+} from "lucide-react";
 import { TYPE_STRIPE } from "../../constants/editor";
 import type { InstrumentItem, LibraryItem } from "../../types/editor";
 import { flatAll } from "../../utils/editor";
@@ -107,10 +116,12 @@ export function LeftPanel({
   return (
     <>
       <div className="flex border-b border-border shrink-0">
-        {([
-          ["plan", "Plan", <List size={12} />],
-          ["library", "Steps", <Database size={12} />],
-        ] as const).map(([tab, label, icon]) => (
+        {(
+          [
+            ["plan", "Plan", <List size={12} />],
+            ["library", "Steps", <Database size={12} />],
+          ] as const
+        ).map(([tab, label, icon]) => (
           <button
             key={tab}
             onClick={() => setLeftTab(tab)}
@@ -125,41 +136,64 @@ export function LeftPanel({
       {leftTab === "plan" && (
         <>
           <div className="flex items-center gap-1 px-3 h-8 border-b border-border shrink-0 bg-muted/20">
-            <span className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider flex-1">Test Plan Tree</span>
-            <button onClick={() => setExpanded(new Set(flatAll(plan).map(step => step.id)))} className="text-[10px] font-mono text-muted-foreground hover:text-foreground px-1.5 py-0.5 hover:bg-secondary">Expand</button>
-            <button onClick={() => setExpanded(new Set())} className="text-[10px] font-mono text-muted-foreground hover:text-foreground px-1.5 py-0.5 hover:bg-secondary">Collapse</button>
-            {hasPlan && <button onClick={handleAddGroup} className="text-muted-foreground hover:text-primary p-0.5 hover:bg-secondary ml-1"><FolderPlus size={12} /></button>}
+            <span className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider flex-1"></span>
+            {(() => {
+              const allIds = flatAll(plan).map((step) => step.id);
+              const isAllExpanded =
+                allIds.length > 0 && allIds.every((id) => expanded.has(id));
+              return (
+                <button
+                  onClick={() =>
+                    setExpanded(isAllExpanded ? new Set() : new Set(allIds))
+                  }
+                  title={isAllExpanded ? "Collapse all" : "Expand all"}
+                  className="text-muted-foreground hover:text-foreground p-1 hover:bg-secondary transition-colors"
+                >
+                  <ChevronUp
+                    size={13}
+                    className="transition-transform duration-200"
+                    style={{
+                      transform: isAllExpanded
+                        ? "rotate(0deg)"
+                        : "rotate(180deg)",
+                    }}
+                  />
+                </button>
+              );
+            })()}
+            
           </div>
           <div className="flex-1 overflow-y-auto">
             {!hasPlan ? (
               <div className="px-4 py-6 text-center">
-                {/* <div className="text-[12px] text-muted-foreground font-mono mb-3">No plan open</div> */}
-                <button onClick={() => setShowNewPlan(true)} className="px-3 py-1.5 bg-primary text-primary-foreground text-[12px] font-mono hover:bg-primary/90">Create Plan</button>
+                
+                <button
+                  onClick={() => setShowNewPlan(true)}
+                  className="px-3 py-1.5 bg-primary text-primary-foreground text-[12px] font-mono hover:bg-primary/90"
+                >
+                  Create Plan
+                </button>
               </div>
-            ) 
-            // : plan.length === 0 ? (
-            //   <div className="px-4 py-4 text-center">
-            //     <div className="text-[12px] text-muted-foreground font-mono mb-2">Empty plan</div>
-            //     <button onClick={handleAddGroup} className="text-primary text-[12px] font-mono hover:underline">+ Add sequence</button>
-            //   </div>
-            // ) 
-            : plan.map(step => (
-              <StepTree
-                key={step.id}
-                step={step}
-                selectedId={selectedId}
-                expanded={expanded}
-                renaming={renaming}
-                renameRef={renameRef}
-                renameVal={renameVal}
-                setRenameVal={setRenameVal}
-                commitRename={commitRename}
-                setRenaming={setRenaming}
-                setSelectedId={setSelectedId}
-                setContextMenu={setContextMenu}
-                toggleExpand={toggleExpand}
-              />
-            ))}
+            ) : (
+  
+              plan.map((step) => (
+                <StepTree
+                  key={step.id}
+                  step={step}
+                  selectedId={selectedId}
+                  expanded={expanded}
+                  renaming={renaming}
+                  renameRef={renameRef}
+                  renameVal={renameVal}
+                  setRenameVal={setRenameVal}
+                  commitRename={commitRename}
+                  setRenaming={setRenaming}
+                  setSelectedId={setSelectedId}
+                  setContextMenu={setContextMenu}
+                  toggleExpand={toggleExpand}
+                />
+              ))
+            )}
           </div>
         </>
       )}
@@ -169,12 +203,24 @@ export function LeftPanel({
           <div className="flex items-center gap-2 px-2 py-2 border-b border-border shrink-0">
             <div className="flex items-center gap-2 border border-border px-2.5 py-1.5 bg-background flex-1">
               <Search size={11} className="text-muted-foreground shrink-0" />
-              <input value={libSearch} onChange={e => setLibSearch(e.target.value)} placeholder="Search steps..." className="flex-1 bg-transparent text-[12px] font-mono text-foreground placeholder:text-muted-foreground outline-none" />
-              {libSearch && <button onClick={() => setLibSearch("")} className="text-muted-foreground hover:text-foreground shrink-0"><X size={10} /></button>}
+              <input
+                value={libSearch}
+                onChange={(e) => setLibSearch(e.target.value)}
+                placeholder="Search steps..."
+                className="flex-1 bg-transparent text-[12px] font-mono text-foreground placeholder:text-muted-foreground outline-none"
+              />
+              {libSearch && (
+                <button
+                  onClick={() => setLibSearch("")}
+                  className="text-muted-foreground hover:text-foreground shrink-0"
+                >
+                  <X size={10} />
+                </button>
+              )}
             </div>
             <div className="relative shrink-0">
               <button
-                onClick={e => {
+                onClick={(e) => {
                   e.stopPropagation();
                   setLibFilterOpen((value: boolean) => !value);
                 }}
@@ -185,9 +231,14 @@ export function LeftPanel({
                 <Filter size={13} />
               </button>
               {libFilterOpen && (
-                <div className="absolute right-0 top-9 bg-popover border border-border shadow-xl z-50 w-44 py-1" onClick={e => e.stopPropagation()}>
-                  <div className="px-3 py-1.5 text-[10px] font-mono font-bold text-muted-foreground uppercase tracking-widest border-b border-border mb-1">Filter by Category</div>
-                  {libCats.map(category => (
+                <div
+                  className="absolute right-0 top-9 bg-popover border border-border shadow-xl z-50 w-44 py-1"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div className="px-3 py-1.5 text-[10px] font-mono font-bold text-muted-foreground uppercase tracking-widest border-b border-border mb-1">
+                    Filter by Category
+                  </div>
+                  {libCats.map((category) => (
                     <button
                       key={category}
                       onClick={() => {
@@ -195,15 +246,39 @@ export function LeftPanel({
                         setLibFilterOpen(false);
                       }}
                       className="w-full text-left px-3 py-1.5 text-[12px] font-mono flex items-center justify-between transition-colors"
-                      style={libCat === category ? { background: "rgba(34,62,84,0.10)", color: "#223e54", borderLeft: "2px solid #223e54" } : {}}
+                      style={
+                        libCat === category
+                          ? {
+                              background: "rgba(34,62,84,0.10)",
+                              color: "#223e54",
+                              borderLeft: "2px solid #223e54",
+                            }
+                          : {}
+                      }
                     >
-                      <span className={libCat === category ? "font-semibold" : "text-muted-foreground"}>{category}</span>
-                      {libCat === category && <Check size={11} style={{ color: "#223e54" }} />}
+                      <span
+                        className={
+                          libCat === category
+                            ? "font-semibold"
+                            : "text-muted-foreground"
+                        }
+                      >
+                        {category}
+                      </span>
+                      {libCat === category && (
+                        <Check size={11} style={{ color: "#223e54" }} />
+                      )}
                     </button>
                   ))}
                   {libCat !== "All" && (
                     <div className="border-t border-border mt-1 pt-1">
-                      <button onClick={() => { setLibCat("All"); setLibFilterOpen(false); }} className="w-full text-left px-3 py-1.5 text-[11px] font-mono text-muted-foreground hover:text-foreground transition-colors">
+                      <button
+                        onClick={() => {
+                          setLibCat("All");
+                          setLibFilterOpen(false);
+                        }}
+                        className="w-full text-left px-3 py-1.5 text-[11px] font-mono text-muted-foreground hover:text-foreground transition-colors"
+                      >
                         Clear filter
                       </button>
                     </div>
@@ -213,42 +288,78 @@ export function LeftPanel({
             </div>
           </div>
           {libCat !== "All" && (
-            <div className="px-3 py-1.5 border-b border-border flex items-center gap-2 shrink-0" style={{ background: "rgba(34,62,84,0.05)" }}>
-              <span className="text-[11px] font-mono" style={{ color: "#223e54" }}>Filter: {libCat}</span>
-              <button onClick={() => setLibCat("All")} className="ml-auto text-muted-foreground hover:text-foreground"><X size={10} /></button>
+            <div
+              className="px-3 py-1.5 border-b border-border flex items-center gap-2 shrink-0"
+              style={{ background: "rgba(34,62,84,0.05)" }}
+            >
+              <span
+                className="text-[11px] font-mono"
+                style={{ color: "#223e54" }}
+              >
+                Filter: {libCat}
+              </span>
+              <button
+                onClick={() => setLibCat("All")}
+                className="ml-auto text-muted-foreground hover:text-foreground"
+              >
+                <X size={10} />
+              </button>
             </div>
           )}
           <div className="flex-1 overflow-y-auto">
-            {filteredLib.map(item => (
+            {filteredLib.map((item) => (
               <div
                 key={item.id}
                 draggable
                 onDragStart={() => setDragLibItem(item)}
-                onDragEnd={() => { setDragLibItem(null); setDropIdx(null); }}
+                onDragEnd={() => {
+                  setDragLibItem(null);
+                  setDropIdx(null);
+                }}
                 onDoubleClick={() => {
                   if (!hasPlan) {
                     setShowNewPlan(true);
                     return;
                   }
-                  handleAddStep(item, selectedStep?.type === "sequence" ? selectedId : null);
+                  handleAddStep(
+                    item,
+                    selectedStep?.type === "sequence" ? selectedId : null,
+                  );
                 }}
                 className="flex items-start gap-2.5 px-3 py-2.5 cursor-grab group border-b border-border/30 transition-colors"
               >
-                <div className="w-[3px] h-4 mt-0.5 shrink-0" style={{ background: TYPE_STRIPE[item.type] || "#64748b" }} />
+                <div
+                  className="w-[3px] h-4 mt-0.5 shrink-0"
+                  style={{ background: TYPE_STRIPE[item.type] || "#64748b" }}
+                />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5">
-                    <span className="text-[12px] font-mono text-foreground group-hover:text-primary transition-colors">{item.name}</span>
-                    {item.pluginId && <span className="text-[9px] font-mono text-primary border border-primary/30 px-1 shrink-0">plugin</span>}
+                    <span className="text-[12px] font-mono text-foreground group-hover:text-primary transition-colors">
+                      {item.name}
+                    </span>
+                    {item.pluginId && (
+                      <span className="text-[9px] font-mono text-primary border border-primary/30 px-1 shrink-0">
+                        plugin
+                      </span>
+                    )}
                   </div>
-                  <div className="text-[11px] text-muted-foreground mt-0.5 leading-tight">Base Type: {item.baseType}</div>
-                  <div className="text-[11px] text-muted-foreground mt-0.5 leading-tight">Assembly: {item.assembly}</div>
+                  <div className="text-[11px] text-muted-foreground mt-0.5 leading-tight">
+                    Base Type: {item.baseType}
+                  </div>
+                  <div className="text-[11px] text-muted-foreground mt-0.5 leading-tight">
+                    Assembly: {item.assembly}
+                  </div>
                 </div>
               </div>
             ))}
           </div>
           <div className="px-3 h-7 border-t border-border flex items-center shrink-0">
-            <span className="text-[10px] font-mono text-muted-foreground">{filteredLib.length} steps</span>
-            <span className="ml-auto text-[10px] font-mono text-primary/60">drag or double-click</span>
+            <span className="text-[10px] font-mono text-muted-foreground">
+              {filteredLib.length} steps
+            </span>
+            <span className="ml-auto text-[10px] font-mono text-primary/60">
+              drag or double-click
+            </span>
           </div>
         </>
       )}

@@ -1422,8 +1422,8 @@ export function EditorShell(props: EditorShellProps) {
               </div>
             </div>
             <div className="px-3 py-3 border-b border-border shrink-0">
-              <div className="flex items-center gap-2">
-                <div className="flex w-3/4 items-center gap-2 border border-border px-2.5 py-2 bg-background">
+              <div className="flex w-full items-center gap-2">
+                <div className="flex flex-1 items-center gap-2 border border-border px-2.5 py-2 bg-background">
                   <Search
                     size={13}
                     className="text-muted-foreground shrink-0"
@@ -1431,6 +1431,9 @@ export function EditorShell(props: EditorShellProps) {
                   <input
                     value={testPlanQuery}
                     onChange={(e) => setTestPlanQuery(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") handleSearchTestPlans();
+                    }}
                     placeholder="Search test plans..."
                     className="flex-1 bg-transparent text-[12px] font-mono text-foreground placeholder:text-muted-foreground outline-none"
                   />
@@ -1445,15 +1448,15 @@ export function EditorShell(props: EditorShellProps) {
                 </div>
                 <button
                   onClick={handleSearchTestPlans}
-                  className="flex h-[34px] items-center gap-2 px-3 bg-primary text-primary-foreground text-[12px] font-mono font-semibold hover:bg-primary/90 transition-colors"
+                  className="flex h-[34px] items-center gap-2 px-3 bg-primary text-primary-foreground text-[12px] font-mono font-semibold hover:bg-primary/90 transition-colors shrink-0"
                 >
                   <Search size={12} /> Search
                 </button>
               </div>
             </div>
             {showUnsavedPlanWarning && (
-              <div className="mx-4 mt-4 border border-yellow-500/30 bg-yellow-500/10 shadow-sm">
-                <div className="flex items-start gap-3 px-4 py-3">
+              <div className="mx-4 mt-2 border border-yellow-500/30 bg-yellow-500/10 shadow-sm">
+                <div className="flex items-start gap-3 px-3 py-2">
                   <AlertTriangle
                     size={16}
                     className="text-yellow-500 shrink-0 mt-0.5"
@@ -1472,15 +1475,15 @@ export function EditorShell(props: EditorShellProps) {
                     </div>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
-                    {/* <button
+                    <button
                       onClick={() => {
                         setShowUnsavedPlanWarning(false);
                         setPendingTestPlan(null);
                       }}
                       className="h-8 px-3 border border-border text-[12px] font-mono text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
                     >
-                      Keep Browsing
-                    </button> */}
+                      Cancel
+                    </button>
                     <button
                       onClick={async () => {
                         await handleSaveAndMarkClean();
@@ -1512,36 +1515,52 @@ export function EditorShell(props: EditorShellProps) {
                   No testplans found.
                 </div>
               ) : (
-                testPlans.map((plan: any, index: number) => (
-                  <button
-                    key={`${plan.path}:${index}`}
-                    onClick={() => handleOpenTestPlan(plan)}
-                    disabled={!!openingTestPlanPath}
-                    className="w-full text-left px-5 py-4 border-b border-border transition-colors group hover:bg-secondary/60 focus:bg-primary/8 focus:outline-none disabled:cursor-wait disabled:opacity-60"
-                  >
-                    <div className="flex flex-col gap-2">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-[13px] font-semibold text-foreground group-hover:text-primary transition-colors">
-                          {plan.name}
-                        </span>
-                        <span className="text-[11px] font-mono text-muted-foreground border border-border px-2">
-                          {plan.stepCount} steps
-                        </span>
-                        <span className="text-[11px] font-mono text-muted-foreground border border-border px-2">
-                          {new Date(plan.lastModified).toLocaleString()}
-                        </span>
-                        {openingTestPlanPath === plan.path && (
-                          <span className="text-[11px] font-mono text-primary border border-primary/30 px-2">
+                testPlans.map((plan: any, index: number) => {
+                  const isOpening = openingTestPlanPath === plan.path;
+                  return (
+                    <button
+                      key={`${plan.path}:${index}`}
+                      onClick={() => handleOpenTestPlan(plan)}
+                      disabled={!!openingTestPlanPath}
+                      title={String(plan.path ?? "").replace(/\\/g, "\\\\")}
+                      className="relative w-full text-left px-5 py-4 border-b border-border transition-colors group hover:bg-secondary/60 focus:bg-primary/8 focus:outline-none disabled:cursor-wait disabled:opacity-60"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="min-w-0 flex-1 flex flex-col gap-1">
+                          <span className="text-[13px] font-semibold text-foreground group-hover:text-primary transition-colors truncate">
+                            {plan.name}
+                          </span>
+                          <span className="text-[12px] text-muted-foreground truncate group-hover:text-foreground/70 transition-colors">
+                            {String(plan.path ?? "").replace(/\\/g, "\\\\")}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span className="text-[11px] font-mono text-muted-foreground border border-border px-2 py-0.5 whitespace-nowrap">
+                            {plan.stepCount} steps
+                          </span>
+                          <span className="text-[11px] font-mono text-muted-foreground border border-border px-2 py-0.5 whitespace-nowrap">
+                            {new Date(plan.lastModified).toLocaleString()}
+                          </span>
+                          <ChevronRight
+                            size={14}
+                            className="text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+                          />
+                        </div>
+                      </div>
+                      {isOpening && (
+                        <div className="absolute inset-0 flex items-center justify-center bg-card/80 backdrop-blur-[1px]">
+                          <Loader2
+                            size={16}
+                            className="animate-spin text-primary"
+                          />
+                          <span className="ml-2 text-[12px] font-mono text-primary">
                             Opening...
                           </span>
-                        )}
-                      </div>
-                      <div className="text-[12px] text-muted-foreground break-all group-hover:text-foreground/70 transition-colors">
-                        {String(plan.path ?? "").replace(/\\/g, "\\\\")}
-                      </div>
-                    </div>
-                  </button>
-                ))
+                        </div>
+                      )}
+                    </button>
+                  );
+                })
               )}
             </div>
             <div className="px-4 py-2 border-t border-border bg-muted/20 text-[11px] text-muted-foreground font-mono">
