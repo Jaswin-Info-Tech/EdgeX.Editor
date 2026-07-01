@@ -35,8 +35,48 @@ function Field({ label, value, onChange, placeholder, textarea }: any) {
 
 export function NewPlanModal({ onClose, onCreate }: { onClose: () => void; onCreate: (m: PlanMeta) => void }) {
   const [step, setStep] = useState(0);
-  const [meta, setMeta] = useState<PlanMeta>({ name: "Untitled Test Plan", description: "", author: "", version: "1.0.0", dutName: "", dutSerial: "", dutModel: "", dutFirmware: "" });
-  const upd = (k: keyof PlanMeta) => (e: any) => setMeta(m => ({ ...m, [k]: e.target.value }));
+  const [meta, setMeta] = useState<PlanMeta>({
+    name: "",
+    description: "",
+    author: "",
+    version: "1.0.0",
+    dutName: "",
+    dutSerial: "",
+    dutModel: "",
+    dutFirmware: "",
+  });
+
+  const [errors, setErrors] = useState({
+    name: "",
+  });
+
+  const upd = (k: keyof PlanMeta) => (e: any) => {
+    const value = e.target.value;
+
+    setMeta((m) => ({
+      ...m,
+      [k]: value,
+    }));
+
+    if (k === "name") {
+      setErrors((prev) => ({
+        ...prev,
+        name: value.trim() ? "" : "Plan Name is required.",
+      }));
+    }
+  };
+
+  const handleCreate = () => {
+    const newErrors = {
+      name: meta.name.trim() ? "" : "Plan Name is required.",
+    };
+
+    setErrors(newErrors);
+
+    if (newErrors.name) return;
+
+    onCreate(meta);
+  };
 
   return (
     <div className="fixed inset-0 bg-black/75 flex items-center justify-center z-50" onClick={onClose}>
@@ -51,7 +91,19 @@ export function NewPlanModal({ onClose, onCreate }: { onClose: () => void; onCre
         <div className="flex border-b border-border">
         </div>
         <div className="px-5 py-5 space-y-4">
-          <Field label="Plan Name *" value={meta.name} onChange={upd("name")} placeholder="e.g. RF Board Validation v3" />
+          <div>
+            <Field
+              label="Plan Name *"
+              value={meta.name}
+              onChange={upd("name")}
+              placeholder="e.g. RF Board Validation v3"
+            />
+            {errors.name && (
+              <p className="mt-1 text-[11px] text-red-500 font-mono">
+                {errors.name}
+              </p>
+            )}
+          </div>
           <Field label="Description" value={meta.description} onChange={upd("description")} placeholder="What does this plan verify?" textarea />
           <div className="grid grid-cols-2 gap-3">
             <Field label="Author" value={meta.author} onChange={upd("author")} placeholder="Engineer name" />
@@ -61,8 +113,12 @@ export function NewPlanModal({ onClose, onCreate }: { onClose: () => void; onCre
         <div className="flex justify-between items-center px-5 py-3 border-t border-border bg-muted/20">
           <button onClick={onClose} className="text-[12px] text-muted-foreground hover:text-foreground font-mono">Cancel</button>
           <div className="flex gap-2">
-            <button onClick={() => onCreate(meta)} className="flex items-center gap-1 px-4 h-8 bg-emerald-600 text-white text-[12px] font-mono font-semibold hover:bg-emerald-600/90">
-              <Check size={12} /> Create Plan
+            <button
+              onClick={handleCreate}
+              className="flex items-center gap-1 px-4 h-8 bg-emerald-600 text-white text-[12px] font-mono font-semibold hover:bg-emerald-600/90"
+            >
+              <Check size={12} />
+              Create Plan
             </button>
           </div>
         </div>

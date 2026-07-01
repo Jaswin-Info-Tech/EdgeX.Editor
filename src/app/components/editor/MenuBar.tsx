@@ -1,7 +1,7 @@
 import { Moon, PanelLeftOpen, PanelRightOpen, Sun, Check } from "lucide-react";
 
 const MENU_ITEMS: Record<string, string[]> = {
-  File: ["New Test Plan", "Open...", "-", "Save", "Save As...", "Export Report...", "-", "Exit"],
+  File: ["New Test Plan", "Open...", "-", "Save", "Save As...","Import Plan...","Export Plan...", "-", "Exit"],
   Edit: ["Undo", "Redo", "-", "Cut", "Copy", "Paste", "-", "Select All"],
   View: ["Step Library", "Properties", "Console", "-", "Reset Layout"],
   Run: ["Run All", "Run Selected", "-", "Pause", "Stop", "-", "Reset Plan"],
@@ -30,6 +30,8 @@ interface MenuBarProps {
   setShowInstrumentsPanel: (value: boolean) => void;
   setShowDutsPanel: (value: boolean) => void;
   handleSave: () => void;
+  handleExportPlan: () => void;
+  handleImportPlan: () => void;
   handleRun: () => void;
   handleStop: () => void;
   handlePause: () => void;
@@ -56,6 +58,8 @@ export function MenuBar({
   setShowInstrumentsPanel,
   setShowDutsPanel,
   handleSave,
+  handleExportPlan,
+  handleImportPlan,
   handleRun,
   handleStop,
   handlePause,
@@ -85,6 +89,8 @@ export function MenuBar({
       setRightOpen(true);
       setShowConsole(true);
     }
+    if (item === "Export Plan...") handleExportPlan();
+    if (item === "Import Plan...") handleImportPlan();
   };
 
   return (

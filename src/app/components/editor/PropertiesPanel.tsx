@@ -134,7 +134,7 @@ export function PropertiesPanel({
     });
     setSchemaPropertyValues(values);
   }, [selectedStep, schemaProperties]);
-  
+
 
   const getTypedValue = (prop: any, value: any) => {
     const type = normalizeEditorType(prop.editorType);
@@ -243,7 +243,7 @@ export function PropertiesPanel({
     }));
   };
 
-const renderProperties = () => {
+  const renderProperties = () => {
     if (!selectedStep)
       return (
         <div className="flex flex-col items-center justify-center h-full gap-3 text-muted-foreground">
@@ -457,16 +457,20 @@ const renderProperties = () => {
                   : "No configurable properties."}
               </div>
             )}
-            <div className="px-3 py-3 border-t border-border mt-1">
-              <button
-                onClick={commitSchemaProperties}
-                className="w-full h-8 text-[12px] font-mono bg-info hover:bg-secondary/80 text-foreground flex items-center justify-center gap-1.5 border border-border transition-colors"
-              >
-                <Plug size={11} /> Save Properties
-              </button>
-            </div>
+            
           </>
         )}
+        {selectedStep && (
+              <div className="px-3 py-3 border-t border-border mt-1">
+                <button
+                  onClick={commitSchemaProperties}
+                  className="w-full h-8 text-[12px] font-mono bg-info hover:bg-secondary/80 text-foreground flex items-center justify-center gap-1.5 border border-border transition-colors"
+                >
+                  <Plug size={11} />
+                  Save Properties
+                </button>
+              </div>
+            )}
 
         {/* Footer actions */}
         {/* <div className="px-3 py-3 border-t border-border flex gap-2 mt-1">
