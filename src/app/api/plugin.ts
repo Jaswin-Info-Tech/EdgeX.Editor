@@ -56,10 +56,12 @@ export const createTestPlan = async (payload: any) => {
   return data;
 };
 
+
 export const runTestPlan = async (payload: any) => {
   const { data } = await axiosClient.post("/testplans/run", payload); // ✅ send directly
   return data;
 };
+
 
 export const getDuts = async () => {
   const { data } = await axiosClient.get("/plugins/duts");

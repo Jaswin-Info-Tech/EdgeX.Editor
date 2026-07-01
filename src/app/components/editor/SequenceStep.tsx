@@ -81,9 +81,23 @@ export function SequenceStep(props: SequenceStepProps) {
     const isBeingDragged = draggedStepId === step.id;
     const isAnyDragActive = !!dragLibItem || !!draggedStepId;
     const isDropTargetRow = isSequence && isAnyDragActive && dragOverSequenceId === step.id;
+    const summaryProp =
+      step.properties.find((p: any) => p.key?.includes("inst")) ??
+      step.properties.find(
+        (p: any) =>
+          p.type === "frequency" ||
+          p.type === "number" ||
+          p.type === "string"
+      );
 
-    const summaryProp = step.properties.find(p => p.type === "frequency" || p.type === "number" || p.type === "string");
-    const summary = summaryProp ? (summaryProp.type === "frequency" ? formatFreq(summaryProp.value as number) : `${summaryProp.value}${summaryProp.unit ? " " + summaryProp.unit : ""}`) : "";
+    const value: any = summaryProp?.value;
+
+    const summary =
+      value && typeof value === "object"
+        ? value.Name
+        : summaryProp?.type === "frequency"
+          ? formatFreq(value as number)
+          : `${value ?? ""}${summaryProp?.unit ? ` ${summaryProp.unit}` : ""}`;
 
     const onAnyDrop = (e: any, targetParentId: string | null, targetIdx: number) => {
       e.stopPropagation();

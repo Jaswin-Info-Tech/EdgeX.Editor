@@ -1,4 +1,4 @@
-import { Cpu, FilePlus, FolderOpen, FolderPlus, Package, Pause, Play, Plus, RotateCcw, Save, Square } from "lucide-react";
+import { Database, FilePlus, FolderOpen, FolderPlus, Package, Pause, Play, Plus, RotateCcw, Save, Square } from "lucide-react";
 import { ToolBtn } from "./atoms";
 
 interface EditorToolbarProps {
@@ -9,10 +9,8 @@ interface EditorToolbarProps {
   runState: string;
   isSaved: boolean;
   setShowNewPlan: (value: boolean) => void;
-  setLeftTab: (value: "plan" | "library" | "plugins" | "instruments") => void;
   setShowPluginMgr: (value: boolean) => void;
-  setShowInstrumentsPanel: (value: boolean) => void;
-  setShowDutsPanel: (value: boolean) => void;
+  setShowResourcesPanel: (value: boolean) => void;
   setShowTestPlansPanel: (value: boolean) => void;
   setAddStepParentId: (value: string | null) => void;
   setAddStepIdx: (value: number | undefined) => void;
@@ -33,10 +31,8 @@ export function EditorToolbar({
   runState,
   isSaved,
   setShowNewPlan,
-  setLeftTab,
   setShowPluginMgr,
-  setShowInstrumentsPanel,
-  setShowDutsPanel,
+  setShowResourcesPanel,
   setShowTestPlansPanel,
   setAddStepParentId,
   setAddStepIdx,
@@ -78,36 +74,14 @@ export function EditorToolbar({
 
       <div className="w-px h-6 bg-border mx-1.5 shrink-0" />
 
-      <div className="flex items-center gap-0.5">
-        <ToolBtn onClick={handleAddGroup} disabled={!hasPlan} title="Add Sequence">
-          <FolderPlus size={14} />{!isTablet && "Sequence"}
-        </ToolBtn>
-        <ToolBtn
-          onClick={() => {
-            setAddStepParentId(null);
-            setAddStepIdx(undefined);
-            setShowAddStep(true);
-          }}
-          disabled={!hasPlan}
-          title="Add Step"
-        >
-          <Plus size={14} />{!isTablet && "Step"}
-        </ToolBtn>
-      </div>
-
-      <div className="w-px h-6 bg-border mx-1.5 shrink-0" />
-
       <ToolBtn onClick={() => setShowPluginMgr(true)} title="Plugin Manager">
         <Package size={14} />{!isTablet && "Plugins"}
       </ToolBtn>
-      <ToolBtn onClick={() => setShowInstrumentsPanel(true)} title="Instruments">
-        <Package size={14} />{!isTablet && "Instruments"}
-      </ToolBtn>
-      <ToolBtn onClick={() => setShowDutsPanel(true)} title="DUTs">
-        <Cpu size={14} />{!isTablet && "DUTs"}
-      </ToolBtn>
       <ToolBtn onClick={() => setShowTestPlansPanel(true)} title="Test Plans">
         <FolderPlus size={14} />{!isTablet && "Test Plans"}
+      </ToolBtn>
+      <ToolBtn onClick={() => setShowResourcesPanel(true)} title="Resources">
+        <Database size={14} />{!isTablet && "Resources"}
       </ToolBtn>
 
       <div className="ml-auto flex items-center gap-3 font-mono text-[12px] text-muted-foreground shrink-0">
