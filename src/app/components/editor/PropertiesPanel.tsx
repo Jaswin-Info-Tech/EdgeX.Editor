@@ -135,6 +135,7 @@ const dispatch = useAppDispatch();
     setSchemaPropertyValues(values);
   }, [selectedStep, schemaProperties]);
 
+
   const getTypedValue = (prop: any, value: any) => {
     const type = normalizeEditorType(prop.editorType);
     const isBlank = value == null || (typeof value === "string" && value.trim() === "");
@@ -435,16 +436,21 @@ const dispatch = useAppDispatch();
                   : "No configurable properties."}
               </div>
             )}
-            <div className="px-3 py-3 border-t border-border mt-1">
-              <button
-                onClick={commitSchemaProperties}
-                className="w-full h-8 text-[12px] font-mono bg-info hover:bg-secondary/80 text-foreground flex items-center justify-center gap-1.5 border border-border transition-colors"
-              >
-                <Plug size={11} /> Save Properties
-              </button>
-            </div>
+            
           </>
         )}
+        {selectedStep && (
+              <div className="px-3 py-3 border-t border-border mt-1">
+                <button
+                  onClick={commitSchemaProperties}
+                  className="w-full h-8 text-[12px] font-mono bg-info hover:bg-secondary/80 text-foreground flex items-center justify-center gap-1.5 border border-border transition-colors"
+                >
+                  <Plug size={11} />
+                  Save Properties
+                </button>
+              </div>
+            )}
+
       </div>
     );
   };

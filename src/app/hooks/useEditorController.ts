@@ -12,7 +12,10 @@ import { useInstalledPlugins, useDuts, usePlugins, useInstruments } from "./useP
 import { useWindowWidth } from "./useWindowWidth";
 import { useDebounce } from "./useDebounce";
 import { moveStepToPosition } from "../utils/editor";
-import { composeTestPlan, runTestPlan } from "../api/plugin";
+import { usePackages } from "./usePackage";
+import { usePackageUpload } from "./usePackageUpload";
+
+import { composeTestPlan, createTestPlan, runTestPlan } from "../api/plugin";
 
 
 
@@ -548,6 +551,146 @@ export function useEditorController() {
     }
   };
 
+  const handleExportPlan = () => {
+    const exportData = {
+      testplan: {
+        name: planMeta.name,
+        description: planMeta.description,
+        author: planMeta.author,
+        version: planMeta.version,
+        steps: plan.map(formatStepForCompose),
+      },
+    };
+
+    console.log(JSON.stringify(exportData, null, 2));
+
+    const blob = new Blob(
+      [JSON.stringify(exportData, null, 2)],
+      { type: "application/json" }
+    );
+
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${planMeta.name || "TestPlan"}.json`;
+    a.click();
+
+    URL.revokeObjectURL(url);
+
+    addLog("INFO", "TestPlans", "Plan exported as JSON.");
+  };
+
+  const collectExpandedIds = (steps: TestStep[]): Set<string> => {
+    const ids = new Set<string>();
+
+    const visit = (step: TestStep) => {
+      if (step.children && step.children.length > 0) {
+        ids.add(step.id);
+        step.children.forEach(visit);
+      }
+    };
+
+    steps.forEach(visit);
+
+    return ids;
+  };
+
+  const convertImportedStep = (step: any): TestStep => {
+    return {
+      id: crypto.randomUUID(),
+
+      name: step.name,
+
+      enabled: true,
+
+      status: "pending",
+
+      type: step.stepTypeName,
+
+      stepTypeName: step.stepTypeName,
+
+      typeName: step.stepTypeName,
+
+      fullName: step.stepTypeName,
+
+      className: step.stepTypeName,
+
+      properties: Object.entries(step.properties || {}).map(([key, value]) => {
+        let propertyValue: string | number | boolean;
+
+        if (typeof value === "boolean") {
+          propertyValue = value;
+        } else if (typeof value === "number") {
+          propertyValue = value;
+        } else {
+          propertyValue = value == null ? "" : String(value);
+        }
+
+        return {
+          key,
+          label: key,
+          type:
+            typeof propertyValue === "boolean"
+              ? "boolean"
+              : typeof propertyValue === "number"
+                ? "number"
+                : "string",
+          value: propertyValue,
+          group: "Properties",
+          isEditable: true,
+        };
+      }),
+      children: (step.children || []).map(convertImportedStep),
+    };
+  };
+  const importPlan = (json: any) => {
+    if (!json.testplan) return;
+
+    const tp = json.testplan;
+
+    setPlanMeta({
+      name: tp.name,
+      description: tp.description,
+      author: tp.author,
+      version: tp.version,
+      dutName: "",
+      dutSerial: "",
+      dutModel: "",
+      dutFirmware: "",
+    });
+
+    const importedSteps = tp.steps.map(convertImportedStep);
+
+    setPlan(importedSteps);
+    setExpanded(collectExpandedIds(importedSteps));
+
+    if (importedSteps.length > 0) {
+      setSelectedId(importedSteps[0].id);
+    }
+
+    setHasPlan(true);
+    addLog("INFO", "TestPlans", "Plan imported successfully.");
+  };
+  const handleImportPlan = () => {
+    const input = document.createElement("input");
+
+    input.type = "file";
+    input.accept = ".json";
+
+    input.onchange = async (e: any) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+
+      const text = await file.text();
+      const json = JSON.parse(text);
+
+      importPlan(json);
+    };
+
+    input.click();
+  };
+
   const handleSeqDrop = (event: DragEvent, parentId: string | null, idx: number) => {
     event.preventDefault();
     if (!dragLibItem) return;
@@ -622,6 +765,8 @@ export function useEditorController() {
     activeMenu,
     setActiveMenu,
     handleSave,
+    handleExportPlan,
+    handleImportPlan,
     handleRun,
     handleStop,
     handlePause,
