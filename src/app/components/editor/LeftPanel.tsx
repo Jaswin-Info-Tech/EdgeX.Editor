@@ -165,8 +165,7 @@ export function LeftPanel({
           </div>
           <div className="flex-1 overflow-y-auto">
             {!hasPlan ? (
-              <div className="px-4 py-6 text-center">
-                
+              <div className="px-4 py-6 text-center">                
                 <button
                   onClick={() => setShowNewPlan(true)}
                   className="px-3 py-1.5 bg-primary text-primary-foreground text-[12px] font-mono hover:bg-primary/90"

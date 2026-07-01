@@ -1,21 +1,27 @@
+import type { DragEvent } from "react";
 import { FilePlus, FolderPlus, Layers, Plus } from "lucide-react";
 import { SequenceStep } from "./SequenceStep";
+import { flatAll } from "../../utils/editor";
 
 interface SequenceEditorProps {
   hasPlan: boolean;
   plan: any[];
   planMeta: any;
   stats: any;
+  selectedId: string | null;
+  setSelectedId: (value: string | null) => void;
   dragLibItem: any;
   dropIdx: number | null;
   setDropIdx: (value: number | null) => void;
-  handleSeqDrop: (event: React.DragEvent, parentId: string | null, idx: number) => void;
+  handleSeqDrop: (event: DragEvent, parentId: string | null, idx: number) => void;
   handleAddGroup: () => void;
   setShowNewPlan: (value: boolean) => void;
   setAddStepParentId: (value: string | null) => void;
   setAddStepIdx: (value: number | undefined) => void;
   setShowAddStep: (value: boolean) => void;
   sequenceStepProps: any;
+  draggedStepId: string | null;
+  handleStepReorder: (stepId: string, newParentId: string | null, newIdx: number) => void;
 }
 
 export function SequenceEditor({
@@ -23,6 +29,8 @@ export function SequenceEditor({
   plan,
   planMeta,
   stats,
+  selectedId,
+  setSelectedId,
   dragLibItem,
   dropIdx,
   setDropIdx,
@@ -32,8 +40,24 @@ export function SequenceEditor({
   setAddStepParentId,
   setAddStepIdx,
   setShowAddStep,
+  draggedStepId,
+  handleStepReorder,
   sequenceStepProps,
 }: SequenceEditorProps) {
+  const selectedStep = selectedId ? flatAll(plan).find(step => step.id === selectedId) : null;
+  const targetParentId = selectedStep ? selectedId : null;
+  const targetIdx = selectedStep ? (selectedStep.children?.length ?? 0) : plan.length;
+  const isAnyDragActive = !!dragLibItem || !!draggedStepId;
+
+  const handleBackgroundDrop = (e: any) => {
+    e.stopPropagation();
+    if (draggedStepId) {
+      handleStepReorder(draggedStepId, targetParentId, targetIdx);
+    } else if (dragLibItem) {
+      handleSeqDrop(e, targetParentId, targetIdx);
+    }
+  };
+
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-background">
       <div className="flex items-center gap-2.5 px-4 h-9 border-b border-border bg-card shrink-0">
@@ -60,18 +84,17 @@ export function SequenceEditor({
 
       <div
         className="flex-1 overflow-y-auto"
+         onClick={() => setSelectedId(null)}
         onDragOver={(e) => {
           if (dragLibItem) {
             e.preventDefault();
             e.stopPropagation();
-            setDropIdx(plan.length);
+            setDropIdx(targetIdx);
           }
         }}
-        onDrop={(e) => {
-          e.stopPropagation();
-          if (dragLibItem) handleSeqDrop(e, null, plan.length);
-        }}
+        onDrop={handleBackgroundDrop}
       >
+        {/* ...rest unchanged... */}
         {!hasPlan ? (
           <div className="flex flex-col items-center justify-center h-full gap-5 p-8">
             <div className="border-2 border-dashed border-border p-10 text-center w-full max-w-md">
@@ -135,22 +158,19 @@ export function SequenceEditor({
                 onDragOver={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
-                  setDropIdx(plan.length);
+                  setDropIdx(targetIdx);
                 }}
-                onDrop={(e) => {
-                  e.stopPropagation();
-                  handleSeqDrop(e, null, plan.length);
-                }}
+                onDrop={e => { e.stopPropagation(); handleSeqDrop(e, targetParentId, targetIdx); }}
                 className={`h-12 flex items-center justify-center text-[12px] font-mono border border-dashed m-3 transition-colors
-                  ${dropIdx === plan.length ? "border-primary text-primary bg-primary/5" : "border-border/40 text-muted-foreground/30"}`}
+                  ${dropIdx === targetIdx ? "border-primary text-primary bg-primary/5" : "border-border/40 text-muted-foreground/30"}`}
               >
-                + Drop here to append
+                {selectedStep ? `+ Drop here to add into "${selectedStep.name}"` : "+ Drop here to append"}
               </div>
             )}
             <button
               onClick={() => {
-                setAddStepParentId(null);
-                setAddStepIdx(plan.length);
+                setAddStepParentId(targetParentId);
+                setAddStepIdx(targetIdx);
                 setShowAddStep(true);
               }}
               className="w-full py-2 border-t border-dashed border-border/40 text-[12px] font-mono text-muted-foreground/50 hover:text-primary hover:bg-primary/5 flex items-center justify-center gap-1.5 transition-colors"
@@ -160,6 +180,17 @@ export function SequenceEditor({
           </div>
         )}
       </div>
+
+      {isAnyDragActive && (
+        <div
+          onDragOver={e => { e.preventDefault(); e.stopPropagation(); setDropIdx(targetIdx); }}
+          onDrop={handleBackgroundDrop}
+          className={`h-12 flex items-center justify-center text-[12px] font-mono border border-dashed m-3 transition-colors
+              ${dropIdx === targetIdx ? "border-primary text-primary bg-primary/5" : "border-border/40 text-muted-foreground/30"}`}
+        >
+          {selectedStep ? `+ Drop here to add into "${selectedStep.name}"` : "+ Drop here to append"}
+        </div>
+      )}
 
       <div className="flex items-center gap-4 px-4 h-7 border-t border-border bg-card text-[11px] font-mono text-muted-foreground shrink-0">
         {hasPlan ? (

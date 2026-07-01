@@ -7,6 +7,7 @@ interface EditorToolbarProps {
   plan: any[];
   stats: any;
   runState: string;
+  isSaved: boolean;
   setShowNewPlan: (value: boolean) => void;
   setShowPluginMgr: (value: boolean) => void;
   setShowResourcesPanel: (value: boolean) => void;
@@ -28,6 +29,7 @@ export function EditorToolbar({
   plan,
   stats,
   runState,
+  isSaved,
   setShowNewPlan,
   setShowPluginMgr,
   setShowResourcesPanel,
@@ -53,7 +55,12 @@ export function EditorToolbar({
       <div className="w-px h-6 bg-border mx-1.5 shrink-0" />
 
       <div className="flex items-center gap-0.5">
-        <ToolBtn variant="run" onClick={handleRun} disabled={runState === "running" || !hasPlan || plan.length === 0} title="Run (F5)">
+         <ToolBtn
+    variant="run"
+    onClick={handleRun}
+    disabled={runState === "running" || !hasPlan || plan.length === 0 || !isSaved}
+    title={!isSaved && hasPlan ? "Save the plan before running (F5)" : "Run (F5)"}
+  >
           <Play size={13} fill="currentColor" /> Run
         </ToolBtn>
         <ToolBtn onClick={handlePause} disabled={runState === "idle" || runState === "completed"} active={runState === "paused"} title="Pause (F6)">

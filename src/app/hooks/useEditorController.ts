@@ -13,6 +13,8 @@ import { useInstalledPlugins, useDuts, usePlugins, useInstruments } from "./useP
 import { useWindowWidth } from "./useWindowWidth";
 import { useDebounce } from "./useDebounce";
 
+
+import { moveStepToPosition } from "../utils/editor";
 import { usePackages } from "./usePackage";
 import { usePackageUpload } from "./usePackageUpload";
 
@@ -53,6 +55,7 @@ export function useEditorController() {
   const [libSearch, setLibSearch] = useState("");
   const [libFilterOpen, setLibFilterOpen] = useState(false);
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
+  const [dragOverSequenceId, setDragOverSequenceId] = useState<string | null>(null);
   const [plugins, setPlugins] = useState<Plugin[]>([]);
   const [installedPlugins, setInstalledPlugins] = useState<Plugin[]>([]);
   const [renaming, setRenaming] = useState<string | null>(null);
@@ -61,6 +64,8 @@ export function useEditorController() {
   const [addStepParentId, setAddStepParentId] = useState<string | null>(null);
   const [addStepIdx, setAddStepIdx] = useState<number | undefined>(undefined);
   const [isDark, setIsDark] = useState(false);
+  const [isSaved, setIsSaved] = useState(false);
+  const [draggedStepId, setDraggedStepId] = useState<string | null>(null);
 
   const [leftOpen, setLeftOpen] = useState(true);
   const [rightOpen, setRightOpen] = useState(true);
@@ -88,6 +93,7 @@ export function useEditorController() {
   useEffect(() => { document.documentElement.classList.toggle("dark", isDark); }, [isDark]);
   useEffect(() => { logEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [logs]);
   useEffect(() => { renameRef.current?.focus(); }, [renaming]);
+  useEffect(() => { setIsSaved(false); }, [plan]);
   useEffect(() => {
     const asBool = (value: unknown, fallback = false) => {
       if (typeof value === "boolean") return value;
@@ -218,6 +224,7 @@ export function useEditorController() {
     setRunState("idle");
     setLogs([]);
     setHasPlan(true);
+    setIsSaved(false);
     setShowNewPlan(false);
     setLeftTab("library");
     addLog("INFO", "EdgeX", `Plan created: "${meta.name}"`);
@@ -233,14 +240,14 @@ export function useEditorController() {
     addLog("INFO", "Plan", `Added sequence: "${sequence.name}"`);
   };
 
-  const handleAddStep = (item: LibraryItem, parentId?: string | null, atIdx?: number) => {
+  const handleAddStep = (item: LibraryItem, parentId?: string | null, atIdx?: number, switchTab: boolean = true) => {
     const step = makeStep(item);
     const pid = parentId !== undefined ? parentId : addStepParentId;
     const idx = atIdx !== undefined ? atIdx : addStepIdx;
     setPlan(prev => addToParent(prev, pid ?? null, step, idx));
     if (pid) setExpanded(prev => new Set([...prev, pid]));
     setSelectedId(step.id);
-    setLeftTab("plan");
+    if (switchTab) setLeftTab("plan");
     addLog("INFO", "Plan", `Added: "${step.name}"`);
   };
 
@@ -297,33 +304,13 @@ export function useEditorController() {
     })));
   };
 
-const handleRun = async () => {
-    if (runState === "running" || plan.length === 0) return;
+  const handleRun = async () => {
+    if (runState === "running" || plan.length === 0 || !isSaved) return;
     runTimers.current.forEach(clearTimeout);
     setPlan(resetAll);
     setLogs([]);
     setRunState("running");
 
-    // ✅ Step 1: Compose first
-    const jsonData = {
-      outputPath: "D:\\plans\\SamplePlan.TapPlan",
-      overwrite: true,
-      steps: plan.map(formatStepForCompose),
-    };
-
-    console.log(JSON.stringify(jsonData, null, 2));
-
-    try {
-      await composeTestPlan(jsonData);
-      addLog("INFO", "TestPlans", `Composed: ${jsonData.outputPath}`);
-    } catch (error) {
-      console.error("Failed to compose test plan:", error);
-      addLog("ERROR", "TestPlans", "Failed to compose test plan. Aborting run.");
-      setRunState("idle");
-      return; // ✅ Stop if compose fails
-    }
-
-    // ✅ Step 2: Run after compose succeeds
     try {
       await runTestPlan({
         path: "D:\\plans\\SamplePlan.TapPlan",
@@ -464,6 +451,14 @@ const handleRun = async () => {
     setRunState("idle");
     setPlan(resetAll);
     setLogs([{ id: logId.current++, timestamp: nowTs(), level: "INFO", source: "EdgeX", message: "Plan reset. Ready." }]);
+  };
+
+
+  const handleStepReorder = (stepId: string, newParentId: string | null, newIdx: number) => {
+    setPlan(prev => moveStepToPosition(prev, stepId, newParentId, newIdx));
+    if (newParentId) setExpanded(prev => new Set([...prev, newParentId]));
+    setDraggedStepId(null);
+    addLog("INFO", "Plan", `Reordered step`);
   };
 
   const refreshPluginData = useCallback(() => {
@@ -607,28 +602,28 @@ const handleRun = async () => {
   };
 
   const handleSave = async () => {
-
     const jsonData = {
       outputPath: "D:\\plans\\SamplePlan.TapPlan",
       overwrite: true,
-      // steps: plan.map(formatStepForCompose),
+      steps: plan.map(formatStepForCompose),
     };
-
     console.log(JSON.stringify(jsonData, null, 2));
     try {
-      const response = await createTestPlan(jsonData);
+      const response = await composeTestPlan(jsonData);
       addLog("INFO", "TestPlans", `Saved: ${jsonData.outputPath}`);
+      setIsSaved(true);
       return response;
     } catch (error) {
       console.error("Failed to compose test plan:", error);
       addLog("ERROR", "TestPlans", "Failed to save test plan.");
+      setIsSaved(false);
     }
   };
 
   const handleSeqDrop = (event: DragEvent, parentId: string | null, idx: number) => {
     event.preventDefault();
     if (!dragLibItem) return;
-    handleAddStep(dragLibItem, parentId, idx);
+    handleAddStep(dragLibItem, parentId, idx, false);
     setDragLibItem(null);
     setDropIdx(null);
   };
@@ -653,6 +648,8 @@ const handleRun = async () => {
     dragLibItem,
     dropIdx,
     setDropIdx,
+    dragOverSequenceId,
+    setDragOverSequenceId,
     handleSeqDrop,
     setPlan,
     setPlanMeta,
@@ -715,6 +712,7 @@ const handleRun = async () => {
     dragConsole,
     consoleH,
     setLogs,
+    isSaved,
     setShowConsole,
     logEndRef,
     showNewPlan,
@@ -729,5 +727,8 @@ const handleRun = async () => {
     setLibFilterOpen,
     libFilterOpen,
     setDragLibItem,
+    draggedStepId,
+    setDraggedStepId,
+    handleStepReorder,
   };
 }

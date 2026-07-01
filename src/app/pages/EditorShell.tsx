@@ -35,6 +35,8 @@ interface EditorShellProps {
   dragLibItem: any;
   dropIdx: any;
   setDropIdx: any;
+  dragOverSequenceId: string | null;
+  setDragOverSequenceId: any;
   handleSeqDrop: any;
   setPlan: any;
   setPlanMeta: any;
@@ -45,6 +47,7 @@ interface EditorShellProps {
   setShowAddStep: any;
   updateProperty: any;
   runState: any;
+  isSaved: any;
   logs: any;
   consoleFilter: any;
   setConsoleFilter: any;
@@ -111,6 +114,13 @@ interface EditorShellProps {
   setLibFilterOpen: any;
   libFilterOpen: any;
   setDragLibItem: any;
+  draggedStepId: string | null;
+  setDraggedStepId: (id: string | null) => void;
+  handleStepReorder: (
+    stepId: string,
+    newParentId: string | null,
+    newIdx: number,
+  ) => void;
 }
 
 export function EditorShell(props: EditorShellProps) {
@@ -134,6 +144,8 @@ export function EditorShell(props: EditorShellProps) {
     dragLibItem,
     dropIdx,
     setDropIdx,
+    dragOverSequenceId,
+    setDragOverSequenceId,
     handleSeqDrop,
     setPlan,
     setPlanMeta,
@@ -144,6 +156,7 @@ export function EditorShell(props: EditorShellProps) {
     setShowAddStep,
     updateProperty,
     runState,
+    isSaved,
     logs,
     consoleFilter,
     setConsoleFilter,
@@ -210,6 +223,9 @@ export function EditorShell(props: EditorShellProps) {
     setLibFilterOpen,
     libFilterOpen,
     setDragLibItem,
+    draggedStepId,
+    setDraggedStepId,
+    handleStepReorder,
   } = props;
   const [libCat, setLibCat] = useState("All");
   const [instrumentSearch, setInstrumentSearch] = useState("");
@@ -851,6 +867,11 @@ export function EditorShell(props: EditorShellProps) {
     dragLibItem,
     dropIdx,
     setDropIdx,
+    dragOverSequenceId,
+    setDragOverSequenceId,
+    draggedStepId,
+    setDraggedStepId,
+    handleStepReorder,
     handleSeqDrop,
     setPlan,
     setAddStepParentId,
@@ -899,6 +920,7 @@ export function EditorShell(props: EditorShellProps) {
         plan={plan}
         stats={stats}
         runState={runState}
+        isSaved={isSaved}
         setShowNewPlan={setShowNewPlan}
         setShowPluginMgr={setShowPluginMgr}
         setShowResourcesPanel={setShowResourcesPanel}
@@ -946,6 +968,8 @@ export function EditorShell(props: EditorShellProps) {
           plan={plan}
           planMeta={planMeta}
           stats={stats}
+          selectedId={selectedId}
+          setSelectedId={setSelectedId}
           dragLibItem={dragLibItem}
           dropIdx={dropIdx}
           setDropIdx={setDropIdx}
@@ -956,6 +980,8 @@ export function EditorShell(props: EditorShellProps) {
           setAddStepIdx={setAddStepIdx}
           setShowAddStep={setShowAddStep}
           sequenceStepProps={sequenceStepProps}
+          draggedStepId={draggedStepId}
+          handleStepReorder={handleStepReorder}
         />
 
         {rightOpen && (

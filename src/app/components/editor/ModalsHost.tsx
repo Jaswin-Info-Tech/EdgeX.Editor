@@ -74,8 +74,6 @@ export function ModalsHost({
       {showAddStep && (
         <AddStepModal
           library={library}
-          instruments={instruments}
-          duts={duts}
           onClose={() => setShowAddStep(false)}
           onAdd={item => handleAddStep(item, addStepParentId, addStepIdx)}
         />
