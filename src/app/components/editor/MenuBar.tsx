@@ -31,6 +31,7 @@ interface MenuBarProps {
   setShowDutsPanel: (value: boolean) => void;
   handleSave: () => void;
   handleExportPlan: () => void;
+  handleImportPlan: () => void;
   handleRun: () => void;
   handleStop: () => void;
   handlePause: () => void;
@@ -58,6 +59,7 @@ export function MenuBar({
   setShowDutsPanel,
   handleSave,
   handleExportPlan,
+  handleImportPlan,
   handleRun,
   handleStop,
   handlePause,
@@ -88,6 +90,7 @@ export function MenuBar({
       setShowConsole(true);
     }
     if (item === "Export Plan...") handleExportPlan();
+    if (item === "Import Plan...") handleImportPlan();
   };
 
   return (

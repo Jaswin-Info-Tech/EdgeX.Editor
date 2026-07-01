@@ -82,7 +82,8 @@ interface EditorShellProps {
   activeMenu: any;
   setActiveMenu: any;
   handleSave: any;
-  handleExportPlan: any; 
+  handleExportPlan: any;
+  handleImportPlan: any;
   handleRun: any;
   handleStop: any;
   handlePause: any;
@@ -193,6 +194,7 @@ export function EditorShell(props: EditorShellProps) {
     setActiveMenu,
     handleSave,
     handleExportPlan,
+    handleImportPlan,
     handleRun,
     handleStop,
     handlePause,
@@ -915,6 +917,7 @@ export function EditorShell(props: EditorShellProps) {
         handlePause={handlePause}
         handleReset={handleReset}
         handleExportPlan={handleExportPlan}
+        handleImportPlan={handleImportPlan}
       />
 
       <EditorToolbar
