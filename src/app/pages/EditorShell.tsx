@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, ChevronLeft, ChevronRight, Database, Pencil, Plus, Save, Search, Trash2, X } from "lucide-react";
+import { AlertTriangle, ChevronLeft, ChevronRight, Database, Loader2, Pencil, Plus, Save, Search, Trash2, X } from "lucide-react";
 import { getTestPlanEditorModel } from "../api/testplans";
 import { getStepSchema } from "../api/plugin";
 import { ConsolePanel } from "../components/editor/ConsolePanel";
@@ -82,6 +82,7 @@ interface EditorShellProps {
   activeMenu: any;
   setActiveMenu: any;
   handleSave: any;
+  handleExportPlan: any; 
   handleRun: any;
   handleStop: any;
   handlePause: any;
@@ -191,6 +192,7 @@ export function EditorShell(props: EditorShellProps) {
     activeMenu,
     setActiveMenu,
     handleSave,
+    handleExportPlan,
     handleRun,
     handleStop,
     handlePause,
@@ -912,6 +914,7 @@ export function EditorShell(props: EditorShellProps) {
         handleStop={handleStop}
         handlePause={handlePause}
         handleReset={handleReset}
+        handleExportPlan={handleExportPlan}
       />
 
       <EditorToolbar

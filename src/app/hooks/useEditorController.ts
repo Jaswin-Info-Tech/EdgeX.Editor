@@ -620,6 +620,36 @@ export function useEditorController() {
     }
   };
 
+  const handleExportPlan = () => {
+  const exportData = {
+    testplan: {
+      name: planMeta.name,
+      description: planMeta.description,
+      author: planMeta.author,
+      version: planMeta.version,
+      steps: plan.map(formatStepForCompose),
+    },
+  };
+
+  console.log(JSON.stringify(exportData, null, 2));
+
+  const blob = new Blob(
+    [JSON.stringify(exportData, null, 2)],
+    { type: "application/json" }
+  );
+
+  const url = URL.createObjectURL(blob);
+
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `${planMeta.name || "TestPlan"}.json`;
+  a.click();
+
+  URL.revokeObjectURL(url);
+
+  addLog("INFO", "TestPlans", "Plan exported as JSON.");
+};
+
   const handleSeqDrop = (event: DragEvent, parentId: string | null, idx: number) => {
     event.preventDefault();
     if (!dragLibItem) return;
@@ -694,6 +724,7 @@ export function useEditorController() {
     activeMenu,
     setActiveMenu,
     handleSave,
+    handleExportPlan,
     handleRun,
     handleStop,
     handlePause,
