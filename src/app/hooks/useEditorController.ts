@@ -2,23 +2,20 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { DragEvent } from "react";
 import { toast } from "sonner";
 import { useDragResize } from "../components/editor/resizable";
-import { BASE_LIBRARY } from "../data/library";
+// import { BASE_LIBRARY } from "../data/library";
 import type { CtxMenu, LibraryItem, LogEntry, PlanMeta, Plugin, RunState, StepStatus, TestStep } from "../types/editor";
 import { addToParent, deleteIn, flatAll, makeSequence, makeStep, moveIn, nowTs, parseFreq, resetAll, setStatusIn, uid, updateIn, toArray } from "../utils/editor";
 import { removePlugin, uploadPlugin } from "../api/plugin";
 import { installPackage, uninstallPackage } from "../api/package";
-// import { usePlugins } from "./usePlugin";
 import { useAvailablePackages } from "./usePackage";
 import { useInstalledPlugins, useDuts, usePlugins, useInstruments } from "./usePlugin";
 import { useWindowWidth } from "./useWindowWidth";
 import { useDebounce } from "./useDebounce";
-
-
 import { moveStepToPosition } from "../utils/editor";
 import { usePackages } from "./usePackage";
 import { usePackageUpload } from "./usePackageUpload";
 
-import { composeTestPlan, createTestPlan,runTestPlan } from "../api/plugin";
+import { composeTestPlan, createTestPlan, runTestPlan } from "../api/plugin";
 
 
 
@@ -187,15 +184,22 @@ export function useEditorController() {
   }, []);
 
   const { data } = usePlugins();
+
   const library: LibraryItem[] = useMemo(() => {
     const apiSteps = Array.isArray(data) ? data : [];
+
     const pluginSteps = plugins
       .filter(plugin => plugin.state === "installed")
-      .flatMap(plugin => (plugin.steps ?? []).map(step => ({ ...step, pluginId: plugin.id })));
+      .flatMap(plugin =>
+        (plugin.steps ?? []).map(step => ({
+          ...step,
+          pluginId: plugin.id,
+        }))
+      );
 
-    const baseCatalog = apiSteps.length > 0 ? apiSteps : BASE_LIBRARY;
-    return [...baseCatalog, ...pluginSteps];
+    return [...apiSteps, ...pluginSteps];
   }, [data, plugins]);
+
   const { data: instruments, isLoading: isInstrumentsLoading, isError: isInstrumentsError } = useInstruments();
   const { data: duts, isLoading: isDutsLoading, isError: isDutsError } = useDuts();
 
@@ -356,79 +360,6 @@ export function useEditorController() {
 
     runTimers.current.push(finishTimer);
   };
-
-  // const handleRun = async () => {
-  //   if (runState === "running" || plan.length === 0) return;
-  //   runTimers.current.forEach(clearTimeout);
-  //   setPlan(resetAll);
-  //   setLogs([]);
-  //   setRunState("running");
-
-  //   // ✅ Step 1: Compose first
-  //   const jsonData = {
-  //     outputPath: "D:\\plans\\SamplePlan.TapPlan",
-  //     overwrite: true,
-  //     steps: plan.map(formatStepForCompose),
-  //   };
-
-  //   console.log(JSON.stringify(jsonData, null, 2));
-
-    // try {
-    //   await composeTestPlan(jsonData);
-    //   addLog("INFO", "TestPlans", `Composed: ${jsonData.outputPath}`);
-    // } catch (error) {
-    //   console.error("Failed to compose test plan:", error);
-    //   addLog("ERROR", "TestPlans", "Failed to compose test plan. Aborting run.");
-    //   setRunState("idle");
-    //   return; // ✅ Stop if compose fails
-    // }
-
-    // ✅ Step 2: Run after compose succeeds
-    // try {
-    //   await runTestPlan({
-    //     path: "D:\\plans\\SamplePlan.TapPlan",
-    //     cacheXml: true,
-    //   });
-    //   addLog("INFO", "TestPlans", `Run started: D:\\plans\\SamplePlan.TapPlan`);
-    // } catch (error) {
-    //   console.error("Failed to run test plan:", error);
-    //   addLog("ERROR", "TestPlans", "Failed to start test plan run.");
-    //   setRunState("idle");
-    //   return;
-    // }
-
-    // ✅ Step 3: Animate UI steps after both API calls succeed
-  //   const leaves = flatAll(plan).filter(step => !step.children && step.enabled);
-  //   addLog("INFO", "EdgeX", `=== Run started - "${planMeta.name}" ===`);
-  //   addLog("INFO", "EdgeX", `${leaves.length} enabled steps`);
-  //   let offset = 0;
-
-  //   leaves.forEach(step => {
-  //     const start = offset + 200 + Math.random() * 150;
-  //     const duration = 500 + Math.random() * 1500;
-  //     offset = start + duration;
-  //     const stepType = (step.type ?? step.stepTypeName ?? "STEP").toUpperCase();
-
-  //     runTimers.current.push(setTimeout(() => {
-  //       setPlan(prev => setStatusIn(prev, step.id, "running"));
-  //       addLog("INFO", stepType, `-> ${step.name}`);
-  //     }, start));
-
-  //     const verdict: StepStatus = Math.random() > 0.1 ? "passed" : "failed";
-  //     runTimers.current.push(setTimeout(() => {
-  //       setPlan(prev => setStatusIn(prev, step.id, verdict));
-  //       addLog(verdict === "passed" ? "PASS" : "FAIL", stepType, `  ${step.name}: ${verdict.toUpperCase()} (${duration.toFixed(0)}ms)`);
-  //       if (verdict === "failed") addLog("ERROR", stepType, "  Out-of-limits condition detected");
-  //     }, start + duration));
-  //   });
-
-  //   const finishTimer = setTimeout(() => {
-  //     setRunState("completed");
-  //     addLog("INFO", "EdgeX", `=== Run complete - ${(offset / 1000).toFixed(2)}s ===`);
-  //   }, offset + 300);
-
-  //   runTimers.current.push(finishTimer);
-  // };
 
   const handleStop = () => {
     runTimers.current.forEach(clearTimeout);
@@ -620,6 +551,146 @@ export function useEditorController() {
     }
   };
 
+  const handleExportPlan = () => {
+    const exportData = {
+      testplan: {
+        name: planMeta.name,
+        description: planMeta.description,
+        author: planMeta.author,
+        version: planMeta.version,
+        steps: plan.map(formatStepForCompose),
+      },
+    };
+
+    console.log(JSON.stringify(exportData, null, 2));
+
+    const blob = new Blob(
+      [JSON.stringify(exportData, null, 2)],
+      { type: "application/json" }
+    );
+
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${planMeta.name || "TestPlan"}.json`;
+    a.click();
+
+    URL.revokeObjectURL(url);
+
+    addLog("INFO", "TestPlans", "Plan exported as JSON.");
+  };
+
+  const collectExpandedIds = (steps: TestStep[]): Set<string> => {
+    const ids = new Set<string>();
+
+    const visit = (step: TestStep) => {
+      if (step.children && step.children.length > 0) {
+        ids.add(step.id);
+        step.children.forEach(visit);
+      }
+    };
+
+    steps.forEach(visit);
+
+    return ids;
+  };
+
+  const convertImportedStep = (step: any): TestStep => {
+    return {
+      id: crypto.randomUUID(),
+
+      name: step.name,
+
+      enabled: true,
+
+      status: "pending",
+
+      type: step.stepTypeName,
+
+      stepTypeName: step.stepTypeName,
+
+      typeName: step.stepTypeName,
+
+      fullName: step.stepTypeName,
+
+      className: step.stepTypeName,
+
+      properties: Object.entries(step.properties || {}).map(([key, value]) => {
+        let propertyValue: string | number | boolean;
+
+        if (typeof value === "boolean") {
+          propertyValue = value;
+        } else if (typeof value === "number") {
+          propertyValue = value;
+        } else {
+          propertyValue = value == null ? "" : String(value);
+        }
+
+        return {
+          key,
+          label: key,
+          type:
+            typeof propertyValue === "boolean"
+              ? "boolean"
+              : typeof propertyValue === "number"
+                ? "number"
+                : "string",
+          value: propertyValue,
+          group: "Properties",
+          isEditable: true,
+        };
+      }),
+      children: (step.children || []).map(convertImportedStep),
+    };
+  };
+  const importPlan = (json: any) => {
+    if (!json.testplan) return;
+
+    const tp = json.testplan;
+
+    setPlanMeta({
+      name: tp.name,
+      description: tp.description,
+      author: tp.author,
+      version: tp.version,
+      dutName: "",
+      dutSerial: "",
+      dutModel: "",
+      dutFirmware: "",
+    });
+
+    const importedSteps = tp.steps.map(convertImportedStep);
+
+    setPlan(importedSteps);
+    setExpanded(collectExpandedIds(importedSteps));
+
+    if (importedSteps.length > 0) {
+      setSelectedId(importedSteps[0].id);
+    }
+
+    setHasPlan(true);
+    addLog("INFO", "TestPlans", "Plan imported successfully.");
+  };
+  const handleImportPlan = () => {
+    const input = document.createElement("input");
+
+    input.type = "file";
+    input.accept = ".json";
+
+    input.onchange = async (e: any) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+
+      const text = await file.text();
+      const json = JSON.parse(text);
+
+      importPlan(json);
+    };
+
+    input.click();
+  };
+
   const handleSeqDrop = (event: DragEvent, parentId: string | null, idx: number) => {
     event.preventDefault();
     if (!dragLibItem) return;
@@ -694,6 +765,8 @@ export function useEditorController() {
     activeMenu,
     setActiveMenu,
     handleSave,
+    handleExportPlan,
+    handleImportPlan,
     handleRun,
     handleStop,
     handlePause,

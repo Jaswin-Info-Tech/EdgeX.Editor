@@ -1,10 +1,6 @@
 // hooks/useUsers.js
 import { useQuery } from "@tanstack/react-query";
-
-import { getInstalledPlugins, getInstruments, getSteps } from "../api/plugin";
-import type { InstrumentItem, LibraryItem } from "../types/editor";
-
-import { getDuts, getInstruments, getSteps } from "../api/plugin";
+import { getInstalledPlugins, getInstruments, getDuts, getSteps } from "../api/plugin";
 import { getTestPlans } from "../api/testplans";
 import type { DutItem, InstrumentItem, LibraryItem, TestPlanItem } from "../types/editor";
 
