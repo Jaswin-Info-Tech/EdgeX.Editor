@@ -1,16 +1,6 @@
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { DragEvent } from "react";
-import { FilePlus, FolderPlus, Layers, Plus, GripVertical } from "lucide-react";
-import {
-  DndContext,
-  PointerSensor,
-  useSensor,
-  useSensors,
-  closestCenter,
-  DragOverlay,
-} from "@dnd-kit/core";
-import type { DragEndEvent, DragStartEvent } from "@dnd-kit/core";
-import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import { FilePlus, GripVertical, Layers, Plus } from "lucide-react";
 import { SequenceStep } from "./SequenceStep";
 import { flatAll } from "../../utils/editor";
 
@@ -24,7 +14,11 @@ interface SequenceEditorProps {
   dragLibItem: any;
   dropIdx: number | null;
   setDropIdx: (value: number | null) => void;
-  handleSeqDrop: (event: DragEvent, parentId: string | null, idx: number) => void;
+  handleSeqDrop: (
+    event: DragEvent,
+    parentId: string | null,
+    idx: number,
+  ) => void;
   handleAddGroup: () => void;
   setShowNewPlan: (value: boolean) => void;
   setAddStepParentId: (value: string | null) => void;
@@ -32,7 +26,23 @@ interface SequenceEditorProps {
   setShowAddStep: (value: boolean) => void;
   sequenceStepProps: any;
   draggedStepId: string | null;
-  handleStepReorder: (stepId: string, newParentId: string | null, newIdx: number) => void;
+  handleStepReorder: (
+    stepId: string,
+    newParentId: string | null,
+    newIdx: number,
+  ) => void;
+}
+
+// A resolved drop location while a reorder-drag is in progress.
+// mode "before"/"after" = reorder as a sibling next to the hovered row.
+// mode "into" = nest as a child of the hovered row (only offered for
+// "sequence" type rows, i.e. group containers) - this is what gives us
+// drag-to-nest support, mirroring how a folder/group would accept drops.
+interface DropTarget {
+  parentId: string | null;
+  idx: number;
+  mode: "before" | "after" | "into";
+  rowId: string;
 }
 
 // Flattens the plan into the currently *visible* rows (respecting which
@@ -42,7 +52,7 @@ function flattenVisible(
   steps: any[],
   expanded: Set<string>,
   parentId: string | null = null,
-  out: { id: string; parentId: string | null; idx: number }[] = []
+  out: { id: string; parentId: string | null; idx: number }[] = [],
 ) {
   steps.forEach((step, idx) => {
     out.push({ id: step.id, parentId, idx });
@@ -70,42 +80,207 @@ export function SequenceEditor({
   setAddStepIdx,
   setShowAddStep,
   sequenceStepProps,
+  draggedStepId,
   handleStepReorder,
 }: SequenceEditorProps) {
-  const [activeDragId, setActiveDragId] = useState<string | null>(null);
-
-  const selectedStep = selectedId ? flatAll(plan).find(step => step.id === selectedId) : null;
+  const selectedStep = selectedId
+    ? flatAll(plan).find((step) => step.id === selectedId)
+    : null;
   const targetParentId = selectedStep ? selectedId : null;
-  const targetIdx = selectedStep ? (selectedStep.children?.length ?? 0) : plan.length;
-  const isAnyDragActive = !!dragLibItem;
+  const targetIdx = selectedStep
+    ? (selectedStep.children?.length ?? 0)
+    : plan.length;
 
   const expanded: Set<string> = sequenceStepProps.expanded;
+  const setDraggedStepId: (id: string | null) => void =
+    sequenceStepProps.setDraggedStepId;
 
   const flatItems = useMemo(
     () => flattenVisible(plan, expanded),
-    [plan, expanded]
+    [plan, expanded],
   );
 
-  const sortableIds = useMemo(() => flatItems.map(i => i.id), [flatItems]);
+  const stepById = useMemo(() => {
+    const map = new Map<string, any>();
+    flatAll(plan).forEach((step) => map.set(step.id, step));
+    return map;
+  }, [plan]);
 
-  const activeStep = activeDragId ? flatAll(plan).find(s => s.id === activeDragId) : null;
+  // ----- Custom (DragListView-style) reorder-drag state -----
+  // activeDrag only holds the id + the pointer position at mousedown (used
+  // once, to place the ghost initially). Live pointer tracking after that
+  // happens via refs/direct DOM writes so we don't re-render on every
+  // mousemove - only dropTarget (which row/zone we're over) triggers a
+  // render, since that's what needs to visually update.
+  const [activeDrag, setActiveDrag] = useState<{
+    id: string;
+    x: number;
+    y: number;
+  } | null>(null);
+  const [dropTarget, setDropTarget] = useState<DropTarget | null>(null);
+  const dropTargetRef = useRef<DropTarget | null>(null);
+  const ghostRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const autoScrollSpeedRef = useRef(0);
+  const autoScrollRafRef = useRef<number | null>(null);
 
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 6 } })
+  // Ids that are invalid drop targets while dragging: the dragged step
+  // itself, plus everything nested inside it (can't drop a group into its
+  // own descendant).
+  const excludedIds = useMemo(() => {
+    if (!activeDrag) return new Set<string>();
+    const node = stepById.get(activeDrag.id);
+    if (!node) return new Set([activeDrag.id]);
+    return new Set(flatAll([node]).map((s: any) => s.id));
+  }, [activeDrag, stepById]);
+
+  const startStepDrag = useCallback(
+    (stepId: string, e: React.MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setActiveDrag({ id: stepId, x: e.clientX, y: e.clientY });
+      setDraggedStepId(stepId);
+      document.body.style.userSelect = "none";
+      document.body.style.cursor = "grabbing";
+    },
+    [setDraggedStepId],
   );
 
-  const handleDragStart = (event: DragStartEvent) => {
-    setActiveDragId(String(event.active.id));
-  };
+  useEffect(() => {
+    if (!activeDrag) return;
 
-  const handleDragEnd = (event: DragEndEvent) => {
-    setActiveDragId(null);
-    const { active, over } = event;
-    if (!over || active.id === over.id) return;
-    const target = flatItems.find(i => i.id === over.id);
-    if (!target) return;
-    handleStepReorder(String(active.id), target.parentId, target.idx);
-  };
+    const tickAutoScroll = () => {
+      if (autoScrollSpeedRef.current !== 0 && scrollContainerRef.current) {
+        scrollContainerRef.current.scrollTop += autoScrollSpeedRef.current;
+      }
+      autoScrollRafRef.current = requestAnimationFrame(tickAutoScroll);
+    };
+    autoScrollRafRef.current = requestAnimationFrame(tickAutoScroll);
+
+    const handleMouseMove = (e: MouseEvent) => {
+      if (ghostRef.current) {
+        ghostRef.current.style.transform = `translate(${e.clientX + 14}px, ${e.clientY + 12}px)`;
+      }
+
+      // ----- hit test: find which row (if any) is under the cursor -----
+      const el = document.elementFromPoint(
+        e.clientX,
+        e.clientY,
+      ) as HTMLElement | null;
+      const rowEl = el?.closest("[data-step-row]") as HTMLElement | null;
+      const rowId = rowEl?.getAttribute("data-step-row") ?? null;
+
+      if (rowId && !excludedIds.has(rowId)) {
+        const item = flatItems.find((i) => i.id === rowId);
+        const step = stepById.get(rowId);
+        if (item && step && rowEl) {
+          const rect = rowEl.getBoundingClientRect();
+          const relY = (e.clientY - rect.top) / rect.height;
+          const isSequence = step.type === "sequence";
+
+          let next: DropTarget;
+          if (isSequence) {
+            if (relY < 0.25) {
+              next = {
+                parentId: item.parentId,
+                idx: item.idx,
+                mode: "before",
+                rowId,
+              };
+            } else if (relY > 0.75) {
+              next = {
+                parentId: item.parentId,
+                idx: item.idx + 1,
+                mode: "after",
+                rowId,
+              };
+            } else {
+              next = {
+                parentId: step.id,
+                idx: step.children?.length ?? 0,
+                mode: "into",
+                rowId,
+              };
+            }
+          } else {
+            next =
+              relY < 0.5
+                ? {
+                    parentId: item.parentId,
+                    idx: item.idx,
+                    mode: "before",
+                    rowId,
+                  }
+                : {
+                    parentId: item.parentId,
+                    idx: item.idx + 1,
+                    mode: "after",
+                    rowId,
+                  };
+          }
+
+          const prev = dropTargetRef.current;
+          if (!prev || prev.rowId !== next.rowId || prev.mode !== next.mode) {
+            dropTargetRef.current = next;
+            setDropTarget(next);
+          }
+        }
+      } else if (dropTargetRef.current !== null) {
+        dropTargetRef.current = null;
+        setDropTarget(null);
+      }
+
+      // ----- auto-scroll near top/bottom edge of the list -----
+      const container = scrollContainerRef.current;
+      if (container) {
+        const rect = container.getBoundingClientRect();
+        const edge = 56;
+        const maxSpeed = 16;
+        if (e.clientY < rect.top + edge) {
+          const intensity = Math.min(1, (rect.top + edge - e.clientY) / edge);
+          autoScrollSpeedRef.current = -maxSpeed * intensity;
+        } else if (e.clientY > rect.bottom - edge) {
+          const intensity = Math.min(
+            1,
+            (e.clientY - (rect.bottom - edge)) / edge,
+          );
+          autoScrollSpeedRef.current = maxSpeed * intensity;
+        } else {
+          autoScrollSpeedRef.current = 0;
+        }
+      }
+    };
+
+    const handleMouseUp = () => {
+      const target = dropTargetRef.current;
+      if (target) {
+        handleStepReorder(activeDrag.id, target.parentId, target.idx);
+      }
+      autoScrollSpeedRef.current = 0;
+      dropTargetRef.current = null;
+      setDropTarget(null);
+      setActiveDrag(null);
+      setDraggedStepId(null);
+      document.body.style.userSelect = "";
+      document.body.style.cursor = "";
+    };
+
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mouseup", handleMouseUp);
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
+      if (autoScrollRafRef.current)
+        cancelAnimationFrame(autoScrollRafRef.current);
+    };
+  }, [
+    activeDrag,
+    excludedIds,
+    flatItems,
+    stepById,
+    handleStepReorder,
+    setDraggedStepId,
+  ]);
 
   const handleBackgroundDrop = (e: any) => {
     e.stopPropagation();
@@ -113,6 +288,8 @@ export function SequenceEditor({
       handleSeqDrop(e, targetParentId, targetIdx);
     }
   };
+
+  const activeStepName = activeDrag ? stepById.get(activeDrag.id)?.name : null;
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-background">
@@ -138,132 +315,106 @@ export function SequenceEditor({
         )}
       </div>
 
-      <DndContext
-        sensors={sensors}
-        collisionDetection={closestCenter}
-        onDragStart={handleDragStart}
-        onDragEnd={handleDragEnd}
-        onDragCancel={() => setActiveDragId(null)}
+      <div
+        ref={scrollContainerRef}
+        className="flex-1 overflow-y-auto"
+        onClick={() => setSelectedId(null)}
+        onDragOver={(e) => {
+          if (dragLibItem) {
+            e.preventDefault();
+            e.stopPropagation();
+            setDropIdx(targetIdx);
+          }
+        }}
+        onDrop={handleBackgroundDrop}
       >
-        <div
-          className="flex-1 overflow-y-auto"
-           onClick={() => setSelectedId(null)}
-          onDragOver={(e) => {
-            if (dragLibItem) {
-              e.preventDefault();
-              e.stopPropagation();
-              setDropIdx(targetIdx);
-            }
-          }}
-          onDrop={handleBackgroundDrop}
-        >
-          {/* ...rest unchanged... */}
-          {!hasPlan ? (
-            <div className="flex flex-col items-center justify-center h-full gap-5 p-8">
-              <div className="border-2 border-dashed border-border p-10 text-center w-full max-w-md">
-                <FilePlus
-                  size={40}
-                  className="mx-auto text-muted-foreground/20 mb-4"
-                />
-                <div className="text-[14px] font-semibold text-foreground mb-1">
-                  No Test Plan Open
-                </div>
-                <div className="text-[12px] text-muted-foreground font-mono mb-5">
-                  Create a new plan or open an existing one.
-                </div>
-                <button
-                  onClick={() => setShowNewPlan(true)}
-                  className="px-6 py-2.5 bg-primary text-primary-foreground text-[13px] font-semibold hover:bg-primary/90 transition-colors"
-                >
-                  Create New Test Plan
-                </button>
+        {!hasPlan ? (
+          <div className="flex flex-col items-center justify-center h-full gap-5 p-8">
+            <div className="border-2 border-dashed border-border p-10 text-center w-full max-w-md">
+              <FilePlus
+                size={40}
+                className="mx-auto text-muted-foreground/20 mb-4"
+              />
+              <div className="text-[14px] font-semibold text-foreground mb-1">
+                No Test Plan Open
               </div>
+              <div className="text-[12px] text-muted-foreground font-mono mb-5">
+                Create a new plan or open an existing one.
+              </div>
+              <button
+                onClick={() => setShowNewPlan(true)}
+                className="px-6 py-2.5 bg-primary text-primary-foreground text-[13px] font-semibold hover:bg-primary/90 transition-colors"
+              >
+                Create New Test Plan
+              </button>
             </div>
-          ) : plan.length === 0 ? (
-            <div
-              className="flex flex-col items-center justify-center h-full gap-4 p-8"
-              onDragOver={(e) => {
-                if (dragLibItem) {
-                  e.preventDefault();
-                  e.stopPropagation();
-                }
-              }}
-              onDrop={(e) => {
+          </div>
+        ) : plan.length === 0 ? (
+          <div
+            className="flex flex-col items-center justify-center h-full gap-4 p-8"
+            onDragOver={(e) => {
+              if (dragLibItem) {
+                e.preventDefault();
                 e.stopPropagation();
-                if (dragLibItem) handleSeqDrop(e, null, 0);
+              }
+            }}
+            onDrop={(e) => {
+              e.stopPropagation();
+              if (dragLibItem) handleSeqDrop(e, null, 0);
+            }}
+          >
+            <div className="border-2 border-dashed border-border p-10 text-center w-full max-w-lg">
+              {" "}
+              <Layers
+                size={32}
+                className="mx-auto text-muted-foreground/20 mb-4"
+              />{" "}
+              <div className="text-[13px] text-muted-foreground font-mono mb-4">
+                Plan is empty - Drag and Drop a step to begin
+              </div>{" "}
+            </div>
+          </div>
+        ) : (
+          <div>
+            {plan.map((step, index) => (
+              <SequenceStep
+                key={step.id}
+                {...sequenceStepProps}
+                step={step}
+                parentId={null}
+                idx={index}
+                draggedStepId={draggedStepId}
+                dropTarget={dropTarget}
+                onStepDragStart={startStepDrag}
+              />
+            ))}
+            <button
+              onClick={() => {
+                setAddStepParentId(targetParentId);
+                setAddStepIdx(targetIdx);
+                setShowAddStep(true);
               }}
+              className="w-full py-2 border-t border-dashed border-border/40 text-[12px] font-mono text-muted-foreground/50 hover:text-primary hover:bg-primary/5 flex items-center justify-center gap-1.5 transition-colors"
             >
-              <div className="border-2 border-dashed border-border p-10 text-center w-full max-w-lg">
-                {" "}
-                <Layers
-                  size={32}
-                  className="mx-auto text-muted-foreground/20 mb-4"
-                />{" "}
-                <div className="text-[13px] text-muted-foreground font-mono mb-4">
-                  Plan is empty - Drag and Drop a step to begin
-                </div>{" "}
-                {" "}
-              </div>
-            </div>
-          ) : (
-            <SortableContext items={sortableIds} strategy={verticalListSortingStrategy}>
-              <div>
-                {plan.map((step, index) => (
-                  <SequenceStep
-                    key={step.id}
-                    {...sequenceStepProps}
-                    step={step}
-                    parentId={null}
-                    idx={index}
-                  />
-                ))}
-                {dragLibItem && (
-                  <div
-                    onDragOver={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      setDropIdx(targetIdx);
-                    }}
-                    onDrop={e => { e.stopPropagation(); handleSeqDrop(e, targetParentId, targetIdx); }}
-                    className={`h-12 flex items-center justify-center text-[12px] font-mono border border-dashed m-3 transition-colors
-                      ${dropIdx === targetIdx ? "border-primary text-primary bg-primary/5" : "border-border/40 text-muted-foreground/30"}`}
-                  >
-                    {selectedStep ? `+ Drop here to add into "${selectedStep.name}"` : "+ Drop here to append"}
-                  </div>
-                )}
-                <button
-                  onClick={() => {
-                    setAddStepParentId(targetParentId);
-                    setAddStepIdx(targetIdx);
-                    setShowAddStep(true);
-                  }}
-                  className="w-full py-2 border-t border-dashed border-border/40 text-[12px] font-mono text-muted-foreground/50 hover:text-primary hover:bg-primary/5 flex items-center justify-center gap-1.5 transition-colors"
-                >
-                  <Plus size={11} /> Add Test Step
-                </button>
-              </div>
-            </SortableContext>
-          )}
-        </div>
+              <Plus size={11} /> Add Test Step
+            </button>
+          </div>
+        )}
+      </div>
 
-        <DragOverlay>
-          {activeStep ? (
-            <div className="flex items-center gap-2 px-3 py-2.5 bg-card border border-primary shadow-lg text-[13px] font-mono text-foreground">
-              <GripVertical size={12} className="text-muted-foreground/50" />
-              {activeStep.name}
-            </div>
-          ) : null}
-        </DragOverlay>
-      </DndContext>
-
-      {isAnyDragActive && (
+      {/* Floating ghost row that follows the cursor while reordering,
+          DragListView-style. Positioned via direct transform writes in
+          the mousemove handler above (not React state) for smoothness. */}
+      {activeDrag && (
         <div
-          onDragOver={e => { e.preventDefault(); e.stopPropagation(); setDropIdx(targetIdx); }}
-          onDrop={handleBackgroundDrop}
-          className={`h-12 flex items-center justify-center text-[12px] font-mono border border-dashed m-3 transition-colors
-              ${dropIdx === targetIdx ? "border-primary text-primary bg-primary/5" : "border-border/40 text-muted-foreground/30"}`}
+          ref={ghostRef}
+          className="fixed top-0 left-0 z-[100] pointer-events-none flex items-center gap-2 px-3 py-2.5 bg-card border border-primary shadow-lg text-[13px] font-mono text-foreground"
+          style={{
+            transform: `translate(${activeDrag.x + 14}px, ${activeDrag.y + 12}px)`,
+          }}
         >
-          {selectedStep ? `+ Drop here to add into "${selectedStep.name}"` : "+ Drop here to append"}
+          <GripVertical size={12} className="text-muted-foreground/50" />
+          {activeStepName}
         </div>
       )}
 

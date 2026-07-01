@@ -112,7 +112,29 @@ export function moveStepToPosition(
   newIdx: number
 ): TestStep[] {
   let movedStep: TestStep | null = null;
+  let oldParentId: string | null = null;
+  let oldIdx = -1;
 
+  const findLocation = (
+    list: TestStep[],
+    parentId: string | null = null,
+  ): boolean => {
+    for (let i = 0; i < list.length; i++) {
+      if (list[i].id === stepId) {
+        oldParentId = parentId;
+        oldIdx = i;
+        return true;
+      }
+
+      if (list[i].children && findLocation(list[i].children!, list[i].id)) {
+        return true;
+      }
+    }
+
+    return false;
+  };
+
+  findLocation(steps);
   // Remove the step from wherever it currently lives, tracking it
   const removeStep = (list: TestStep[]): TestStep[] =>
     list
@@ -131,6 +153,13 @@ export function moveStepToPosition(
 
   const withoutMoved = removeStep(steps);
   if (!movedStep) return steps; // not found, no-op
+  if (
+    oldParentId === newParentId &&
+    oldIdx !== -1 &&
+    oldIdx < newIdx
+  ) {
+    newIdx--;
+  }
 
   // Guard: don't allow dropping a sequence into its own descendant
   const isDescendant = (parentCandidateId: string | null, node: TestStep): boolean => {
