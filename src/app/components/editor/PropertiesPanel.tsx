@@ -1,14 +1,14 @@
-import { Plus, Sliders, Trash2, Plug } from "lucide-react";
+import { Sliders, Plug } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { useAppDispatch, useAppSelector } from "../../store/hooks";
 import { TYPE_STRIPE } from "../../constants/editor";
-import { deleteIn, flatAll, formatFreq, updateIn } from "../../utils/editor";
+import { flatAll, formatFreq, updateIn } from "../../utils/editor";
 import { StatusPill, Toggle, TypeIcon } from "./atoms";
-import { getStepSchema } from "../../api/plugin";
+import { fetchStepSchema, lockResolvedTypeName } from "../../store/slices/propertiesSlice"; // 👈 update path to match your file
 import {
   EditorContext,
   getSchemaRecords,
   inputCls,
-  labelCls,
   normalizeEditorType,
   renderEditor,
   toBackendRecordOption,
@@ -35,18 +35,18 @@ export function PropertiesPanel({
   instruments,
   testSteps,
   setPlan,
-  setSelectedId,
-  setAddStepParentId,
-  setShowAddStep,
   updateProperty,
 }: PropertiesPanelProps) {
-  const [schemaResponse, setSchemaResponse] = useState<any>(null);
-  const [schemaError, setSchemaError] = useState<string | null>(null);
+const dispatch = useAppDispatch();
   const [schemaPropertyValues, setSchemaPropertyValues] = useState<Record<string, any>>({});
 
+  // Reads from the `properties` slice
+  const resolvedTypeNames = useAppSelector((state: any) => state.properties.resolvedTypeNames);
+  const schemaCache = useAppSelector((state: any) => state.properties.cache);
+  const errorsByTypeName = useAppSelector((state: any) => state.properties.errorsByTypeName);
+
   const getSchemaPropertyKey = (prop: any) => `${prop.name || prop.displayName} || ${prop.name}`;
-  const schemaRecords = useMemo(() => getSchemaRecords(schemaResponse), [schemaResponse]);
-  const schemaProperties = useMemo(() => schemaRecords[0]?.properties ?? [], [schemaRecords]);
+
   const isObjectLikeEditor = (prop: any) => {
     const type = normalizeEditorType(prop.editorType);
     return type === "object" || type === "json";
@@ -70,38 +70,39 @@ export function PropertiesPanel({
       })),
   }), [instruments, testSteps, plan, selectedStep?.id]);
 
+
+  const stepTypeName = useMemo(() => {
+    if (!selectedStep) return null;
+    const locked = resolvedTypeNames[selectedStep.id];
+    if (locked) return locked;
+    return (
+      selectedStep.stepTypeName ??
+      selectedStep.typeName ??
+      selectedStep.fullName ??
+      selectedStep.className ??
+      selectedStep.name
+    );
+  }, [selectedStep?.id, resolvedTypeNames]);
+
+
   useEffect(() => {
-    if (!selectedStep) {
-      setSchemaResponse(null);
-      setSchemaError(null);
-      setSchemaPropertyValues({});
-      return;
+    if (!selectedStep || !stepTypeName) return;
+    if (!resolvedTypeNames[selectedStep.id]) {
+      dispatch(lockResolvedTypeName({ stepId: selectedStep.id, stepTypeName }));
     }
-    let cancelled = false;
-    setSchemaResponse(null);
-    setSchemaError(null);
+  }, [selectedStep?.id, stepTypeName, resolvedTypeNames, dispatch]);
 
-    const fetchSchema = async () => {
-      try {
-        const stepTypeName =
-          selectedStep.stepTypeName ??
-          selectedStep.typeName ??
-          selectedStep.fullName ??
-          selectedStep.className ??
-          selectedStep.name;
-        const data = await getStepSchema(stepTypeName);
-        if (cancelled) return;
-        setSchemaResponse(data);
-        setSchemaError(null);
-      } catch (err) {
-        if (cancelled) return;
-        setSchemaError(String(err));
-      }
-    };
 
-    fetchSchema();
-    return () => { cancelled = true; };
-  }, [selectedStep?.name]);
+  useEffect(() => {
+    if (!stepTypeName) return;
+    dispatch(fetchStepSchema(stepTypeName));
+  }, [stepTypeName, dispatch]);
+
+  const schemaResponse = stepTypeName ? schemaCache[stepTypeName] : null;
+  const schemaError = stepTypeName ? errorsByTypeName[stepTypeName] : null;
+
+  const schemaRecords = useMemo(() => getSchemaRecords(schemaResponse), [schemaResponse]);
+  const schemaProperties = useMemo(() => schemaRecords[0]?.properties ?? [], [schemaRecords]);
 
   useEffect(() => {
     if (!selectedStep) { setSchemaPropertyValues({}); return; }
@@ -116,7 +117,6 @@ export function PropertiesPanel({
         prop.fullTypeName?.includes("OpenTap.Enabled");
 
       if (isEnabledWrapper && value && typeof value === "object") {
-        // Unwrap for editing — show just the inner Value in the text input
         values[prop.name] = value.Value ?? "";
       } else if (
         prop.editorType === "instrument-selector" &&
@@ -148,14 +148,12 @@ export function PropertiesPanel({
       return {};
     }
 
-    // NEW: Enabled<T> wrapper properties
     const isEnabledWrapper =
       prop.propertyType?.includes("OpenTap.Enabled") ||
       prop.fullTypeName?.includes("OpenTap.Enabled");
 
     if (isEnabledWrapper) {
       if (value == null || String(value).trim() === "") return null;
-
       return {
         IsEnabled: value !== "" && value != null,
         Value: value ?? "",
@@ -165,20 +163,15 @@ export function PropertiesPanel({
     switch (type) {
       case "integer":
         return value === "" ? 0 : parseInt(value, 10);
-
       case "number":
         return value === "" ? 0 : Number(value);
-
       case "checkbox":
         return Boolean(value);
-
       case "multiselect":
         return Array.isArray(value) ? value : value ? [value] : [];
-
       case "select":
       case "dropdown":
         return value == null || String(value).trim() === "" ? undefined : value;
-
       case "instrument-selector":
         if (!value) return null;
         return {
@@ -189,7 +182,6 @@ export function PropertiesPanel({
             "Keysight.OpenTap.Plugins.ScpiNetInstrument.Ag33210_1_04v4.Ag33210_1_04v4",
           Name: value,
         };
-
       case "object":
       case "json":
         if (value == null) return null;
@@ -203,7 +195,6 @@ export function PropertiesPanel({
           return null;
         }
         return value;
-
       default:
         return value;
     }
@@ -261,15 +252,10 @@ export function PropertiesPanel({
     ).filter((group): group is string => group !== "Schema Properties");
     const hasDisplayedProperties = groups.length > 0;
 
-    // const groups: string[] = Array.from(
-    //   new Set((selectedStep.properties || []).map((p: any) => p.group as string))
-    // ).filter((group): group is string => group !== "Schema Properties");
-
     const stripe = TYPE_STRIPE[selectedStep.type] || "#64748b";
 
     return (
       <div className="overflow-y-auto h-full">
-        {/* Step identity */}
         <div
           className="border-b border-border"
           style={{ borderLeft: `3px solid ${stripe}` }}
@@ -295,12 +281,7 @@ export function PropertiesPanel({
           </div>
         </div>
 
-        {/* Toggles */}
         <div className="border-b border-border">
-          {/* <div className="flex items-center justify-between px-3 py-2 border-b border-border/50">
-            <span className="text-[11px] font-mono text-muted-foreground uppercase tracking-wider">Enabled</span>
-            <Toggle value={selectedStep.enabled} onChange={() => setPlan((prev: any) => updateIn(prev, selectedStep.id, s => ({ ...s, enabled: !s.enabled })))} />
-          </div> */}
           <div className="flex items-center justify-between px-3 py-2">
             <span className="text-[11px] font-mono text-muted-foreground uppercase tracking-wider">
               Breakpoint
@@ -319,7 +300,6 @@ export function PropertiesPanel({
           </div>
         </div>
 
-        {/* Properties by group */}
         {groups.map((group) => (
           <div key={group}>
             <div className="flex items-center gap-2 px-3 py-2 bg-muted/30 border-b border-border">
@@ -432,7 +412,6 @@ export function PropertiesPanel({
           </div>
         ))}
 
-        {/* Schema properties (when no groups exist) */}
         {!hasDisplayedProperties && (
           <>
             <div className="flex items-center gap-2 px-3 py-2 bg-muted/30 border-b border-border">
@@ -472,29 +451,6 @@ export function PropertiesPanel({
               </div>
             )}
 
-        {/* Footer actions */}
-        {/* <div className="px-3 py-3 border-t border-border flex gap-2 mt-1">
-          <button
-            onClick={() => {
-              setAddStepParentId(null);
-              setShowAddStep(true);
-            }}
-            className="flex-1 h-8 text-[12px] font-mono bg-secondary hover:bg-secondary/80 text-foreground flex items-center justify-center gap-1.5 border border-border transition-colors"
-          >
-            <Plus size={11} /> Add Step
-          </button>
-          <button
-            onClick={() => {
-              if (selectedId) {
-                setPlan((prev: any) => deleteIn(prev, selectedId));
-                setSelectedId(null);
-              }
-            }}
-            className="flex-1 h-8 text-[12px] font-mono text-red-500 hover:bg-red-500/10 border border-red-500/30 flex items-center justify-center gap-1.5 transition-colors"
-          >
-            <Trash2 size={11} /> Delete
-          </button>
-        </div> */}
       </div>
     );
   };
