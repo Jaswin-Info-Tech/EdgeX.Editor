@@ -1,21 +1,25 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Cpu,
   CheckCircle2,
   DatabaseZap,
   Search,
+  Trash2,
   X,
   XCircle,
   Zap,
 } from "lucide-react";
+import { toast } from "sonner";
 import {
- 
+  addResource,
+  deleteResource,
+  getResources,
   getResourceSchema,
   extractTypeName,
+  updateResource,
   type Resource,
   type ResourceSchemaProperty,
 } from "../../api/resources"; // adjust path
-import { getDuts } from "../../api/plugin"; // adjust path
 import { renderEditor, type EditorContext } from "./PropertyEditors"; // adjust path
 
 interface DutsPanelProps {
@@ -31,8 +35,6 @@ const labelCls =
   "block text-[10px] font-mono font-semibold text-muted-foreground uppercase tracking-wider mb-1.5";
 
 const getDutIcon = () => <Cpu size={15} className="text-primary shrink-0" />;
-
-const getDefaultName = (dut: any) => (dut?.name ? `${dut.name} 1` : "");
 
 // ─── Map .NET schema types to the editorType strings renderEditor expects ────
 const mapDotNetTypeToEditorType = (type: string, hasEnum: boolean): string => {
@@ -71,8 +73,14 @@ const emptyEditorContext: EditorContext = {
   instrumentOptions: [],
   testStepOptions: [],
   planStepOptions: [],
-  resourceOptions: [], 
+  resourceOptions: [],
 };
+
+const getResourceDisplayName = (resource: Resource) =>
+  resource.name ||
+  resource.properties?.Name ||
+  resource.properties?.name ||
+  String(resource.dutName ?? resource.model ?? resource.type ?? "");
 
 export function DutsPanel({
   duts,
@@ -83,8 +91,8 @@ export function DutsPanel({
   onClose,
 }: DutsPanelProps) {
   const [selectedKey, setSelectedKey] = useState("");
-  const [dutName, setDutName] = useState("");
-
+  const [resourceName, setResourceName] = useState("");
+console.log(duts, "duts");
   // ─── Schema state (property definitions for the selected DUT type) ────────
   const [schemaProperties, setSchemaProperties] = useState<
     ResourceSchemaProperty[]
@@ -94,12 +102,17 @@ export function DutsPanel({
   >({});
   const [schemaLoading, setSchemaLoading] = useState(false);
   const [schemaError, setSchemaError] = useState(false);
-
+  console.log(resourceName, "lllllll");
   // ─── Resource (existing DUT instance) state ────────────────────────────────
   const [resources, setResources] = useState<Resource[]>([]);
   const [resourcesLoading, setResourcesLoading] = useState(false);
   const [resourcesError, setResourcesError] = useState(false);
   const [selectedResourceId, setSelectedResourceId] = useState<string>("");
+  const resourceNameInputRef = useRef<HTMLInputElement>(null);
+  const [saveResourceLoading, setSaveResourceLoading] = useState(false);
+  const [saveResourceError, setSaveResourceError] = useState("");
+  const [deleteResourceLoading, setDeleteResourceLoading] = useState(false);
+  const [deleteResourceError, setDeleteResourceError] = useState("");
 
   const selectedDut = useMemo(
     () =>
@@ -108,16 +121,26 @@ export function DutsPanel({
     [duts, selectedKey],
   );
 
+  const selectedDutType = useMemo(
+    () => String(selectedDut?.type ?? selectedDut?.name ?? "").trim(),
+    [selectedDut?.type, selectedDut?.name],
+  );
+
+  const selectedDutTypeName = useMemo(
+    () => extractTypeName(selectedDutType),
+    [selectedDutType],
+  );
+
   useEffect(() => {
     if (!selectedDut) {
       setSelectedKey("");
-      setDutName("");
+      setResourceName("");
       return;
     }
 
     const key = `${selectedDut.name}:${selectedDut.assembly}`;
     if (selectedKey !== key) setSelectedKey(key);
-    setDutName(getDefaultName(selectedDut));
+    setResourceName("");
     setSelectedResourceId(""); // reset resource selection when switching type
   }, [selectedDut?.name, selectedDut?.assembly]);
 
@@ -134,7 +157,7 @@ export function DutsPanel({
 
   // ─── Fetch schema whenever the selected DUT type changes ─────────────────
   useEffect(() => {
-    if (!selectedDut?.name) {
+    if (!selectedDutType) {
       setSchemaProperties([]);
       setSchemaPropertyValues({});
       return;
@@ -144,7 +167,7 @@ export function DutsPanel({
     setSchemaLoading(true);
     setSchemaError(false);
 
-    getResourceSchema(selectedDut.name, "Dut")
+    getResourceSchema(selectedDutType, "duts")
       .then((schema) => {
         if (cancelled) return;
         const properties = schema.properties ?? [];
@@ -170,7 +193,7 @@ export function DutsPanel({
     return () => {
       cancelled = true;
     };
-  }, [selectedDut?.name]);
+  }, [selectedDutType]);
 
   // ─── Fetch all existing DUT resources once ────────────────────────────────
   useEffect(() => {
@@ -178,9 +201,10 @@ export function DutsPanel({
     setResourcesLoading(true);
     setResourcesError(false);
 
-    getDuts()
-      .then((data) => {
-        if (!cancelled) setResources(data);
+    getResources()
+      .then((normalized) => {
+        if (cancelled) return;
+        setResources(normalized);
       })
       .catch(() => {
         if (!cancelled) setResourcesError(true);
@@ -196,11 +220,26 @@ export function DutsPanel({
 
   // ─── Resources that match the currently selected DUT type ────────────────
   const matchingResources = useMemo(() => {
-    if (!selectedDut?.name) return [];
-    return resources.filter(
-      (resource) => extractTypeName(resource.type) === selectedDut.name,
-    );
-  }, [resources, selectedDut?.name]);
+    if (!selectedDutType) return [];
+    const selectedTypeLower = selectedDutType.toLowerCase();
+    const selectedTypeNameLower = selectedDutTypeName.toLowerCase();
+    const selectedNameLower = String(selectedDut?.name ?? "").toLowerCase();
+    return resources.filter((resource) => {
+      const typeName = extractTypeName(String(resource.type ?? "")).toLowerCase();
+      const instrumentName = String(resource.instrument ?? "").toLowerCase();
+      const rawType = String(resource.type ?? "").toLowerCase();
+      const resourceNameLower = String(getResourceDisplayName(resource)).toLowerCase();
+      return (
+        typeName === selectedTypeLower ||
+        typeName === selectedTypeNameLower ||
+        instrumentName === selectedTypeLower ||
+        instrumentName === selectedTypeNameLower ||
+        rawType.includes(selectedTypeLower) ||
+        rawType.includes(selectedTypeNameLower) ||
+        resourceNameLower === selectedNameLower
+      );
+    });
+  }, [resources, selectedDutType, selectedDutTypeName, selectedDut?.name]);
 
   const selectedResource = useMemo(
     () => matchingResources.find((r) => r.id === selectedResourceId) ?? null,
@@ -214,7 +253,7 @@ export function DutsPanel({
 
   const selectDut = (dut: any) => {
     setSelectedKey(`${dut.name}:${dut.assembly}`);
-    setDutName(getDefaultName(dut));
+    setResourceName("");
   };
 
   // ─── Clicking a resource card loads its live values into the editors ─────
@@ -222,7 +261,7 @@ export function DutsPanel({
     // Clicking the already-selected resource deselects it and blanks the form
     if (resource.id === selectedResourceId) {
       setSelectedResourceId("");
-      setDutName(getDefaultName(selectedDut));
+      setResourceName("");
       const blankValues: Record<string, any> = {};
       schemaProperties.forEach((property) => {
         blankValues[property.name] = getBlankValue(property);
@@ -232,7 +271,7 @@ export function DutsPanel({
     }
 
     setSelectedResourceId(resource.id);
-    setDutName(resource.name);
+    setResourceName(resource.name);
 
     setSchemaPropertyValues((prev) => {
       const next = { ...prev };
@@ -246,6 +285,97 @@ export function DutsPanel({
       });
       return next;
     });
+  };
+
+  const handleSaveDut = async () => {
+    const pluginTypeName = selectedDutType;
+    console.log("Selected DUT type:", pluginTypeName);
+    const trimmedResourceName = (resourceNameInputRef.current?.value ?? resourceName).trim();
+    if (!pluginTypeName || !trimmedResourceName) return;
+
+    setSaveResourceLoading(true);
+    setSaveResourceError("");
+    const isUpdate = Boolean(selectedResource);
+    const toastId = toast.loading(
+      isUpdate ? `Updating ${selectedResource?.name}...` : `Creating ${trimmedResourceName}...`,
+    );
+
+    try {
+      const properties = editableProperties.reduce<Record<string, any>>((values, property) => {
+        if (!property.name || property.name.toLowerCase() === "name") return values;
+        values[property.name] = schemaPropertyValues[property.name];
+        return values;
+      }, {});
+
+      if (selectedResource) {
+        await updateResource({
+          resourceKind: "duts",
+          name: selectedResource.name,
+          newName: trimmedResourceName,
+          properties,
+        });
+      } else {
+        await addResource({
+          resourceKind: "duts",
+          pluginTypeName,
+          name: trimmedResourceName,
+          properties,
+        });
+      }
+
+      const updatedResources = await getResources();
+      setResources(updatedResources);
+      toast.success(
+        isUpdate ? `${trimmedResourceName} updated successfully` : `${trimmedResourceName} created successfully`,
+        { id: toastId },
+      );
+      closePanel();
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : isUpdate
+            ? "Unable to update DUT."
+            : "Unable to add DUT.";
+      setSaveResourceError(message);
+      toast.error(message, { id: toastId });
+    } finally {
+      setSaveResourceLoading(false);
+    }
+  };
+
+  const handleDeleteDut = async () => {
+    if (!selectedResource) return;
+
+    setDeleteResourceLoading(true);
+    setDeleteResourceError("");
+    setSaveResourceError("");
+    const toastId = toast.loading(`Deleting ${selectedResource.name}...`);
+
+    try {
+      await deleteResource({
+        resourceKind: "duts",
+        name: selectedResource.name,
+      });
+
+      const updatedResources = await getResources();
+      setResources(updatedResources);
+      setSelectedResourceId("");
+      setResourceName("");
+      const blankValues: Record<string, any> = {};
+      schemaProperties.forEach((property) => {
+        blankValues[property.name] = getBlankValue(property);
+      });
+      setSchemaPropertyValues(blankValues);
+      toast.success(`${selectedResource.name} deleted successfully`, { id: toastId });
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Unable to delete DUT.";
+      setDeleteResourceError(message);
+      toast.error(message, { id: toastId });
+    } finally {
+      setDeleteResourceLoading(false);
+    }
   };
 
   const editableProperties = schemaProperties.filter((p) => p.isEditable);
@@ -320,11 +450,10 @@ export function DutsPanel({
                     <button
                       key={key}
                       onClick={() => selectDut(dut)}
-                      className={`flex w-full items-center gap-2 border-b border-border/60 px-3 py-2.5 text-left transition-colors ${
-                        isSelected
-                          ? "bg-secondary text-foreground"
-                          : "text-muted-foreground hover:bg-secondary/60 hover:text-foreground"
-                      }`}
+                      className={`flex w-full items-center gap-2 border-b border-border/60 px-3 py-2.5 text-left transition-colors ${isSelected
+                        ? "bg-secondary text-foreground"
+                        : "text-muted-foreground hover:bg-secondary/60 hover:text-foreground"
+                        }`}
                     >
                       {getDutIcon()}
                       <span className="min-w-0 flex-1 truncate text-[12px] font-semibold">
@@ -369,7 +498,7 @@ export function DutsPanel({
                 {selectedDut && (
                   <div>
                     <div className="mb-2 text-[10px] font-mono font-semibold uppercase tracking-wider text-muted-foreground">
-                      Existing {selectedDut.name} Instances
+                      Existing {selectedDutTypeName || selectedDut.name} Instances
                     </div>
 
                     {resourcesLoading ? (
@@ -394,11 +523,10 @@ export function DutsPanel({
                             <button
                               key={resource.id}
                               onClick={() => selectResource(resource)}
-                              className={`flex items-center gap-2 border px-3 py-2 text-left transition-colors ${
-                                isSelected
-                                  ? "border-primary bg-secondary"
-                                  : "border-border bg-background hover:bg-secondary/60"
-                              }`}
+                              className={`flex items-center gap-2 border px-3 py-2 text-left transition-colors ${isSelected
+                                ? "border-primary bg-secondary"
+                                : "border-border bg-background hover:bg-secondary/60"
+                                }`}
                             >
                               {hasError ? (
                                 <XCircle
@@ -413,14 +541,13 @@ export function DutsPanel({
                               )}
                               <div className="min-w-0">
                                 <div className="truncate text-[12px] font-mono font-semibold text-foreground">
-                                  {resource.name}
+                                  {getResourceDisplayName(resource) || "Unnamed DUT"}
                                 </div>
                                 <div
-                                  className={`text-[10px] font-mono ${
-                                    hasError
-                                      ? "text-destructive"
-                                      : "text-muted-foreground"
-                                  }`}
+                                  className={`text-[10px] font-mono ${hasError
+                                    ? "text-destructive"
+                                    : "text-muted-foreground"
+                                    }`}
                                 >
                                   {resource.status}
                                 </div>
@@ -434,11 +561,12 @@ export function DutsPanel({
                 )}
 
                 <div>
-                  <label className={labelCls}>DUT Name</label>
+                  <label className={labelCls}>Resource Name</label>
                   <input
-                    value={dutName}
-                    onChange={(e) => setDutName(e.target.value)}
-                    placeholder="DUT name"
+                    ref={resourceNameInputRef}
+                    value={resourceName}
+                    onChange={(e) => setResourceName(e.target.value)}
+                    placeholder="Resource name"
                     className="h-9 w-full bg-background border border-border px-3 text-[12px] font-mono text-foreground placeholder:text-muted-foreground outline-none focus:border-primary transition-colors"
                     disabled={!selectedDut}
                   />
@@ -483,9 +611,21 @@ export function DutsPanel({
 
         <div className="flex h-12 items-center border-t border-border bg-muted/20 px-4">
           <span className="text-[11px] font-mono text-muted-foreground">
-            Will be added to the DUTs panel
+            {selectedResource
+              ? "Will update the selected DUT resource"
+              : "Will be added to the DUTs panel"}
           </span>
           <div className="ml-auto flex items-center gap-2">
+            {selectedResource && (
+              <button
+                onClick={handleDeleteDut}
+                disabled={deleteResourceLoading || saveResourceLoading}
+                className="flex h-8 items-center gap-2 border border-destructive/50 px-4 text-[12px] font-mono font-semibold text-destructive transition-colors hover:bg-destructive/10 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <Trash2 size={12} />
+                {deleteResourceLoading ? "Deleting..." : "Delete"}
+              </button>
+            )}
             <button
               onClick={closePanel}
               className="h-8 px-4 border border-border text-[12px] font-mono font-semibold text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors"
@@ -493,12 +633,24 @@ export function DutsPanel({
               Cancel
             </button>
             <button
-              onClick={closePanel}
-              disabled={!selectedDut || !dutName.trim()}
+              onClick={handleSaveDut}
+              disabled={
+                !selectedDut ||
+                !resourceName.trim() ||
+                schemaLoading ||
+                saveResourceLoading ||
+                deleteResourceLoading
+              }
               className="flex h-8 items-center gap-2 bg-primary px-4 text-[12px] font-mono font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
             >
               <Zap size={12} />
-              Add DUT
+              {saveResourceLoading
+                ? selectedResource
+                  ? "Updating..."
+                  : "Adding..."
+                : selectedResource
+                  ? "Update DUT"
+                  : "Add DUT"}
             </button>
           </div>
         </div>

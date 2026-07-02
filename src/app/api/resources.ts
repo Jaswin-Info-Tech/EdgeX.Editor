@@ -11,24 +11,56 @@ export interface Resource {
 export const getResources = async (): Promise<Resource[]> => {
   try {
     const response = await axiosClient.get('plugins/resources');
-    
-    // Handle the API response structure
     const data = response.data;
-    
-    // If response has instruments array
+    const combined: Resource[] = [];
+
+    // Instruments
     if (data.instruments && Array.isArray(data.instruments)) {
-      return data.instruments.map((instrument: any, index: number) => ({
-        id: instrument.name || `instrument-${index}`,
-        name: instrument.name || "Unnamed",
-        instrument: extractTypeName(instrument.type),
-        status: instrument.properties?.Error ? "Error" : "Active",
-        error: instrument.properties?.Error || "",
-        type: instrument.type,
-        properties: instrument.properties || {},
-      }));
+      combined.push(
+        ...data.instruments.map((instrument: any, index: number) => ({
+          id: instrument.name || `instrument-${index}`,
+          name: instrument.name || "Unnamed",
+          instrument: extractTypeName(instrument.type),
+          status: instrument.properties?.Error ? "Error" : "Active",
+          error: instrument.properties?.Error || "",
+          type: instrument.type,
+          properties: instrument.properties || {},
+        })),
+      );
     }
-    
-    // If response is directly an array of resources
+
+    // DUTs
+    if (data.duts && Array.isArray(data.duts)) {
+      combined.push(
+        ...data.duts.map((resource: any, index: number) => ({
+          id: String(resource.id ?? resource.name ?? resource.dutName ?? `dut-${index}`),
+          name:
+            String(
+              resource.name ||
+              resource.properties?.Name ||
+              resource.properties?.name ||
+              resource.dutName ||
+              resource.model ||
+              extractTypeName(resource.type ?? resource.properties?.type ?? "")
+            ) || `DUT ${index}`,
+          instrument: String(
+            resource.instrument ?? extractTypeName(resource.type ?? resource.properties?.type ?? ""),
+          ),
+          status:
+            String(resource.status ?? "").trim() ||
+            (resource.properties?.Error ? "Error" : "Active"),
+          type: String(resource.type ?? resource.properties?.type ?? ""),
+          properties: resource.properties ?? {},
+          ...resource,
+        })),
+      );
+    }
+
+    if (combined.length > 0) {
+      return combined;
+    }
+
+    // Fallbacks (array, or {resources: [...]})
     if (Array.isArray(data)) {
       return data.map((item: any, index: number) => ({
         id: item.id || item.name || `resource-${index}`,
@@ -38,8 +70,7 @@ export const getResources = async (): Promise<Resource[]> => {
         ...item,
       }));
     }
-    
-    // If response is a single object with resources
+
     if (data.resources && Array.isArray(data.resources)) {
       return data.resources.map((resource: any, index: number) => ({
         id: resource.id || resource.name || `resource-${index}`,
@@ -49,7 +80,7 @@ export const getResources = async (): Promise<Resource[]> => {
         ...resource,
       }));
     }
-    
+
     return [];
   } catch (error) {
     throw error;
@@ -121,7 +152,7 @@ export const deleteResource = async (payload: DeleteResourcePayload) => {
 
 export const getResourceSchema = async (
   pluginTypeName: string,
-  resourceKind: string = 'Instrument',
+resourceKind: string = 'instrument',
 ): Promise<ResourceSchema> => {
   try {
     const response = await axiosClient.get('plugins/resources/schema', {

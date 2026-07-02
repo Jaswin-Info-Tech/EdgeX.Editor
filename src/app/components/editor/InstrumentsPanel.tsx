@@ -153,7 +153,7 @@ export function InstrumentsPanel({
     setSchemaLoading(true);
     setSchemaError(false);
 
-    getResourceSchema(selectedInstrument.name)
+    getResourceSchema(selectedInstrument.name, "instrument")
       .then((schema) => {
         if (cancelled) return;
         const properties = schema.properties ?? [];
@@ -286,14 +286,14 @@ export function InstrumentsPanel({
 
       if (selectedResource) {
         await updateResource({
-          resourceKind: "Instrument",
+          resourceKind: "instrument",
           name: selectedResource.name,
           newName: trimmedResourceName,
           properties,
         });
       } else {
         await addResource({
-          resourceKind: "Instrument",
+          resourceKind: "instrument",
           pluginTypeName,
           name: trimmedResourceName,
           properties,
@@ -333,7 +333,7 @@ export function InstrumentsPanel({
 
     try {
       await deleteResource({
-        resourceKind: "Instrument",
+        resourceKind: "instrument",
         name: selectedResource.name,
       });
 
