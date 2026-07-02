@@ -245,6 +245,8 @@ export function useEditorController() {
   };
 
   const handleAddStep = (item: LibraryItem, parentId?: string | null, atIdx?: number, switchTab: boolean = true) => {
+    if (!hasPlan) return;
+
     const step = makeStep(item);
     const pid = parentId !== undefined ? parentId : addStepParentId;
     const idx = atIdx !== undefined ? atIdx : addStepIdx;
@@ -389,7 +391,7 @@ export function useEditorController() {
     setPlan(prev => moveStepToPosition(prev, stepId, newParentId, newIdx));
     if (newParentId) setExpanded(prev => new Set([...prev, newParentId]));
     setDraggedStepId(null);
-    addLog("INFO", "Plan", `Reordered step`);
+    //addLog("INFO", "Plan", `Reordered step`);
   };
 
   const refreshPluginData = useCallback(() => {

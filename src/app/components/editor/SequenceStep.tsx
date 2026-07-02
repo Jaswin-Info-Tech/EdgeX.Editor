@@ -158,7 +158,16 @@ export function SequenceStep(props: SequenceStepProps) {
 
     return (
       <div key={step.id} ref={rowRef} data-step-row={step.id}>
-        {isReorderDropBefore && <div className="h-[2px] bg-primary mx-1" />}
+          <div
+            className={`
+        overflow-hidden
+        transition-all
+        duration-150
+        ${isReorderDropBefore ? "h-8" : "h-0"}
+    `}
+          >
+            <div className="h-[2px] bg-primary mt-3 rounded-full " />
+          </div>
         <div
           onClick={(e) => {
             e.stopPropagation();
@@ -238,7 +247,7 @@ export function SequenceStep(props: SequenceStepProps) {
             >
               <GripVertical
                 size={12}
-                className="text-muted-foreground/30 group-hover:text-muted-foreground/60 shrink-0"
+                className="text-muted-foreground/60 group-hover:text-muted-foreground shrink-0 h-5 w-5"
               />
             </div>
             <TypeIcon type={step.type} size={13} />
@@ -354,7 +363,16 @@ export function SequenceStep(props: SequenceStepProps) {
             </button>
           </div>
         </div>
-        {isReorderDropAfter && <div className="h-[2px] bg-primary mx-1" />}
+          <div
+            className={`
+        overflow-hidden
+        transition-all
+        duration-150
+        ${isReorderDropAfter ? "h-8" : "h-0"}
+    `}
+          >
+            <div className="h-[2px] bg-primary mt-3 rounded-full" />
+          </div>
 
         {/* Children */}
         {hasKids && isExp && (
