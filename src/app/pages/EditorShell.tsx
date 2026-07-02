@@ -6,6 +6,7 @@ import { ConsolePanel } from "../components/editor/ConsolePanel";
 import { DutsPanel } from "../components/editor/DutsPanel";
 import { EditorToolbar } from "../components/editor/EditorToolbar";
 import { InstrumentsPanel } from "../components/editor/InstrumentsPanel";
+import { ConnectionsPanel } from "../components/editor/ConnectionsPanel";
 import { LeftPanel } from "../components/editor/LeftPanel";
 import { MenuBar } from "../components/editor/MenuBar";
 import { ModalsHost } from "../components/editor/ModalsHost";
@@ -80,6 +81,9 @@ interface EditorShellProps {
   duts: any[];
   isDutsLoading: boolean;
   isDutsError: boolean;
+  connections: any[];
+  isConnectionsLoading: boolean;
+  isConnectionsError: boolean;
   plan: any;
   planMeta: any;
   stats: any;
@@ -191,6 +195,9 @@ export function EditorShell(props: EditorShellProps) {
     duts,
     isDutsLoading,
     isDutsError,
+    connections,
+    isConnectionsLoading,
+    isConnectionsError,
     plan,
     planMeta,
     stats,
@@ -239,7 +246,9 @@ export function EditorShell(props: EditorShellProps) {
   const [instrumentSearch, setInstrumentSearch] = useState("");
   const [showInstrumentsPanel, setShowInstrumentsPanel] = useState(false);
   const [dutSearch, setDutSearch] = useState("");
+  const [connectionSearch, setConnectionSearch] = useState("");
   const [showDutsPanel, setShowDutsPanel] = useState(false);
+  const [showConnectionsPanel, setShowConnectionsPanel] = useState(false);
   const [resourceSearch, setResourceSearch] = useState("");
   const [showResourcesPanel, setShowResourcesPanel] = useState(false);
   const [showCreateResource, setShowCreateResource] = useState(false);
@@ -324,6 +333,22 @@ export function EditorShell(props: EditorShellProps) {
       }),
     [duts, dutSearch],
   );
+
+  const filteredConnections = useMemo(
+    () =>
+      connections.filter((connection: any) => {
+        const search = connectionSearch.trim().toLowerCase();
+        if (!search) return true;
+        return [connection.name, connection.baseType, connection.assembly].some(
+          (value) =>
+            String(value ?? "")
+              .toLowerCase()
+              .includes(search),
+        );
+      }),
+    [connections, connectionSearch],
+  );
+
 
   const filteredResourcePlans = useMemo(
     () =>
@@ -932,6 +957,7 @@ export function EditorShell(props: EditorShellProps) {
         setShowPluginMgr={setShowPluginMgr}
         setShowInstrumentsPanel={setShowInstrumentsPanel}
         setShowDutsPanel={setShowDutsPanel}
+        setShowConnectionsPanel={setShowConnectionsPanel}
         handleSave={handleSaveAndMarkClean}
         handleRun={handleRun}
         handleStop={handleStop}
@@ -1049,6 +1075,17 @@ export function EditorShell(props: EditorShellProps) {
         />
       )}
 
+      {showConnectionsPanel && (
+        <ConnectionsPanel
+          connections={filteredConnections}
+          search={connectionSearch}
+          setSearch={setConnectionSearch}
+          isLoading={isConnectionsLoading}
+          isError={isConnectionsError}
+          onClose={() => setShowConnectionsPanel(false)}
+        />
+      )}
+
       {showResourcesPanel && (
         <ResourcesPanel
           resources={filteredResourcePlans}
@@ -1124,6 +1161,7 @@ export function EditorShell(props: EditorShellProps) {
         addStepIdx={addStepIdx}
         instruments={instruments}
         duts={duts}
+        connections={connections}
         showPluginMgr={showPluginMgr}
         setShowPluginMgr={setShowPluginMgr}
         plugins={plugins}

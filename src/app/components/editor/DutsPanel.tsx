@@ -74,6 +74,7 @@ const emptyEditorContext: EditorContext = {
   testStepOptions: [],
   planStepOptions: [],
   resourceOptions: [],
+
 };
 
 const getResourceDisplayName = (resource: Resource) =>

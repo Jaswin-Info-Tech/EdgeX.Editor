@@ -75,7 +75,7 @@ const emptyEditorContext: EditorContext = {
   instrumentOptions: [],
   testStepOptions: [],
   planStepOptions: [],
-  resourceOptions: [], 
+   resourceOptions: [],
 };
 
 export function InstrumentsPanel({
