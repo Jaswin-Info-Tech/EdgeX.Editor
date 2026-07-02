@@ -51,11 +51,6 @@ interface SequenceStepProps {
   setAddStepParentId: any;
   setAddStepIdx: any;
   setShowAddStep: any;
-  // Custom mouse-based reorder-drag (DragListView-style), driven by the
-  // parent SequenceEditor. draggedStepId marks which row is currently
-  // being picked up (dims it); dropTarget marks which row/zone is
-  // currently the drop candidate (before/after/into); onStepDragStart is
-  // called from the grip handle's mousedown to kick the drag off.
   draggedStepId: string | null;
   setDraggedStepId: (id: string | null) => void;
   dropTarget: DropTarget | null;
@@ -114,14 +109,10 @@ export function SequenceStep(props: SequenceStepProps) {
     const rowRef = useRef<HTMLDivElement>(null);
 
     const isBeingDragged = draggedStepId === step.id;
-    // isAnyDragActive reflects a library item being dragged in from the
-    // left panel (native HTML5 drag) - a separate flow from step
-    // reordering (which is mouse-event based, see onStepDragStart).
     const isAnyDragActive = !!dragLibItem;
     const isLibDropTargetRow =
       isSequence && isAnyDragActive && dragOverSequenceId === step.id;
 
-    // Reorder-drag drop indicator state for this row.
     const isReorderDropBefore =
       dropTarget?.rowId === step.id && dropTarget.mode === "before";
     const isReorderDropAfter =
@@ -145,8 +136,6 @@ export function SequenceStep(props: SequenceStepProps) {
           ? formatFreq(value as number)
           : `${value ?? ""}${summaryProp?.unit ? ` ${summaryProp.unit}` : ""}`;
 
-    // Only handles library-item drops (step reordering goes through the
-    // mouse-based onStepDragStart/dropTarget system instead).
     const onLibDrop = (
       e: any,
       targetParentId: string | null,
@@ -386,16 +375,7 @@ export function SequenceStep(props: SequenceStepProps) {
                 idx={ci}
               />
             ))}
-            {/* <button
-              onClick={() => {
-                setAddStepParentId(step.id);
-                setAddStepIdx(undefined);
-                setShowAddStep(true);
-              }}
-              className="w-full text-left px-4 py-1.5 text-[11px] font-mono text-muted-foreground/50 hover:text-primary hover:bg-primary/5 flex items-center gap-1.5 transition-colors border-b border-border/30"
-            >
-              <Plus size={10} /> Add step inside {step.name}
-            </button> */}
+
           </div>
         )}
       </div>
