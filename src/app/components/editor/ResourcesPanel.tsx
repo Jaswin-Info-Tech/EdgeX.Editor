@@ -140,10 +140,10 @@ export function ResourcesPanel({
                   key={resource.id}
                   className="grid grid-cols-[1.4fr_1fr_0.7fr_0.7fr] gap-3 px-5 py-4 border-b border-border text-[12px] font-mono"
                 >
-                  <div className="font-semibold text-foreground">
+                  <div className="min-w-0 truncate font-semibold text-foreground" title={resource.name}>
                     {resource.name}
                   </div>
-                  <div className="text-muted-foreground">
+                  <div className="min-w-0 truncate text-muted-foreground" title={resource.instrument}>
                     {resource.instrument}
                   </div>
                   <div
