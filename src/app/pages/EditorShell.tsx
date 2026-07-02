@@ -816,39 +816,6 @@ export function EditorShell(props: EditorShellProps) {
     [consoleFilter, logs],
   );
 
-  const instrumentToLibraryItem = (instrument: any) => ({
-    id: `instrument:${instrument.name}:${instrument.assembly}`,
-    name: instrument.name,
-    category: "Instruments",
-    type: "instrument",
-    description: `Instrument from ${instrument.assembly}`,
-    baseType: instrument.baseType,
-    assembly: instrument.assembly,
-    defaultProps: [
-      {
-        key: "instrumentName",
-        label: "Instrument Name",
-        type: "string",
-        value: instrument.name,
-        group: "Instrument",
-      },
-      {
-        key: "baseType",
-        label: "Base Type",
-        type: "string",
-        value: instrument.baseType,
-        group: "Instrument",
-      },
-      {
-        key: "assembly",
-        label: "Assembly",
-        type: "string",
-        value: instrument.assembly,
-        group: "Instrument",
-      },
-    ],
-  });
-
   const propertiesPanel = (
     <PropertiesPanel
       selectedStep={selectedStep}

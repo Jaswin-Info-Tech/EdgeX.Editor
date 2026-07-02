@@ -1,17 +1,21 @@
 import { useEffect, useMemo, useState } from "react";
 import {
-  BatteryCharging,
   Cable,
-  Clock3,
-  Cpu,
+  CheckCircle2,
   DatabaseZap,
-  Gauge,
   Search,
-  Thermometer,
-  Wifi,
   X,
+  XCircle,
   Zap,
 } from "lucide-react";
+import {
+  getResources,
+  getResourceSchema,
+  extractTypeName,
+  type Resource,
+  type ResourceSchemaProperty,
+} from "../../api/resources"; // adjust path
+import { renderEditor, type EditorContext } from "./PropertyEditors"; // adjust path
 
 interface InstrumentsPanelProps {
   instruments: any[];
@@ -22,18 +26,54 @@ interface InstrumentsPanelProps {
   onClose: () => void;
 }
 
-const fieldCls =
-  "h-9 w-full bg-background border border-border px-3 text-[12px] font-mono text-foreground placeholder:text-muted-foreground outline-none focus:border-primary transition-colors";
-
 const labelCls =
   "block text-[10px] font-mono font-semibold text-muted-foreground uppercase tracking-wider mb-1.5";
 
-const getInstrumentIcon = (instrument: any) => {
-  return <Cable size={15} className="text-primary shrink-0" />;
-};
+const getInstrumentIcon = () => (
+  <Cable size={15} className="text-primary shrink-0" />
+);
 
 const getDefaultName = (instrument: any) =>
   instrument?.name ? `${instrument.name} 1` : "";
+
+// ─── Map .NET schema types to the editorType strings renderEditor expects ────
+const mapDotNetTypeToEditorType = (type: string, hasEnum: boolean): string => {
+  if (hasEnum) return "select";
+  switch (type) {
+    case "System.Boolean":
+      return "checkbox";
+    case "System.Int16":
+    case "System.Int32":
+    case "System.Int64":
+    case "System.UInt16":
+    case "System.UInt32":
+    case "System.UInt64":
+      return "integer";
+    case "System.Single":
+    case "System.Double":
+    case "System.Decimal":
+      return "number";
+    case "System.String":
+    default:
+      return "text";
+  }
+};
+
+const toEditorProp = (property: ResourceSchemaProperty) => {
+  const hasEnum = (property.enumValues?.length ?? 0) > 0;
+  return {
+    name: property.name,
+    displayName: property.displayName || property.name,
+    editorType: mapDotNetTypeToEditorType(property.type, hasEnum),
+    enumValues: property.enumValues ?? [],
+  };
+};
+
+const emptyEditorContext: EditorContext = {
+  instrumentOptions: [],
+  testStepOptions: [],
+  planStepOptions: [],
+};
 
 export function InstrumentsPanel({
   instruments,
@@ -45,11 +85,18 @@ export function InstrumentsPanel({
 }: InstrumentsPanelProps) {
   const [selectedKey, setSelectedKey] = useState("");
   const [instrumentName, setInstrumentName] = useState("");
-  const [visaAddress, setVisaAddress] = useState("GPIB0::13::INSTR");
-  const [voltageRange, setVoltageRange] = useState("60");
-  const [currentRange, setCurrentRange] = useState("10");
-  const [measurementInterval, setMeasurementInterval] = useState("100");
-  const [interfaceType, setInterfaceType] = useState("GPIB");
+
+  // ─── Schema state (property definitions for the selected instrument type) ─
+  const [schemaProperties, setSchemaProperties] = useState<ResourceSchemaProperty[]>([]);
+  const [schemaPropertyValues, setSchemaPropertyValues] = useState<Record<string, any>>({});
+  const [schemaLoading, setSchemaLoading] = useState(false);
+  const [schemaError, setSchemaError] = useState(false);
+
+  // ─── Resource (existing instrument instance) state ────────────────────────
+  const [resources, setResources] = useState<Resource[]>([]);
+  const [resourcesLoading, setResourcesLoading] = useState(false);
+  const [resourcesError, setResourcesError] = useState(false);
+  const [selectedResourceId, setSelectedResourceId] = useState<string>("");
 
   const selectedInstrument = useMemo(
     () =>
@@ -69,7 +116,95 @@ export function InstrumentsPanel({
     const key = `${selectedInstrument.name}:${selectedInstrument.assembly}`;
     if (selectedKey !== key) setSelectedKey(key);
     setInstrumentName(getDefaultName(selectedInstrument));
+    setSelectedResourceId(""); // reset resource selection when switching type
   }, [selectedInstrument?.name, selectedInstrument?.assembly]);
+
+
+  const getBlankValue = (property: ResourceSchemaProperty): any => {
+    const hasEnum = (property.enumValues?.length ?? 0) > 0;
+    if (hasEnum) return "";
+    switch (property.type) {
+      case "System.Boolean":
+        return false;
+      default:
+        return "";
+    }
+  };
+
+  // ─── Fetch schema whenever the selected instrument type changes ──────────
+  useEffect(() => {
+    if (!selectedInstrument?.name) {
+      setSchemaProperties([]);
+      setSchemaPropertyValues({});
+      return;
+    }
+
+    let cancelled = false;
+    setSchemaLoading(true);
+    setSchemaError(false);
+
+    getResourceSchema(selectedInstrument.name)
+      .then((schema) => {
+        if (cancelled) return;
+        const properties = schema.properties ?? [];
+        setSchemaProperties(properties);
+
+        // Start blank — values only get filled when an existing resource is selected
+        const blankValues: Record<string, any> = {};
+        properties.forEach((property) => {
+          blankValues[property.name] = getBlankValue(property);
+        });
+        setSchemaPropertyValues(blankValues);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setSchemaError(true);
+        setSchemaProperties([]);
+        setSchemaPropertyValues({});
+      })
+      .finally(() => {
+        if (!cancelled) setSchemaLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedInstrument?.name]);
+
+  // ─── Fetch all existing resources once ────────────────────────────────────
+  useEffect(() => {
+    let cancelled = false;
+    setResourcesLoading(true);
+    setResourcesError(false);
+
+    getResources()
+      .then((data) => {
+        if (!cancelled) setResources(data);
+      })
+      .catch(() => {
+        if (!cancelled) setResourcesError(true);
+      })
+      .finally(() => {
+        if (!cancelled) setResourcesLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // ─── Resources that match the currently selected instrument type ─────────
+  const matchingResources = useMemo(() => {
+    if (!selectedInstrument?.name) return [];
+    return resources.filter(
+      (resource) => extractTypeName(resource.type) === selectedInstrument.name,
+    );
+  }, [resources, selectedInstrument?.name]);
+
+  const selectedResource = useMemo(
+    () => matchingResources.find((r) => r.id === selectedResourceId) ?? null,
+    [matchingResources, selectedResourceId],
+  );
 
   const closePanel = () => {
     onClose();
@@ -80,6 +215,38 @@ export function InstrumentsPanel({
     setSelectedKey(`${instrument.name}:${instrument.assembly}`);
     setInstrumentName(getDefaultName(instrument));
   };
+
+  // ─── Clicking a resource card loads its live values into the editors ─────
+  const selectResource = (resource: Resource) => {
+    // Clicking the already-selected resource deselects it and blanks the form
+    if (resource.id === selectedResourceId) {
+      setSelectedResourceId("");
+      setInstrumentName(getDefaultName(selectedInstrument));
+      const blankValues: Record<string, any> = {};
+      schemaProperties.forEach((property) => {
+        blankValues[property.name] = getBlankValue(property);
+      });
+      setSchemaPropertyValues(blankValues);
+      return;
+    }
+
+    setSelectedResourceId(resource.id);
+    setInstrumentName(resource.name);
+
+    setSchemaPropertyValues((prev) => {
+      const next = { ...prev };
+      schemaProperties.forEach((property) => {
+        if (resource.properties && property.name in resource.properties) {
+          next[property.name] = resource.properties[property.name] ?? getBlankValue(property);
+        } else {
+          next[property.name] = getBlankValue(property);
+        }
+      });
+      return next;
+    });
+  };
+
+  const editableProperties = schemaProperties.filter((p) => p.isEditable);
 
   return (
     <div
@@ -151,13 +318,12 @@ export function InstrumentsPanel({
                     <button
                       key={key}
                       onClick={() => selectInstrument(instrument)}
-                      className={`flex w-full items-center gap-2 border-b border-border/60 px-3 py-2.5 text-left transition-colors ${
-                        isSelected
-                          ? "bg-secondary text-foreground"
-                          : "text-muted-foreground hover:bg-secondary/60 hover:text-foreground"
-                      }`}
+                      className={`flex w-full items-center gap-2 border-b border-border/60 px-3 py-2.5 text-left transition-colors ${isSelected
+                        ? "bg-secondary text-foreground"
+                        : "text-muted-foreground hover:bg-secondary/60 hover:text-foreground"
+                        }`}
                     >
-                      {getInstrumentIcon(instrument)}
+                      {getInstrumentIcon()}
                       <span className="min-w-0 flex-1 truncate text-[12px] font-semibold">
                         {instrument.name}
                       </span>
@@ -172,7 +338,7 @@ export function InstrumentsPanel({
             <div className="border-b border-border px-5 py-4">
               {selectedInstrument ? (
                 <div className="flex items-start gap-3">
-                  <div className="mt-0.5">{getInstrumentIcon(selectedInstrument)}</div>
+                  <div className="mt-0.5">{getInstrumentIcon()}</div>
                   <div className="min-w-0">
                     <div className="truncate text-[13px] font-semibold text-foreground">
                       {selectedInstrument.name}
@@ -196,77 +362,104 @@ export function InstrumentsPanel({
 
             <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
               <div className="space-y-5">
+                {/* ─── Existing resource cards for this instrument type ─── */}
+                {selectedInstrument && (
+                  <div>
+                    <div className="mb-2 text-[10px] font-mono font-semibold uppercase tracking-wider text-muted-foreground">
+                      Existing {selectedInstrument.name} Instances
+                    </div>
+
+                    {resourcesLoading ? (
+                      <div className="py-3 text-[11px] font-mono text-muted-foreground">
+                        Loading resources...
+                      </div>
+                    ) : resourcesError ? (
+                      <div className="py-3 text-[11px] font-mono text-destructive">
+                        Unable to load resources.
+                      </div>
+                    ) : matchingResources.length === 0 ? (
+                      <div className="py-3 text-[11px] font-mono text-muted-foreground">
+                        No existing instances of this instrument.
+                      </div>
+                    ) : (
+                      <div className="flex flex-wrap gap-2">
+                        {matchingResources.map((resource) => {
+                          const isSelected = resource.id === selectedResourceId;
+                          const hasError = resource.status === "Error";
+
+                          return (
+                            <button
+                              key={resource.id}
+                              onClick={() => selectResource(resource)}
+                              className={`flex items-center gap-2 border px-3 py-2 text-left transition-colors ${isSelected
+                                ? "border-primary bg-secondary"
+                                : "border-border bg-background hover:bg-secondary/60"
+                                }`}
+                            >
+                              {hasError ? (
+                                <XCircle size={13} className="shrink-0 text-destructive" />
+                              ) : (
+                                <CheckCircle2 size={13} className="shrink-0 text-emerald-500" />
+                              )}
+                              <div className="min-w-0">
+                                <div className="truncate text-[12px] font-mono font-semibold text-foreground">
+                                  {resource.name}
+                                </div>
+                                <div
+                                  className={`text-[10px] font-mono ${hasError ? "text-destructive" : "text-muted-foreground"
+                                    }`}
+                                >
+                                  {resource.status}
+                                </div>
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 <div>
                   <label className={labelCls}>Instrument Name</label>
                   <input
                     value={instrumentName}
                     onChange={(e) => setInstrumentName(e.target.value)}
                     placeholder="Instrument name"
-                    className={fieldCls}
+                    className="h-9 w-full bg-background border border-border px-3 text-[12px] font-mono text-foreground placeholder:text-muted-foreground outline-none focus:border-primary transition-colors"
                     disabled={!selectedInstrument}
                   />
                 </div>
 
                 <div>
                   <div className="mb-3 border-t border-border pt-3 text-[10px] font-mono font-semibold uppercase tracking-wider text-muted-foreground">
-                    Default Parameters
+                    {selectedResource ? `Properties — ${selectedResource.name}` : "Default Parameters"}
                   </div>
-                  <div className="grid grid-cols-[150px_minmax(0,1fr)] items-center gap-x-3 gap-y-2">
-                    <label className="text-[11px] font-mono text-muted-foreground">
-                      VISA Address
-                    </label>
-                    <input
-                      value={visaAddress}
-                      onChange={(e) => setVisaAddress(e.target.value)}
-                      className={fieldCls}
-                      disabled={!selectedInstrument}
-                    />
 
-                    <label className="text-[11px] font-mono text-muted-foreground">
-                      Voltage Range (V)
-                    </label>
-                    <input
-                      value={voltageRange}
-                      onChange={(e) => setVoltageRange(e.target.value)}
-                      className={fieldCls}
-                      disabled={!selectedInstrument}
-                    />
-
-                    <label className="text-[11px] font-mono text-muted-foreground">
-                      Current Range (A)
-                    </label>
-                    <input
-                      value={currentRange}
-                      onChange={(e) => setCurrentRange(e.target.value)}
-                      className={fieldCls}
-                      disabled={!selectedInstrument}
-                    />
-
-                    <label className="text-[11px] font-mono text-muted-foreground">
-                      Measurement Interval (ms)
-                    </label>
-                    <input
-                      value={measurementInterval}
-                      onChange={(e) => setMeasurementInterval(e.target.value)}
-                      className={fieldCls}
-                      disabled={!selectedInstrument}
-                    />
-
-                    <label className="text-[11px] font-mono text-muted-foreground">
-                      Interface
-                    </label>
-                    <select
-                      value={interfaceType}
-                      onChange={(e) => setInterfaceType(e.target.value)}
-                      className={fieldCls}
-                      disabled={!selectedInstrument}
-                    >
-                      <option>GPIB</option>
-                      <option>USB</option>
-                      <option>LAN</option>
-                      <option>Serial</option>
-                    </select>
-                  </div>
+                  {!selectedInstrument ? null : schemaLoading ? (
+                    <div className="py-6 text-center text-[12px] font-mono text-muted-foreground">
+                      Loading parameters...
+                    </div>
+                  ) : schemaError ? (
+                    <div className="py-6 text-center text-[12px] font-mono text-destructive">
+                      Unable to load parameters for this instrument.
+                    </div>
+                  ) : editableProperties.length === 0 ? (
+                    <div className="py-6 text-center text-[12px] font-mono text-muted-foreground">
+                      No configurable parameters.
+                    </div>
+                  ) : (
+                    <div className="-mx-1">
+                      {editableProperties.map((property) =>
+                        renderEditor(
+                          toEditorProp(property),
+                          schemaPropertyValues,
+                          setSchemaPropertyValues,
+                          emptyEditorContext,
+                        ),
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

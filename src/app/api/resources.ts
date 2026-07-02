@@ -60,7 +60,9 @@ export const getResources = async (): Promise<Resource[]> => {
  * Extract the type name from a fully qualified type name
  * Example: "OpenTap.Plugins.BasicSteps.GenericScpiInstrument" -> "GenericScpiInstrument"
  */
-const extractTypeName = (fullType: string): string => {
+// resources.ts
+
+export const extractTypeName = (fullType: string): string => {
   if (!fullType) return "";
   const parts = fullType.split(".");
   return parts[parts.length - 1] || fullType;
