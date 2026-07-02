@@ -33,11 +33,6 @@ interface SequenceEditorProps {
   ) => void;
 }
 
-// A resolved drop location while a reorder-drag is in progress.
-// mode "before"/"after" = reorder as a sibling next to the hovered row.
-// mode "into" = nest as a child of the hovered row (only offered for
-// "sequence" type rows, i.e. group containers) - this is what gives us
-// drag-to-nest support, mirroring how a folder/group would accept drops.
 interface DropTarget {
   parentId: string | null;
   idx: number;
@@ -45,9 +40,6 @@ interface DropTarget {
   rowId: string;
 }
 
-// Flattens the plan into the currently *visible* rows (respecting which
-// groups are expanded), in the same top-to-bottom order they render in.
-// Each entry carries the parentId/idx a dropped step would land at.
 function flattenVisible(
   steps: any[],
   expanded: Set<string>,
@@ -106,12 +98,6 @@ export function SequenceEditor({
     return map;
   }, [plan]);
 
-  // ----- Custom (DragListView-style) reorder-drag state -----
-  // activeDrag only holds the id + the pointer position at mousedown (used
-  // once, to place the ghost initially). Live pointer tracking after that
-  // happens via refs/direct DOM writes so we don't re-render on every
-  // mousemove - only dropTarget (which row/zone we're over) triggers a
-  // render, since that's what needs to visually update.
   const [activeDrag, setActiveDrag] = useState<{
     id: string;
     x: number;
@@ -124,9 +110,6 @@ export function SequenceEditor({
   const autoScrollSpeedRef = useRef(0);
   const autoScrollRafRef = useRef<number | null>(null);
 
-  // Ids that are invalid drop targets while dragging: the dragged step
-  // itself, plus everything nested inside it (can't drop a group into its
-  // own descendant).
   const excludedIds = useMemo(() => {
     if (!activeDrag) return new Set<string>();
     const node = stepById.get(activeDrag.id);
@@ -162,7 +145,6 @@ export function SequenceEditor({
         ghostRef.current.style.transform = `translate(${e.clientX + 14}px, ${e.clientY + 12}px)`;
       }
 
-      // ----- hit test: find which row (if any) is under the cursor -----
       const el = document.elementFromPoint(
         e.clientX,
         e.clientY,
@@ -230,7 +212,7 @@ export function SequenceEditor({
         setDropTarget(null);
       }
 
-      // ----- auto-scroll near top/bottom edge of the list -----
+
       const container = scrollContainerRef.current;
       if (container) {
         const rect = container.getBoundingClientRect();
@@ -402,9 +384,6 @@ export function SequenceEditor({
         )}
       </div>
 
-      {/* Floating ghost row that follows the cursor while reordering,
-          DragListView-style. Positioned via direct transform writes in
-          the mousemove handler above (not React state) for smoothness. */}
       {activeDrag && (
         <div
           ref={ghostRef}
