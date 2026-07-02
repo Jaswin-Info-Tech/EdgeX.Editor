@@ -1,18 +1,20 @@
 import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, ChevronLeft, ChevronRight, Database, Loader2, Pencil, Plus, Save, Search, Trash2, X } from "lucide-react";
 import { getTestPlanEditorModel } from "../api/testplans";
-import { getStepSchema } from "../api/plugin";
 import { getResources, getResourceSchema } from "../api/resources";
 import { Toggle } from "../components/editor/atoms";
 import { ConsolePanel } from "../components/editor/ConsolePanel";
+import { DutsPanel } from "../components/editor/DutsPanel";
 import { EditorToolbar } from "../components/editor/EditorToolbar";
+import { InstrumentsPanel } from "../components/editor/InstrumentsPanel";
 import { LeftPanel } from "../components/editor/LeftPanel";
 import { MenuBar } from "../components/editor/MenuBar";
 import { ModalsHost } from "../components/editor/ModalsHost";
 import { PropertiesDock } from "../components/editor/PropertiesDock";
 import { PropertiesPanel } from "../components/editor/PropertiesPanel";
+import { ResourcesPanel } from "../components/editor/ResourcesPanel";
 import { SequenceEditor } from "../components/editor/SequenceEditor";
 import { Splitter } from "../components/editor/resizable";
+import { TestPlansPanel } from "../components/editor/TestPlansPanel";
 import { useTestPlans } from "../hooks/usePlugin";
 import type { Property, TestStep } from "../types/editor";
 import { flatAll } from "../utils/editor";
@@ -243,7 +245,6 @@ export function EditorShell(props: EditorShellProps) {
   const [showCreateResource, setShowCreateResource] = useState(false);
   const [resourcePlanName, setResourcePlanName] = useState("");
   const [selectedResourceInstrument, setSelectedResourceInstrument] = useState("");
-  const [selectedResourceInstrumentType, setSelectedResourceInstrumentType] = useState("");
   const [resourceSchema, setResourceSchema] = useState<any>(null);
   const [resourceSchemaValues, setResourceSchemaValues] = useState<Record<string, any>>({});
   const [isResourceSchemaLoading, setIsResourceSchemaLoading] = useState(false);
@@ -355,22 +356,6 @@ export function EditorShell(props: EditorShellProps) {
       ),
     [browsableResourceInstruments, selectedResourceInstrument],
   );
-
-  // Update the instrument type when selection changes
-  useEffect(() => {
-    if (!selectedResourceInstrumentRecord) {
-      setSelectedResourceInstrumentType("");
-      return;
-    }
-    // Use fullName or fullTypeName first (most reliable), fall back to name as last resort
-    const typeToUse = selectedResourceInstrumentRecord.fullName ||
-      selectedResourceInstrumentRecord.fullTypeName ||
-      selectedResourceInstrumentRecord.type ||
-      selectedResourceInstrumentRecord.typeName ||
-      selectedResourceInstrumentRecord.name;
-    
-    setSelectedResourceInstrumentType(typeToUse);
-  }, [selectedResourceInstrumentRecord]);
 
   const resourceSchemaProperties = useMemo(
     () => (resourceSchema as any)?.properties ?? [],
@@ -1076,619 +1061,75 @@ export function EditorShell(props: EditorShellProps) {
       </div>
 
       {showInstrumentsPanel && (
-        <div
-          className="fixed inset-0 bg-black/75 flex items-center justify-center z-50"
-          onClick={() => {
-            setShowInstrumentsPanel(false);
-            setInstrumentSearch("");
-          }}
-        >
-          <div
-            className="bg-card border border-border w-[660px] max-w-[92vw] h-[520px] max-h-[85vh] flex flex-col shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between px-5 py-3 border-b border-border bg-muted/30">
-              <div className="flex items-center gap-2">
-                <span className="text-[13px] font-semibold text-foreground">
-                  Instruments
-                </span>
-              </div>
-              <button
-                onClick={() => {
-                  setShowInstrumentsPanel(false);
-                  setInstrumentSearch("");
-                }}
-                className="text-muted-foreground hover:text-foreground"
-              >
-                <X size={14} />
-              </button>
-            </div>
-            <div className="px-3 py-3 border-b border-border shrink-0">
-              <div className="flex items-center gap-2 border border-border px-2.5 py-2 bg-background">
-                <Search size={13} className="text-muted-foreground shrink-0" />
-                <input
-                  value={instrumentSearch}
-                  onChange={(e) => setInstrumentSearch(e.target.value)}
-                  placeholder="Search instruments..."
-                  className="flex-1 bg-transparent text-[12px] font-mono text-foreground placeholder:text-muted-foreground outline-none"
-                />
-                {instrumentSearch && (
-                  <button
-                    onClick={() => setInstrumentSearch("")}
-                    className="text-muted-foreground hover:text-foreground shrink-0"
-                  >
-                    <X size={10} />
-                  </button>
-                )}
-              </div>
-            </div>
-            <div className="flex-1 overflow-y-auto">
-              {isInstrumentsLoading ? (
-                <div className="px-5 py-8 text-center text-[12px] font-mono text-muted-foreground">
-                  Loading instruments...
-                </div>
-              ) : isInstrumentsError ? (
-                <div className="px-5 py-8 text-center text-[12px] font-mono text-destructive">
-                  Unable to load instruments.
-                </div>
-              ) : filteredInstruments.length === 0 ? (
-                <div className="px-5 py-8 text-center text-[12px] font-mono text-muted-foreground">
-                  {instrumentSearch
-                    ? "No matching instruments."
-                    : "No instruments available."}
-                </div>
-              ) : (
-                filteredInstruments.map((instrument) => (
-                  <div
-                    key={`${instrument.name}:${instrument.assembly}`}
-                    className="px-5 py-4 border-b border-border"
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="text-[13px] font-semibold text-foreground">
-                            {instrument.name}
-                          </span>
-                          <span className="text-[11px] font-mono text-muted-foreground border border-border px-2">
-                            {instrument.baseType}
-                          </span>
-                        </div>
-                        <div className="text-[12px] text-muted-foreground mb-1">
-                          {instrument.assembly}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-            <div className="px-4 py-2 border-t border-border bg-muted/20 text-[11px] text-muted-foreground font-mono">
-              {filteredInstruments.length} instruments
-            </div>
-          </div>
-        </div>
+        <InstrumentsPanel
+          instruments={filteredInstruments}
+          search={instrumentSearch}
+          setSearch={setInstrumentSearch}
+          isLoading={isInstrumentsLoading}
+          isError={isInstrumentsError}
+          onClose={() => setShowInstrumentsPanel(false)}
+        />
       )}
 
       {showDutsPanel && (
-        <div
-          className="fixed inset-0 bg-black/75 flex items-center justify-center z-50"
-          onClick={() => {
-            setShowDutsPanel(false);
-            setDutSearch("");
-          }}
-        >
-          <div
-            className="bg-card border border-border w-[660px] max-w-[92vw] h-[520px] max-h-[85vh] flex flex-col shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between px-5 py-3 border-b border-border bg-muted/30">
-              <div className="flex items-center gap-2">
-                <span className="text-[13px] font-semibold text-foreground">
-                  DUTs
-                </span>
-              </div>
-              <button
-                onClick={() => {
-                  setShowDutsPanel(false);
-                  setDutSearch("");
-                }}
-                className="text-muted-foreground hover:text-foreground"
-              >
-                <X size={14} />
-              </button>
-            </div>
-            <div className="px-3 py-3 border-b border-border shrink-0">
-              <div className="flex items-center gap-2 border border-border px-2.5 py-2 bg-background">
-                <Search size={13} className="text-muted-foreground shrink-0" />
-                <input
-                  value={dutSearch}
-                  onChange={(e) => setDutSearch(e.target.value)}
-                  placeholder="Search DUTs..."
-                  className="flex-1 bg-transparent text-[12px] font-mono text-foreground placeholder:text-muted-foreground outline-none"
-                />
-                {dutSearch && (
-                  <button
-                    onClick={() => setDutSearch("")}
-                    className="text-muted-foreground hover:text-foreground shrink-0"
-                  >
-                    <X size={10} />
-                  </button>
-                )}
-              </div>
-            </div>
-            <div className="flex-1 overflow-y-auto">
-              {isDutsLoading ? (
-                <div className="px-5 py-8 text-center text-[12px] font-mono text-muted-foreground">
-                  Loading DUTs...
-                </div>
-              ) : isDutsError ? (
-                <div className="px-5 py-8 text-center text-[12px] font-mono text-destructive">
-                  Unable to load DUTs.
-                </div>
-              ) : filteredDuts.length === 0 ? (
-                <div className="px-5 py-8 text-center text-[12px] font-mono text-muted-foreground">
-                  {dutSearch ? "No matching DUTs." : "No DUTs available."}
-                </div>
-              ) : (
-                filteredDuts.map((dut: any, index: number) => (
-                  <div
-                    key={`${dut.name}:${dut.serialNumber}:${index}`}
-                    className="px-5 py-4 border-b border-border"
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2 mb-1 flex-wrap">
-                          <span className="text-[13px] font-semibold text-foreground">
-                            {dut.name || "Unnamed DUT"}
-                          </span>
-                          {dut.baseType && (
-                            <span className="text-[11px] font-mono text-muted-foreground border border-border px-2">
-                              {dut.baseType}
-                            </span>
-                          )}
-                          {dut.model && (
-                            <span className="text-[11px] font-mono text-muted-foreground border border-border px-2">
-                              {dut.model}
-                            </span>
-                          )}
-                          {dut.serialNumber && (
-                            <span className="text-[11px] font-mono text-muted-foreground border border-border px-2">
-                              SN: {dut.serialNumber}
-                            </span>
-                          )}
-                        </div>
-                        {dut.firmware && (
-                          <div className="text-[12px] text-muted-foreground mb-1">
-                            Firmware: {dut.firmware}
-                          </div>
-                        )}
-                        {dut.assembly && (
-                          <div className="text-[11px] text-muted-foreground/70 font-mono">
-                            {dut.assembly}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-            <div className="px-4 py-2 border-t border-border bg-muted/20 text-[11px] text-muted-foreground font-mono">
-              {filteredDuts.length} DUTs
-            </div>
-          </div>
-        </div>
+        <DutsPanel
+          duts={filteredDuts}
+          search={dutSearch}
+          setSearch={setDutSearch}
+          isLoading={isDutsLoading}
+          isError={isDutsError}
+          onClose={() => setShowDutsPanel(false)}
+        />
       )}
 
       {showResourcesPanel && (
-        <div
-          className="fixed inset-0 bg-black/75 flex items-center justify-center z-50"
-          onClick={() => {
-            setShowResourcesPanel(false);
-            setShowCreateResource(false);
-            setResourceSearch("");
-          }}
-        >
-          <div
-            className="bg-card border border-border w-[760px] max-w-[92vw] h-[540px] max-h-[85vh] flex flex-col shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between px-5 py-3 border-b border-border bg-muted/30">
-              <div className="flex items-center gap-2">
-                <span className="text-[13px] font-semibold text-foreground">
-                  Resources
-                </span>
-              </div>
-              <button
-                onClick={() => {
-                  setShowResourcesPanel(false);
-                  setShowCreateResource(false);
-                  setResourceSearch("");
-                }}
-                className="text-muted-foreground hover:text-foreground"
-              >
-                <X size={14} />
-              </button>
-            </div>
-
-            <div className="px-5 py-3 border-b border-border shrink-0">
-              <div className="flex items-center gap-3">
-                <div className="flex min-w-0 flex-1 items-center gap-2 border border-border px-2.5 py-2 bg-background">
-                  <Search
-                    size={13}
-                    className="text-muted-foreground shrink-0"
-                  />
-                  <input
-                    value={resourceSearch}
-                    onChange={(e) => setResourceSearch(e.target.value)}
-                    placeholder="Search resources..."
-                    className="flex-1 bg-transparent text-[12px] font-mono text-foreground placeholder:text-muted-foreground outline-none"
-                  />
-                  {resourceSearch && (
-                    <button
-                      onClick={() => setResourceSearch("")}
-                      className="text-muted-foreground hover:text-foreground shrink-0"
-                    >
-                      <X size={10} />
-                    </button>
-                  )}
-                </div>
-                <button
-                  onClick={() => setShowCreateResource(true)}
-                  className="flex h-[34px] items-center gap-2 px-3 bg-primary text-primary-foreground text-[12px] font-mono font-semibold hover:bg-primary/90 transition-colors"
-                >
-                  <Plus size={12} /> Create New Resource
-                </button>
-              </div>
-            </div>
-
-            <div className="flex-1 overflow-y-auto">
-              <div className="grid grid-cols-[1.4fr_1fr_0.7fr_0.7fr] gap-3 px-5 py-3 border-b border-border bg-muted/20 text-[11px] font-mono font-semibold uppercase tracking-wider text-muted-foreground">
-                <div>Name</div>
-                <div>Instrument</div>
-                <div>Status</div>
-                <div>Actions</div>
-              </div>
-              {isResourcesLoading ? (
-                <div className="px-5 py-8 text-center text-[12px] font-mono text-muted-foreground">
-                  Loading resources...
-                </div>
-              ) : isResourcesError ? (
-                <div className="px-5 py-8 text-center text-[12px] font-mono text-destructive">
-                  Unable to load resources.
-                </div>
-              ) : filteredResourcePlans.length === 0 ? (
-                <div className="px-5 py-8 text-center text-[12px] font-mono text-muted-foreground">
-                  {resourceSearch
-                    ? "No matching resources."
-                    : "No resources available."}
-                </div>
-              ) : (
-                filteredResourcePlans.map((resource) => (
-                  <div
-                    key={resource.id}
-                    className="grid grid-cols-[1.4fr_1fr_0.7fr_0.7fr] gap-3 px-5 py-4 border-b border-border text-[12px] font-mono"
-                  >
-                    <div className="font-semibold text-foreground">
-                      {resource.name}
-                    </div>
-                    <div className="text-muted-foreground">
-                      {resource.instrument}
-                    </div>
-                    <div className={`font-semibold ${resource.status === "Error" ? "text-red-500" : "text-emerald-500"}`} title={resource.error}>
-                      {resource.status}
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <button
-                        onClick={() => handleEditResource(resource)}
-                        className="text-primary hover:text-primary/80"
-                        title="Edit resource"
-                      >
-                        <Pencil size={13} />
-                      </button>
-                      <button
-                        onClick={() => handleDeleteResource(resource.id)}
-                        className="text-red-500 hover:text-red-400"
-                        title="Delete resource"
-                      >
-                        <Trash2 size={13} />
-                      </button>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-
-            <div className="px-4 py-2 border-t border-border bg-muted/20 text-[11px] text-muted-foreground font-mono flex items-center">
-              <span>{filteredResourcePlans.length} resources</span>
-              <div className="ml-auto flex items-center gap-3">
-                <button className="text-muted-foreground hover:text-foreground disabled:opacity-40" disabled>
-                  <ChevronLeft size={14} />
-                </button>
-                <span>1 / 1</span>
-                <button className="text-muted-foreground hover:text-foreground disabled:opacity-40" disabled>
-                  <ChevronRight size={14} />
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {showCreateResource && (
-        <div
-          className="fixed inset-0 bg-background-200/75 flex items-center justify-center z-[60]"
-          onClick={closeCreateResourceModal}
-        >
-          <div
-            className="bg-card border border-border w-[760px] max-w-[92vw]  h-[540px] max-h-[88vh] flex flex-col shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between px-5 py-3 border-b border-border bg-muted/30">
-              <span className="text-[13px] font-semibold text-foreground">
-                Create {selectedResourceInstrument || "Resource"}
-              </span>
-              <button
-                onClick={closeCreateResourceModal}
-                className="text-muted-foreground hover:text-foreground"
-              >
-                <X size={14} />
-              </button>
-            </div>
-
-            <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
-              <div>
-                <label className="block text-[11px] font-mono font-semibold text-muted-foreground mb-1 uppercase tracking-wider">
-                  Instrument
-                </label>
-                <select
-                  value={selectedResourceInstrument}
-                  onChange={(event) => {
-                    const selected = browsableResourceInstruments.find(
-                      (inst: any) => inst.name === event.target.value
-                    );
-                    if (selected) {
-                      setSelectedResourceInstrument(selected.name);
-                      // Type will be extracted automatically by useEffect
-                    }
-                  }}
-                  className="w-full bg-background border border-border px-2.5 py-2 text-[12px] font-mono text-foreground outline-none focus:border-primary transition-colors"
-                >
-                  <option value="">Select instrument</option>
-                  {browsableResourceInstruments.map((instrument: any) => (
-                    <option key={`${instrument.name}:${instrument.assembly}`} value={instrument.name}>
-                      {instrument.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-mono font-semibold text-muted-foreground mb-1 uppercase tracking-wider">
-                  Plan Name
-                </label>
-                <input
-                  value={resourcePlanName}
-                  onChange={(event) => setResourcePlanName(event.target.value)}
-                  placeholder="Enter plan name"
-                  className="w-full bg-background border border-border px-2.5 py-2 text-[12px] font-mono text-foreground placeholder:text-muted-foreground outline-none focus:border-primary transition-colors"
-                />
-              </div>
-
-              {isResourceSchemaLoading ? (
-                <div className="py-8 text-center text-[12px] font-mono text-muted-foreground">
-                  Loading resource schema...
-                </div>
-              ) : selectedResourceInstrument ? (
-                <>
-                  {resourceSchemaError && (
-                    <div className="border border-yellow-500/30 bg-yellow-500/10 px-3 py-2 text-[12px] font-mono text-muted-foreground">
-                      {resourceSchemaError}
-                    </div>
-                  )}
-                  <div className="grid grid-cols-2 gap-x-4 gap-y-4">
-                    {resourceSchemaProperties.map(renderResourceSchemaField)}
-                  </div>
-                </>
-              ) : (
-                <div className="py-8 text-center text-[12px] font-mono text-muted-foreground">
-                  Select an instrument to load resource fields.
-                </div>
-              )}
-            </div>
-
-            <div className="flex justify-end gap-2 px-5 py-3 border-t border-border bg-muted/20">
-              <button
-                onClick={closeCreateResourceModal}
-                className="h-8 px-4 border border-border text-[12px] font-mono font-semibold text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
-              >
-                Close
-              </button>
-              <button
-                onClick={handleSaveResource}
-                disabled={!selectedResourceInstrument || isResourceSchemaLoading}
-                className="h-8 px-4 bg-primary text-primary-foreground text-[12px] font-mono font-semibold hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 transition-colors"
-              >
-                <Save size={12} /> Save
-              </button>
-            </div>
-          </div>
-        </div>
+        <ResourcesPanel
+          resources={filteredResourcePlans}
+          search={resourceSearch}
+          setSearch={setResourceSearch}
+          isLoading={isResourcesLoading}
+          isError={isResourcesError}
+          showCreateResource={showCreateResource}
+          setShowCreateResource={setShowCreateResource}
+          onClose={() => setShowResourcesPanel(false)}
+          onEdit={handleEditResource}
+          onDelete={handleDeleteResource}
+          onSave={handleSaveResource}
+          onCloseCreate={closeCreateResourceModal}
+          resourcePlanName={resourcePlanName}
+          setResourcePlanName={setResourcePlanName}
+          selectedResourceInstrument={selectedResourceInstrument}
+          setSelectedResourceInstrument={setSelectedResourceInstrument}
+          browsableResourceInstruments={browsableResourceInstruments}
+          isResourceSchemaLoading={isResourceSchemaLoading}
+          resourceSchemaError={resourceSchemaError}
+          resourceSchemaProperties={resourceSchemaProperties}
+          renderResourceSchemaField={renderResourceSchemaField}
+        />
       )}
 
       {showTestPlansPanel && (
-        <div
-          className="fixed inset-0 bg-black/75 flex items-center justify-center z-50"
-          onClick={() => setShowTestPlansPanel(false)}
-        >
-          <div
-            className="bg-card border border-border w-[760px] max-w-[92vw] h-[540px] max-h-[85vh] flex flex-col shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between px-5 py-3 border-b border-border bg-muted/30">
-              <div className="flex items-center gap-2">
-                <span className="text-[13px] font-semibold text-foreground">
-                  Test Plans
-                </span>
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setShowTestPlansPanel(false)}
-                  className="text-muted-foreground hover:text-foreground"
-                >
-                  <X size={14} />
-                </button>
-              </div>
-            </div>
-            <div className="px-3 py-3 border-b border-border shrink-0">
-              <div className="flex w-full items-center gap-2">
-                <div className="flex flex-1 items-center gap-2 border border-border px-2.5 py-2 bg-background">
-                  <Search
-                    size={13}
-                    className="text-muted-foreground shrink-0"
-                  />
-                  <input
-                    value={testPlanQuery}
-                    onChange={(e) => setTestPlanQuery(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") handleSearchTestPlans();
-                    }}
-                    placeholder="Search test plans..."
-                    className="flex-1 bg-transparent text-[12px] font-mono text-foreground placeholder:text-muted-foreground outline-none"
-                  />
-                  {testPlanQuery && (
-                    <button
-                      onClick={() => setTestPlanQuery("")}
-                      className="text-muted-foreground hover:text-foreground shrink-0"
-                    >
-                      <X size={10} />
-                    </button>
-                  )}
-                </div>
-                <button
-                  onClick={handleSearchTestPlans}
-                  className="flex h-[34px] items-center gap-2 px-3 bg-primary text-primary-foreground text-[12px] font-mono font-semibold hover:bg-primary/90 transition-colors shrink-0"
-                >
-                  <Search size={12} /> Search
-                </button>
-              </div>
-            </div>
-            {showUnsavedPlanWarning && (
-              <div className="mx-4 mt-2 border border-yellow-500/30 bg-yellow-500/10 shadow-sm">
-                <div className="flex items-start gap-3 px-3 py-2">
-                  <AlertTriangle
-                    size={16}
-                    className="text-yellow-500 shrink-0 mt-0.5"
-                  />
-                  <div className="min-w-0 flex-1">
-                    <div className="text-[13px] font-semibold text-foreground">
-                      Save changes before loading another test plan
-                    </div>
-                    <div className="text-[12px] text-muted-foreground mt-1 leading-relaxed">
-                      Your current test plan has unsaved sequence or property
-                      changes. Click Save before opening
-                      {pendingTestPlan?.name
-                        ? ` "${pendingTestPlan.name}"`
-                        : " another test plan"}
-                      .
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <button
-                      onClick={() => {
-                        setShowUnsavedPlanWarning(false);
-                        setPendingTestPlan(null);
-                      }}
-                      className="h-8 px-3 border border-border text-[12px] font-mono text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      onClick={async () => {
-                        await handleSaveAndMarkClean();
-                      }}
-                      className="h-8 px-3 bg-primary text-primary-foreground text-[12px] font-mono font-semibold hover:bg-primary/90 transition-colors"
-                    >
-                      Save Changes
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
-            <div className="flex-1 overflow-y-auto">
-              {openTestPlanError && (
-                <div className="px-5 py-3 border-b border-border text-[12px] font-mono text-destructive">
-                  {openTestPlanError}
-                </div>
-              )}
-              {isTestPlansLoading ? (
-                <div className="px-5 py-8 text-center text-[12px] font-mono text-muted-foreground">
-                  Searching Test Plans..
-                </div>
-              ) : isTestPlansError ? (
-                <div className="px-5 py-8 text-center text-[12px] font-mono text-destructive">
-                  Unable to load test plans.
-                </div>
-              ) : hasSearchedTestPlans && testPlans.length === 0 ? (
-                <div className="px-5 py-8 text-center text-[12px] font-mono text-muted-foreground">
-                  No testplans found.
-                </div>
-              ) : (
-                testPlans.map((plan: any, index: number) => {
-                  const isOpening = openingTestPlanPath === plan.path;
-                  return (
-                    <button
-                      key={`${plan.path}:${index}`}
-                      onClick={() => handleOpenTestPlan(plan)}
-                      disabled={!!openingTestPlanPath}
-                      title={String(plan.path ?? "").replace(/\\/g, "\\\\")}
-                      className="relative w-full text-left px-5 py-4 border-b border-border transition-colors group hover:bg-secondary/60 focus:bg-primary/8 focus:outline-none disabled:cursor-wait disabled:opacity-60"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="min-w-0 flex-1 flex flex-col gap-1">
-                          <span className="text-[13px] font-semibold text-foreground group-hover:text-primary transition-colors truncate">
-                            {plan.name}
-                          </span>
-                          <span className="text-[12px] text-muted-foreground truncate group-hover:text-foreground/70 transition-colors">
-                            {String(plan.path ?? "").replace(/\\/g, "\\\\")}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-2 shrink-0">
-                          <span className="text-[11px] font-mono text-muted-foreground border border-border px-2 py-0.5 whitespace-nowrap">
-                            {plan.stepCount} steps
-                          </span>
-                          <span className="text-[11px] font-mono text-muted-foreground border border-border px-2 py-0.5 whitespace-nowrap">
-                            {new Date(plan.lastModified).toLocaleString()}
-                          </span>
-                          <ChevronRight
-                            size={14}
-                            className="text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
-                          />
-                        </div>
-                      </div>
-                      {isOpening && (
-                        <div className="absolute inset-0 flex items-center justify-center bg-card/80 backdrop-blur-[1px]">
-                          <Loader2
-                            size={16}
-                            className="animate-spin text-primary"
-                          />
-                          <span className="ml-2 text-[12px] font-mono text-primary">
-                            Opening...
-                          </span>
-                        </div>
-                      )}
-                    </button>
-                  );
-                })
-              )}
-            </div>
-            <div className="px-4 py-2 border-t border-border bg-muted/20 text-[11px] text-muted-foreground font-mono">
-              {testPlans.length} test plans
-            </div>
-          </div>
-        </div>
+        <TestPlansPanel
+          testPlans={testPlans}
+          query={testPlanQuery}
+          setQuery={setTestPlanQuery}
+          hasSearched={hasSearchedTestPlans}
+          isLoading={isTestPlansLoading}
+          isError={isTestPlansError}
+          openingPath={openingTestPlanPath}
+          openError={openTestPlanError}
+          showUnsavedWarning={showUnsavedPlanWarning}
+          pendingTestPlan={pendingTestPlan}
+          onSearch={handleSearchTestPlans}
+          onOpen={handleOpenTestPlan}
+          onClose={() => setShowTestPlansPanel(false)}
+          onCancelUnsavedWarning={() => {
+            setShowUnsavedPlanWarning(false);
+            setPendingTestPlan(null);
+          }}
+          onSaveUnsavedChanges={handleSaveAndMarkClean}
+        />
       )}
-
       {showConsole && (
         <ConsolePanel
           showConsole={showConsole}
