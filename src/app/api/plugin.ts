@@ -30,7 +30,7 @@ export const removePlugin = async (plugin: { pluginName: string; packageName?: s
 
 export const uploadPlugin = async (file: File) => {
   const formData = new FormData();
-  formData.append("file", file); // confirm the field name your backend expects — adjust if it's e.g. "package" or "plugin"
+  formData.append("file", file); 
   const response = await axiosClient.post("/plugins/upload", formData, {
     headers: { "Content-Type": "multipart/form-data" },
   });
@@ -48,17 +48,17 @@ export const getStepSchema = async (stepTypeName: string) => {
 };
 
 export const composeTestPlan = async (payload: any) => {
-  const { data } = await axiosClient.post("/testplans/compose", payload); // ✅ send directly
+  const { data } = await axiosClient.post("/testplans/compose", payload); 
   return data;
 };
 export const createTestPlan = async (payload: any) => {
-  const { data } = await axiosClient.post("/testplans/create", payload); // ✅ send directly
+  const { data } = await axiosClient.post("/testplans/create", payload); 
   return data;
 };
 
 
 export const runTestPlan = async (payload: any) => {
-  const { data } = await axiosClient.post("/testplans/run", payload); // ✅ send directly
+  const { data } = await axiosClient.post("/testplans/run", payload);
   return data;
 };
 
@@ -67,4 +67,9 @@ export const getDuts = async () => {
   const { data } = await axiosClient.get("/plugins/duts");
   return data;
 
+};
+
+export const getConnections = async () => {
+  const { data } = await axiosClient.get("/plugins/connections");
+  return data;
 };

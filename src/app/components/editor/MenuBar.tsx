@@ -5,7 +5,7 @@ const MENU_ITEMS: Record<string, string[]> = {
   Edit: ["Undo", "Redo", "-", "Cut", "Copy", "Paste", "-", "Select All"],
   View: ["Step Library", "Properties", "Console", "-", "Reset Layout"],
   Run: ["Run All", "Run Selected", "-", "Pause", "Stop", "-", "Reset Plan"],
-  Bench: ["Instruments", "DUTs"],
+  Bench: ["Instruments", "DUTs", "Connections"],
   Plugins: ["Plugin Manager", "-", "Reload Plugins"],
   Help: ["Documentation", "About EdgeX", "-", "Check for Updates"],
 };
@@ -29,6 +29,7 @@ interface MenuBarProps {
   setShowPluginMgr: (value: boolean) => void;
   setShowInstrumentsPanel: (value: boolean) => void;
   setShowDutsPanel: (value: boolean) => void;
+  setShowConnectionsPanel: (value: boolean) => void;
   handleSave: () => void;
   handleExportPlan: () => void;
   handleImportPlan: () => void;
@@ -57,6 +58,7 @@ export function MenuBar({
   setShowPluginMgr,
   setShowInstrumentsPanel,
   setShowDutsPanel,
+  setShowConnectionsPanel,
   handleSave,
   handleExportPlan,
   handleImportPlan,
@@ -77,6 +79,7 @@ export function MenuBar({
     if (item === "Plugin Manager") setShowPluginMgr(true);
     if (item === "Instruments") setShowInstrumentsPanel(true);
     if (item === "DUTs") setShowDutsPanel(true);
+    if (item === "Connections") setShowConnectionsPanel(true);
     if (item === "Run All") handleRun();
     if (item === "Stop") handleStop();
     if (item === "Pause") handlePause();

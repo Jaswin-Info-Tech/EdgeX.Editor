@@ -9,7 +9,6 @@ import {
   Zap,
 } from "lucide-react";
 import {
- 
   getResourceSchema,
   extractTypeName,
   type Resource,
@@ -71,6 +70,7 @@ const emptyEditorContext: EditorContext = {
   instrumentOptions: [],
   testStepOptions: [],
   planStepOptions: [],
+   resourceOptions: [],
 };
 
 export function DutsPanel({
