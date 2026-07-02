@@ -536,13 +536,13 @@ export function useEditorController() {
 
   const handleSave = async () => {
     const jsonData = {
-      outputPath: "D:\\plans\\SamplePlan.TapPlan",
+      outputPath: `D:\\plans\\${planMeta.name}.TapPlan`,
       overwrite: true,
       steps: plan.map(formatStepForCompose),
     };
     console.log(JSON.stringify(jsonData, null, 2));
     try {
-      const response = await composeTestPlan(jsonData);
+      const response = await composeTestPlan(jsonData);``
       addLog("INFO", "TestPlans", `Saved: ${jsonData.outputPath}`);
       setIsSaved(true);
       return response;
