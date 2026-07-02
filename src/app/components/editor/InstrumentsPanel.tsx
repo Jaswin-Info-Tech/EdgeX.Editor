@@ -1,21 +1,26 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Cable,
   CheckCircle2,
   DatabaseZap,
   Search,
+  Trash2,
   X,
   XCircle,
   Zap,
 } from "lucide-react";
 import {
+  addResource,
+  deleteResource,
   getResources,
   getResourceSchema,
   extractTypeName,
+  updateResource,
   type Resource,
   type ResourceSchemaProperty,
 } from "../../api/resources"; // adjust path
 import { renderEditor, type EditorContext } from "./PropertyEditors"; // adjust path
+import { toast } from "sonner";
 
 interface InstrumentsPanelProps {
   instruments: any[];
@@ -32,9 +37,6 @@ const labelCls =
 const getInstrumentIcon = () => (
   <Cable size={15} className="text-primary shrink-0" />
 );
-
-const getDefaultName = (instrument: any) =>
-  instrument?.name ? `${instrument.name} 1` : "";
 
 // ─── Map .NET schema types to the editorType strings renderEditor expects ────
 const mapDotNetTypeToEditorType = (type: string, hasEnum: boolean): string => {
@@ -85,7 +87,8 @@ export function InstrumentsPanel({
   onClose,
 }: InstrumentsPanelProps) {
   const [selectedKey, setSelectedKey] = useState("");
-  const [instrumentName, setInstrumentName] = useState("");
+  const [resourceName, setResourceName] = useState("");
+  const resourceNameInputRef = useRef<HTMLInputElement>(null);
 
   // ─── Schema state (property definitions for the selected instrument type) ─
   const [schemaProperties, setSchemaProperties] = useState<ResourceSchemaProperty[]>([]);
@@ -98,6 +101,10 @@ export function InstrumentsPanel({
   const [resourcesLoading, setResourcesLoading] = useState(false);
   const [resourcesError, setResourcesError] = useState(false);
   const [selectedResourceId, setSelectedResourceId] = useState<string>("");
+  const [saveResourceLoading, setSaveResourceLoading] = useState(false);
+  const [saveResourceError, setSaveResourceError] = useState("");
+  const [deleteResourceLoading, setDeleteResourceLoading] = useState(false);
+  const [deleteResourceError, setDeleteResourceError] = useState("");
 
   const selectedInstrument = useMemo(
     () =>
@@ -110,14 +117,16 @@ export function InstrumentsPanel({
   useEffect(() => {
     if (!selectedInstrument) {
       setSelectedKey("");
-      setInstrumentName("");
+      setResourceName("");
       return;
     }
 
     const key = `${selectedInstrument.name}:${selectedInstrument.assembly}`;
     if (selectedKey !== key) setSelectedKey(key);
-    setInstrumentName(getDefaultName(selectedInstrument));
+    setResourceName("");
     setSelectedResourceId(""); // reset resource selection when switching type
+    setSaveResourceError("");
+    setDeleteResourceError("");
   }, [selectedInstrument?.name, selectedInstrument?.assembly]);
 
 
@@ -214,7 +223,9 @@ export function InstrumentsPanel({
 
   const selectInstrument = (instrument: any) => {
     setSelectedKey(`${instrument.name}:${instrument.assembly}`);
-    setInstrumentName(getDefaultName(instrument));
+    setResourceName("");
+    setSaveResourceError("");
+    setDeleteResourceError("");
   };
 
   // ─── Clicking a resource card loads its live values into the editors ─────
@@ -222,7 +233,7 @@ export function InstrumentsPanel({
     // Clicking the already-selected resource deselects it and blanks the form
     if (resource.id === selectedResourceId) {
       setSelectedResourceId("");
-      setInstrumentName(getDefaultName(selectedInstrument));
+      setResourceName("");
       const blankValues: Record<string, any> = {};
       schemaProperties.forEach((property) => {
         blankValues[property.name] = getBlankValue(property);
@@ -232,7 +243,9 @@ export function InstrumentsPanel({
     }
 
     setSelectedResourceId(resource.id);
-    setInstrumentName(resource.name);
+    setResourceName(resource.name);
+    setSaveResourceError("");
+    setDeleteResourceError("");
 
     setSchemaPropertyValues((prev) => {
       const next = { ...prev };
@@ -248,6 +261,101 @@ export function InstrumentsPanel({
   };
 
   const editableProperties = schemaProperties.filter((p) => p.isEditable);
+
+  const handleSaveInstrument = async () => {
+    const pluginTypeName = selectedInstrument?.name?.trim();
+    const trimmedResourceName = (resourceNameInputRef.current?.value ?? resourceName).trim();
+
+    if (!pluginTypeName || !trimmedResourceName) return;
+
+    setSaveResourceLoading(true);
+    setSaveResourceError("");
+    const isUpdate = Boolean(selectedResource);
+    const toastId = toast.loading(
+      isUpdate
+        ? `Updating ${selectedResource?.name}...`
+        : `Creating ${trimmedResourceName}...`,
+    );
+
+    try {
+      const properties = editableProperties.reduce<Record<string, any>>((values, property) => {
+        if (!property.name || property.name.toLowerCase() === "name") return values;
+        values[property.name] = schemaPropertyValues[property.name];
+        return values;
+      }, {});
+
+      if (selectedResource) {
+        await updateResource({
+          resourceKind: "Instrument",
+          name: selectedResource.name,
+          newName: trimmedResourceName,
+          properties,
+        });
+      } else {
+        await addResource({
+          resourceKind: "Instrument",
+          pluginTypeName,
+          name: trimmedResourceName,
+          properties,
+        });
+      }
+
+      const updatedResources = await getResources();
+      setResources(updatedResources);
+      toast.success(
+        isUpdate
+          ? `${trimmedResourceName} updated successfully`
+          : `${trimmedResourceName} created successfully`,
+        { id: toastId },
+      );
+      closePanel();
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : isUpdate
+            ? "Unable to update instrument."
+            : "Unable to add instrument.";
+      setSaveResourceError(message);
+      toast.error(message, { id: toastId });
+    } finally {
+      setSaveResourceLoading(false);
+    }
+  };
+
+  const handleDeleteInstrument = async () => {
+    if (!selectedResource) return;
+
+    setDeleteResourceLoading(true);
+    setDeleteResourceError("");
+    setSaveResourceError("");
+    const toastId = toast.loading(`Deleting ${selectedResource.name}...`);
+
+    try {
+      await deleteResource({
+        resourceKind: "Instrument",
+        name: selectedResource.name,
+      });
+
+      const updatedResources = await getResources();
+      setResources(updatedResources);
+      setSelectedResourceId("");
+      setResourceName("");
+      const blankValues: Record<string, any> = {};
+      schemaProperties.forEach((property) => {
+        blankValues[property.name] = getBlankValue(property);
+      });
+      setSchemaPropertyValues(blankValues);
+      toast.success(`${selectedResource.name} deleted successfully`, { id: toastId });
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Unable to delete instrument.";
+      setDeleteResourceError(message);
+      toast.error(message, { id: toastId });
+    } finally {
+      setDeleteResourceLoading(false);
+    }
+  };
 
   return (
     <div
@@ -391,8 +499,9 @@ export function InstrumentsPanel({
                           return (
                             <button
                               key={resource.id}
+                              title={resource.name}
                               onClick={() => selectResource(resource)}
-                              className={`flex items-center gap-2 border px-3 py-2 text-left transition-colors ${isSelected
+                              className={`flex max-w-[85px] items-center gap-2 border px-3 py-2 text-left transition-colors ${isSelected
                                 ? "border-primary bg-secondary"
                                 : "border-border bg-background hover:bg-secondary/60"
                                 }`}
@@ -402,7 +511,7 @@ export function InstrumentsPanel({
                               ) : (
                                 <CheckCircle2 size={13} className="shrink-0 text-emerald-500" />
                               )}
-                              <div className="min-w-0">
+                              <div className="min-w-0 flex-1">
                                 <div className="truncate text-[12px] font-mono font-semibold text-foreground">
                                   {resource.name}
                                 </div>
@@ -422,11 +531,12 @@ export function InstrumentsPanel({
                 )}
 
                 <div>
-                  <label className={labelCls}>Instrument Name</label>
+                  <label className={labelCls}>Resource Name</label>
                   <input
-                    value={instrumentName}
-                    onChange={(e) => setInstrumentName(e.target.value)}
-                    placeholder="Instrument name"
+                    ref={resourceNameInputRef}
+                    value={resourceName}
+                    onChange={(e) => setResourceName(e.target.value)}
+                    placeholder="Resource name"
                     className="h-9 w-full bg-background border border-border px-3 text-[12px] font-mono text-foreground placeholder:text-muted-foreground outline-none focus:border-primary transition-colors"
                     disabled={!selectedInstrument}
                   />
@@ -436,6 +546,18 @@ export function InstrumentsPanel({
                   <div className="mb-3 border-t border-border pt-3 text-[10px] font-mono font-semibold uppercase tracking-wider text-muted-foreground">
                     {selectedResource ? `Properties — ${selectedResource.name}` : "Default Parameters"}
                   </div>
+
+                  {saveResourceError && (
+                    <div className="mb-3 border border-destructive/30 bg-destructive/10 px-3 py-2 text-[12px] font-mono text-destructive">
+                      {saveResourceError}
+                    </div>
+                  )}
+
+                  {deleteResourceError && (
+                    <div className="mb-3 border border-destructive/30 bg-destructive/10 px-3 py-2 text-[12px] font-mono text-destructive">
+                      {deleteResourceError}
+                    </div>
+                  )}
 
                   {!selectedInstrument ? null : schemaLoading ? (
                     <div className="py-6 text-center text-[12px] font-mono text-muted-foreground">
@@ -469,9 +591,21 @@ export function InstrumentsPanel({
 
         <div className="flex h-12 items-center border-t border-border bg-muted/20 px-4">
           <span className="text-[11px] font-mono text-muted-foreground">
-            Will be added to the Instruments panel
+            {selectedResource
+              ? "Will update the selected instrument resource"
+              : "Will be added to the Instruments panel"}
           </span>
           <div className="ml-auto flex items-center gap-2">
+            {selectedResource && (
+              <button
+                onClick={handleDeleteInstrument}
+                disabled={deleteResourceLoading || saveResourceLoading}
+                className="flex h-8 items-center gap-2 border border-destructive/50 px-4 text-[12px] font-mono font-semibold text-destructive transition-colors hover:bg-destructive/10 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <Trash2 size={12} />
+                {deleteResourceLoading ? "Deleting..." : "Delete"}
+              </button>
+            )}
             <button
               onClick={closePanel}
               className="h-8 px-4 border border-border text-[12px] font-mono font-semibold text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors"
@@ -479,12 +613,24 @@ export function InstrumentsPanel({
               Cancel
             </button>
             <button
-              onClick={closePanel}
-              disabled={!selectedInstrument || !instrumentName.trim()}
+              onClick={handleSaveInstrument}
+              disabled={
+                !selectedInstrument ||
+                !resourceName.trim() ||
+                schemaLoading ||
+                saveResourceLoading ||
+                deleteResourceLoading
+              }
               className="flex h-8 items-center gap-2 bg-primary px-4 text-[12px] font-mono font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
             >
               <Zap size={12} />
-              Add Instrument
+              {saveResourceLoading
+                ? selectedResource
+                  ? "Updating..."
+                  : "Adding..."
+                : selectedResource
+                  ? "Update Instrument"
+                  : "Add Instrument"}
             </button>
           </div>
         </div>

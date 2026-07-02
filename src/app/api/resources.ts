@@ -85,6 +85,40 @@ export interface ResourceSchema {
   properties: ResourceSchemaProperty[];
 }
 
+export interface AddResourcePayload {
+  resourceKind: string;
+  pluginTypeName: string;
+  name: string;
+  properties: Record<string, any>;
+}
+
+export interface UpdateResourcePayload {
+  resourceKind: string;
+  name: string;
+  newName: string;
+  properties: Record<string, any>;
+}
+
+export interface DeleteResourcePayload {
+  resourceKind: string;
+  name: string;
+}
+
+export const addResource = async (payload: AddResourcePayload) => {
+  const response = await axiosClient.post('plugins/resources/add', payload);
+  return response.data;
+};
+
+export const updateResource = async (payload: UpdateResourcePayload) => {
+  const response = await axiosClient.post('plugins/resources/update', payload);
+  return response.data;
+};
+
+export const deleteResource = async (payload: DeleteResourcePayload) => {
+  const response = await axiosClient.post('plugins/resources/delete', payload);
+  return response.data;
+};
+
 export const getResourceSchema = async (
   pluginTypeName: string,
   resourceKind: string = 'Instrument',
