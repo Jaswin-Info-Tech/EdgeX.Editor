@@ -9,13 +9,17 @@ import {
     Zap,
 } from "lucide-react";
 import {
+    addResource,
+    deleteResource,
     getResourceSchema,
     extractTypeName,
+    getResources,
+    updateResource,
     type Resource,
     type ResourceSchemaProperty,
-} from "../../api/resources"; 
-import { getConnections } from "../../api/plugin";
+} from "../../api/resources";
 import { renderEditor, type EditorContext } from "./PropertyEditors";
+import { toast } from "sonner";
 
 interface ConnectionsPanelProps {
     connections: any[];
@@ -32,10 +36,6 @@ const labelCls =
 const getConnectionIcon = () => (
     <Cable size={15} className="text-primary shrink-0" />
 );
-
-const getDefaultName = (connection: any) =>
-    connection?.name ? `${connection.name} 1` : "";
-
 
 const mapDotNetTypeToEditorType = (type: string, hasEnum: boolean): string => {
     if (hasEnum) return "select";
@@ -85,7 +85,7 @@ export function ConnectionsPanel({
     onClose,
 }: ConnectionsPanelProps) {
     const [selectedKey, setSelectedKey] = useState("");
-    const [connectionName, setConnectionName] = useState("");
+    const [resourceName, setResourceName] = useState("");
 
     // ─── Schema state (property definitions for the selected connection type) ─
     const [schemaProperties, setSchemaProperties] = useState<ResourceSchemaProperty[]>([]);
@@ -98,6 +98,10 @@ export function ConnectionsPanel({
     const [resourcesLoading, setResourcesLoading] = useState(false);
     const [resourcesError, setResourcesError] = useState(false);
     const [selectedResourceId, setSelectedResourceId] = useState<string>("");
+    const [saveResourceLoading, setSaveResourceLoading] = useState(false);
+    const [saveResourceError, setSaveResourceError] = useState("");
+    const [deleteResourceLoading, setDeleteResourceLoading] = useState(false);
+    const [deleteResourceError, setDeleteResourceError] = useState("");
 
     const selectedConnection = useMemo(
         () =>
@@ -110,16 +114,23 @@ export function ConnectionsPanel({
     useEffect(() => {
         if (!selectedConnection) {
             setSelectedKey("");
-            setConnectionName("");
+            setResourceName("");
             return;
         }
 
         const key = `${selectedConnection.name}:${selectedConnection.assembly}`;
         if (selectedKey !== key) setSelectedKey(key);
-        setConnectionName(getDefaultName(selectedConnection));
+        setResourceName("");
         setSelectedResourceId(""); // reset resource selection when switching type
+        setSaveResourceError("");
+        setDeleteResourceError("");
     }, [selectedConnection?.name, selectedConnection?.assembly]);
 
+useEffect(() => {
+  console.log("selectedConnection.name:", selectedConnection?.name);
+  console.log("all resources:", resources);
+  console.log("resource types seen:", resources.map(r => r.type));
+}, [resources, selectedConnection]);
 
     const getBlankValue = (property: ResourceSchemaProperty): any => {
         const hasEnum = (property.enumValues?.length ?? 0) > 0;
@@ -144,7 +155,7 @@ export function ConnectionsPanel({
         setSchemaLoading(true);
         setSchemaError(false);
 
-        getResourceSchema(selectedConnection.name, "Connection")
+        getResourceSchema(selectedConnection.name, "connections")
             .then((schema) => {
                 if (cancelled) return;
                 const properties = schema.properties ?? [];
@@ -178,7 +189,7 @@ export function ConnectionsPanel({
         setResourcesLoading(true);
         setResourcesError(false);
 
-        getConnections()
+        getResources()
             .then((data) => {
                 if (!cancelled) setResources(data);
             })
@@ -197,9 +208,17 @@ export function ConnectionsPanel({
     // ─── Resources that match the currently selected connection type ─────────
     const matchingResources = useMemo(() => {
         if (!selectedConnection?.name) return [];
-        return resources.filter(
-            (resource) => extractTypeName(resource.type) === selectedConnection.name,
-        );
+        const selectedNameLower = String(selectedConnection.name ?? "").toLowerCase();
+        return resources.filter((resource) => {
+            const typeName = extractTypeName(String(resource.type ?? "")).toLowerCase();
+            const instrumentName = String(resource.instrument ?? "").toLowerCase();
+            const rawType = String(resource.type ?? "").toLowerCase();
+            return (
+                typeName === selectedNameLower ||
+                instrumentName === selectedNameLower ||
+                rawType.includes(selectedNameLower)
+            );
+        });
     }, [resources, selectedConnection?.name]);
 
     const selectedResource = useMemo(
@@ -214,7 +233,9 @@ export function ConnectionsPanel({
 
     const selectConnection = (connection: any) => {
         setSelectedKey(`${connection.name}:${connection.assembly}`);
-        setConnectionName(getDefaultName(connection));
+        setResourceName("");
+        setSaveResourceError("");
+        setDeleteResourceError("");
     };
 
     // ─── Clicking a resource card loads its live values into the editors ─────
@@ -222,7 +243,7 @@ export function ConnectionsPanel({
         // Clicking the already-selected resource deselects it and blanks the form
         if (resource.id === selectedResourceId) {
             setSelectedResourceId("");
-            setConnectionName(getDefaultName(selectedConnection));
+            setResourceName("");
             const blankValues: Record<string, any> = {};
             schemaProperties.forEach((property) => {
                 blankValues[property.name] = getBlankValue(property);
@@ -232,7 +253,7 @@ export function ConnectionsPanel({
         }
 
         setSelectedResourceId(resource.id);
-        setConnectionName(resource.name);
+        setResourceName(resource.name);
 
         setSchemaPropertyValues((prev) => {
             const next = { ...prev };
@@ -248,6 +269,96 @@ export function ConnectionsPanel({
     };
 
     const editableProperties = schemaProperties.filter((p) => p.isEditable);
+
+    const handleSaveConnection = async () => {
+        const pluginTypeName = selectedConnection?.name?.trim();
+        const trimmedResourceName = resourceName.trim();
+
+        if (!pluginTypeName || !trimmedResourceName) return;
+
+        setSaveResourceLoading(true);
+        setSaveResourceError("");
+        const isUpdate = Boolean(selectedResource);
+        const toastId = toast.loading(
+            isUpdate ? `Updating ${selectedResource?.name}...` : `Creating ${trimmedResourceName}...`,
+        );
+
+        try {
+            const properties = editableProperties.reduce<Record<string, any>>((values, property) => {
+                if (!property.name || property.name.toLowerCase() === "name") return values;
+                values[property.name] = schemaPropertyValues[property.name];
+                return values;
+            }, {});
+
+            if (selectedResource) {
+                await updateResource({
+                    resourceKind: "connections",
+                    name: selectedResource.name,
+                    newName: trimmedResourceName,
+                    properties,
+                });
+            } else {
+                await addResource({
+                    resourceKind: "connections",
+                    pluginTypeName,
+                    name: trimmedResourceName,
+                    properties,
+                });
+            }
+
+            const updatedResources = await getResources();
+            setResources(updatedResources);
+            toast.success(
+                isUpdate ? `${trimmedResourceName} updated successfully` : `${trimmedResourceName} created successfully`,
+                { id: toastId },
+            );
+            closePanel();
+        } catch (error) {
+            const message =
+                error instanceof Error
+                    ? error.message
+                    : isUpdate
+                        ? "Unable to update connection."
+                        : "Unable to add connection.";
+            setSaveResourceError(message);
+            toast.error(message, { id: toastId });
+        } finally {
+            setSaveResourceLoading(false);
+        }
+    };
+
+    const handleDeleteConnection = async () => {
+        if (!selectedResource) return;
+
+        setDeleteResourceLoading(true);
+        setDeleteResourceError("");
+        setSaveResourceError("");
+        const toastId = toast.loading(`Deleting ${selectedResource.name}...`);
+
+        try {
+            await deleteResource({
+                resourceKind: "connections",
+                name: selectedResource.name,
+            });
+
+            const updatedResources = await getResources();
+            setResources(updatedResources);
+            setSelectedResourceId("");
+            setResourceName("");
+            const blankValues: Record<string, any> = {};
+            schemaProperties.forEach((property) => {
+                blankValues[property.name] = getBlankValue(property);
+            });
+            setSchemaPropertyValues(blankValues);
+            toast.success(`${selectedResource.name} deleted successfully`, { id: toastId });
+        } catch (error) {
+            const message = error instanceof Error ? error.message : "Unable to delete connection.";
+            setDeleteResourceError(message);
+            toast.error(message, { id: toastId });
+        } finally {
+            setDeleteResourceLoading(false);
+        }
+    };
 
     return (
         <div
@@ -422,11 +533,11 @@ export function ConnectionsPanel({
                                 )}
 
                                 <div>
-                                    <label className={labelCls}>Connection Name</label>
+                                    <label className={labelCls}>Resource Name</label>
                                     <input
-                                        value={connectionName}
-                                        onChange={(e) => setConnectionName(e.target.value)}
-                                        placeholder="Connection name"
+                                        value={resourceName}
+                                        onChange={(e) => setResourceName(e.target.value)}
+                                        placeholder="Resource name"
                                         className="h-9 w-full bg-background border border-border px-3 text-[12px] font-mono text-foreground placeholder:text-muted-foreground outline-none focus:border-primary transition-colors"
                                         disabled={!selectedConnection}
                                     />
@@ -436,6 +547,18 @@ export function ConnectionsPanel({
                                     <div className="mb-3 border-t border-border pt-3 text-[10px] font-mono font-semibold uppercase tracking-wider text-muted-foreground">
                                         {selectedResource ? `Properties — ${selectedResource.name}` : "Default Parameters"}
                                     </div>
+
+                                    {saveResourceError && (
+                                        <div className="mb-3 border border-destructive/30 bg-destructive/10 px-3 py-2 text-[12px] font-mono text-destructive">
+                                            {saveResourceError}
+                                        </div>
+                                    )}
+
+                                    {deleteResourceError && (
+                                        <div className="mb-3 border border-destructive/30 bg-destructive/10 px-3 py-2 text-[12px] font-mono text-destructive">
+                                            {deleteResourceError}
+                                        </div>
+                                    )}
 
                                     {!selectedConnection ? null : schemaLoading ? (
                                         <div className="py-6 text-center text-[12px] font-mono text-muted-foreground">
@@ -469,9 +592,21 @@ export function ConnectionsPanel({
 
                 <div className="flex h-12 items-center border-t border-border bg-muted/20 px-4">
                     <span className="text-[11px] font-mono text-muted-foreground">
-                        Will be added to the Connections panel
+                        {selectedResource
+                            ? "Will update the selected connection resource"
+                            : "Will be added to the Connections panel"}
                     </span>
                     <div className="ml-auto flex items-center gap-2">
+                        {selectedResource && (
+                            <button
+                                onClick={handleDeleteConnection}
+                                disabled={deleteResourceLoading || saveResourceLoading}
+                                className="flex h-8 items-center gap-2 border border-destructive/50 px-4 text-[12px] font-mono font-semibold text-destructive transition-colors hover:bg-destructive/10 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                                <XCircle size={12} />
+                                {deleteResourceLoading ? "Deleting..." : "Delete"}
+                            </button>
+                        )}
                         <button
                             onClick={closePanel}
                             className="h-8 px-4 border border-border text-[12px] font-mono font-semibold text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors"
@@ -479,12 +614,18 @@ export function ConnectionsPanel({
                             Cancel
                         </button>
                         <button
-                            onClick={closePanel}
-                            disabled={!selectedConnection || !connectionName.trim()}
+                            onClick={handleSaveConnection}
+                            disabled={!selectedConnection || !resourceName.trim() || schemaLoading || saveResourceLoading || deleteResourceLoading}
                             className="flex h-8 items-center gap-2 bg-primary px-4 text-[12px] font-mono font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
                         >
                             <Zap size={12} />
-                            Add Connection
+                            {saveResourceLoading
+                                ? selectedResource
+                                    ? "Updating..."
+                                    : "Adding..."
+                                : selectedResource
+                                    ? "Update Connection"
+                                    : "Add Connection"}
                         </button>
                     </div>
                 </div>
