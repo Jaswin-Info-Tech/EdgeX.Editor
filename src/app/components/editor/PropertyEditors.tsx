@@ -29,6 +29,7 @@ export type SelectOption = string | { label: string; value: string; description?
 
 export interface EditorContext {
   instrumentOptions: SelectOption[];
+  resourceOptions: SelectOption[];
   testStepOptions: SelectOption[];
   planStepOptions: SelectOption[];
 }
@@ -47,6 +48,12 @@ export const toBackendRecordOption = (item: any): SelectOption => ({
   label: String(item?.name ?? ""),
   value: String(item?.name ?? ""),
   description: [item?.baseType, item?.assembly].filter(Boolean).join(" | "),
+});
+
+export const toResourceRecordOption = (item: any): SelectOption => ({
+  label: String(item?.name ?? ""),
+  value: String(item?.name ?? ""),
+  description: [item?.instrument, item?.status].filter(Boolean).join(" | "),
 });
 
 export const getSchemaRecords = (response: any) => {
@@ -515,7 +522,12 @@ export function renderEditor(
   const propWithContext = (() => {
     const hasStaticOptions = (prop.enumValues?.length ?? 0) > 0 || (prop.options?.length ?? 0) > 0;
     if (hasStaticOptions) return prop;
-    if (editorType === "instrument-selector") return { ...prop, options: context.instrumentOptions };
+    if (editorType === "instrument-selector") {
+      return {
+        ...prop,
+        options: context.resourceOptions.length > 0 ? context.resourceOptions : context.instrumentOptions,
+      };
+    }
     if (editorType === "test-step") return { ...prop, options: context.testStepOptions };
     if (editorType === "step-selector") return { ...prop, options: context.planStepOptions };
     return prop;

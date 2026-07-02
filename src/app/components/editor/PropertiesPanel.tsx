@@ -20,6 +20,7 @@ interface PropertiesPanelProps {
   selectedId: any;
   plan: any[];
   instruments: any[];
+  resources?: any[];
   testSteps: any[];
   setPlan: any;
   setSelectedId: any;
@@ -33,11 +34,12 @@ export function PropertiesPanel({
   selectedId,
   plan,
   instruments,
+  resources = [],
   testSteps,
   setPlan,
   updateProperty,
 }: PropertiesPanelProps) {
-const dispatch = useAppDispatch();
+  const dispatch = useAppDispatch();
   const [schemaPropertyValues, setSchemaPropertyValues] = useState<Record<string, any>>({});
 
   // Reads from the `properties` slice
@@ -57,6 +59,13 @@ const dispatch = useAppDispatch();
       .filter((instrument: any) => instrument?.canCreateInstance !== false && instrument?.isBrowsable !== false)
       .filter((instrument: any) => instrument?.name)
       .map(toBackendRecordOption),
+    resourceOptions: (resources ?? [])
+      .filter((resource: any) => resource?.name)
+      .map((resource: any) => ({
+        label: String(resource.name),
+        value: String(resource.name),
+        description: [resource?.instrument, resource?.status].filter(Boolean).join(" | "),
+      })),
     testStepOptions: testSteps
       .filter((step: any) => step?.canCreateInstance !== false && step?.isBrowsable !== false)
       .filter((step: any) => step?.name)
@@ -68,7 +77,7 @@ const dispatch = useAppDispatch();
         value: step.id,
         description: step.type,
       })),
-  }), [instruments, testSteps, plan, selectedStep?.id]);
+  }), [instruments, resources, testSteps, plan, selectedStep?.id]);
 
 
   const stepTypeName = useMemo(() => {
@@ -439,20 +448,20 @@ const dispatch = useAppDispatch();
                   : "No configurable properties."}
               </div>
             )}
-            
+
           </>
         )}
         {selectedStep && (
-              <div className="px-3 py-3 border-t border-border mt-1">
-                <button
-                  onClick={commitSchemaProperties}
-                  className="w-full h-8 text-[12px] font-mono bg-info hover:bg-secondary/80 text-foreground flex items-center justify-center gap-1.5 border border-border transition-colors"
-                >
-                  <Plug size={11} />
-                  Save Properties
-                </button>
-              </div>
-            )}
+          <div className="px-3 py-3 border-t border-border mt-1">
+            <button
+              onClick={commitSchemaProperties}
+              className="w-full h-8 text-[12px] font-mono bg-info hover:bg-secondary/80 text-foreground flex items-center justify-center gap-1.5 border border-border transition-colors"
+            >
+              <Plug size={11} />
+              Save Properties
+            </button>
+          </div>
+        )}
 
 
       </div>

@@ -385,7 +385,7 @@ export function EditorShell(props: EditorShellProps) {
       setResourceSchemaError("");
       return;
     }
-    
+
     // Clear schema when instrument selection changes (before fetching new one)
     setResourceSchema(null);
     setResourceSchemaValues({});
@@ -394,14 +394,14 @@ export function EditorShell(props: EditorShellProps) {
     let cancelled = false;
     const fetchResourceSchema = async () => {
       setIsResourceSchemaLoading(true);
-      
+
       // Capture the current instrument name to validate response matches
       const currentInstrumentName = selectedResourceInstrument;
-      
+
       // Use instrument name directly as pluginTypeName
       // The instrument name is the specific type we want to query
       const pluginTypeName = currentInstrumentName?.trim();
-      
+
       if (!pluginTypeName) {
         setResourceSchemaError("Invalid instrument selection.");
         setIsResourceSchemaLoading(false);
@@ -410,21 +410,21 @@ export function EditorShell(props: EditorShellProps) {
 
       try {
         const schema = await getResourceSchema(pluginTypeName);
-        
+
         // Check if request was cancelled or if user switched instruments
         if (cancelled) {
           return;
         }
-        
+
         // CRITICAL: Validate that the response matches the currently selected instrument
         if (currentInstrumentName !== selectedResourceInstrument) {
           return;
         }
-        
+
         setResourceSchema(schema);
       } catch (error) {
         if (cancelled) return;
-        
+
         // Only show error if this is still the selected instrument
         if (currentInstrumentName === selectedResourceInstrument) {
           setResourceSchema(null);
@@ -455,8 +455,6 @@ export function EditorShell(props: EditorShellProps) {
   }, [resourceSchemaProperties]);
 
   useEffect(() => {
-    if (!showResourcesPanel) return;
-
     let cancelled = false;
     const fetchResources = async () => {
       setIsResourcesLoading(true);
@@ -477,7 +475,8 @@ export function EditorShell(props: EditorShellProps) {
     return () => {
       cancelled = true;
     };
-  }, [showResourcesPanel]);
+  }, []);
+
 
   const closeCreateResourceModal = () => {
     setShowCreateResource(false);
@@ -513,22 +512,22 @@ export function EditorShell(props: EditorShellProps) {
 
   const renderResourceSchemaField = (property: any) => {
     if (!property.isEditable) return null;
-    
+
     const key = String(property.name ?? "");
     const label = String(property.displayName ?? property.name ?? "");
     const type = String(property.type ?? "").toLowerCase();
     const value = resourceSchemaValues[key];
     const options = property.enumValues ?? [];
-    
+
     const updateValue = (nextValue: any) =>
       setResourceSchemaValues((values) => ({ ...values, [key]: nextValue }));
-    
+
     const labelNode = (
       <label className="block text-[11px] font-mono font-semibold text-muted-foreground mb-1 uppercase tracking-wider">
         {label}
       </label>
     );
-    
+
     const inputClass =
       "w-full bg-background border border-border px-2.5 py-2 text-[12px] font-mono text-foreground placeholder:text-muted-foreground outline-none focus:border-primary transition-colors";
 
@@ -822,6 +821,7 @@ export function EditorShell(props: EditorShellProps) {
       selectedId={selectedId}
       plan={plan}
       instruments={instruments}
+      resources={resourcePlans}
       testSteps={displayLibrary}
       setPlan={setPlan}
       setSelectedId={setSelectedId}
