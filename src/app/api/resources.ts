@@ -85,11 +85,14 @@ export interface ResourceSchema {
   properties: ResourceSchemaProperty[];
 }
 
-export const getResourceSchema = async (pluginTypeName: string): Promise<ResourceSchema> => {
+export const getResourceSchema = async (
+  pluginTypeName: string,
+  resourceKind: string = 'Instrument',
+): Promise<ResourceSchema> => {
   try {
     const response = await axiosClient.get('plugins/resources/schema', {
       params: {
-        resourceKind: 'Instrument',
+        resourceKind: resourceKind,
         pluginTypeName: pluginTypeName,
       },
     });
