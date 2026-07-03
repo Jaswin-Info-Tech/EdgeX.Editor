@@ -3,9 +3,8 @@ import { getTestPlanEditorModel } from "../api/testplans";
 import { getResources, getResourceSchema } from "../api/resources";
 import { Toggle } from "../components/editor/atoms";
 import { ConsolePanel } from "../components/editor/ConsolePanel";
-import { DutsPanel } from "../components/editor/DutsPanel";
 import { EditorToolbar } from "../components/editor/EditorToolbar";
-import { InstrumentsPanel } from "../components/editor/InstrumentsPanel";
+import { DutsPanel, InstrumentsPanel, ConnectionsPanel } from "../components/editor/benchModals";
 import { LeftPanel } from "../components/editor/LeftPanel";
 import { MenuBar } from "../components/editor/MenuBar";
 import { ModalsHost } from "../components/editor/ModalsHost";
@@ -80,6 +79,9 @@ interface EditorShellProps {
   duts: any[];
   isDutsLoading: boolean;
   isDutsError: boolean;
+  connections: any[];
+  isConnectionsLoading: boolean;
+  isConnectionsError: boolean;
   plan: any;
   planMeta: any;
   stats: any;
@@ -191,6 +193,9 @@ export function EditorShell(props: EditorShellProps) {
     duts,
     isDutsLoading,
     isDutsError,
+    connections,
+    isConnectionsLoading,
+    isConnectionsError,
     plan,
     planMeta,
     stats,
@@ -239,7 +244,9 @@ export function EditorShell(props: EditorShellProps) {
   const [instrumentSearch, setInstrumentSearch] = useState("");
   const [showInstrumentsPanel, setShowInstrumentsPanel] = useState(false);
   const [dutSearch, setDutSearch] = useState("");
+  const [connectionSearch, setConnectionSearch] = useState("");
   const [showDutsPanel, setShowDutsPanel] = useState(false);
+  const [showConnectionsPanel, setShowConnectionsPanel] = useState(false);
   const [resourceSearch, setResourceSearch] = useState("");
   const [showResourcesPanel, setShowResourcesPanel] = useState(false);
   const [showCreateResource, setShowCreateResource] = useState(false);
@@ -325,6 +332,22 @@ export function EditorShell(props: EditorShellProps) {
     [duts, dutSearch],
   );
 
+  const filteredConnections = useMemo(
+    () =>
+      connections.filter((connection: any) => {
+        const search = connectionSearch.trim().toLowerCase();
+        if (!search) return true;
+        return [connection.name, connection.baseType, connection.assembly].some(
+          (value) =>
+            String(value ?? "")
+              .toLowerCase()
+              .includes(search),
+        );
+      }),
+    [connections, connectionSearch],
+  );
+
+
   const filteredResourcePlans = useMemo(
     () =>
       resourcePlans.filter((resource) => {
@@ -385,7 +408,7 @@ export function EditorShell(props: EditorShellProps) {
       setResourceSchemaError("");
       return;
     }
-    
+
     // Clear schema when instrument selection changes (before fetching new one)
     setResourceSchema(null);
     setResourceSchemaValues({});
@@ -394,14 +417,14 @@ export function EditorShell(props: EditorShellProps) {
     let cancelled = false;
     const fetchResourceSchema = async () => {
       setIsResourceSchemaLoading(true);
-      
+
       // Capture the current instrument name to validate response matches
       const currentInstrumentName = selectedResourceInstrument;
-      
+
       // Use instrument name directly as pluginTypeName
       // The instrument name is the specific type we want to query
       const pluginTypeName = currentInstrumentName?.trim();
-      
+
       if (!pluginTypeName) {
         setResourceSchemaError("Invalid instrument selection.");
         setIsResourceSchemaLoading(false);
@@ -410,21 +433,21 @@ export function EditorShell(props: EditorShellProps) {
 
       try {
         const schema = await getResourceSchema(pluginTypeName);
-        
+
         // Check if request was cancelled or if user switched instruments
         if (cancelled) {
           return;
         }
-        
+
         // CRITICAL: Validate that the response matches the currently selected instrument
         if (currentInstrumentName !== selectedResourceInstrument) {
           return;
         }
-        
+
         setResourceSchema(schema);
       } catch (error) {
         if (cancelled) return;
-        
+
         // Only show error if this is still the selected instrument
         if (currentInstrumentName === selectedResourceInstrument) {
           setResourceSchema(null);
@@ -455,8 +478,6 @@ export function EditorShell(props: EditorShellProps) {
   }, [resourceSchemaProperties]);
 
   useEffect(() => {
-    if (!showResourcesPanel) return;
-
     let cancelled = false;
     const fetchResources = async () => {
       setIsResourcesLoading(true);
@@ -477,7 +498,8 @@ export function EditorShell(props: EditorShellProps) {
     return () => {
       cancelled = true;
     };
-  }, [showResourcesPanel]);
+  }, []);
+
 
   const closeCreateResourceModal = () => {
     setShowCreateResource(false);
@@ -513,22 +535,22 @@ export function EditorShell(props: EditorShellProps) {
 
   const renderResourceSchemaField = (property: any) => {
     if (!property.isEditable) return null;
-    
+
     const key = String(property.name ?? "");
     const label = String(property.displayName ?? property.name ?? "");
     const type = String(property.type ?? "").toLowerCase();
     const value = resourceSchemaValues[key];
     const options = property.enumValues ?? [];
-    
+
     const updateValue = (nextValue: any) =>
       setResourceSchemaValues((values) => ({ ...values, [key]: nextValue }));
-    
+
     const labelNode = (
       <label className="block text-[11px] font-mono font-semibold text-muted-foreground mb-1 uppercase tracking-wider">
         {label}
       </label>
     );
-    
+
     const inputClass =
       "w-full bg-background border border-border px-2.5 py-2 text-[12px] font-mono text-foreground placeholder:text-muted-foreground outline-none focus:border-primary transition-colors";
 
@@ -816,45 +838,13 @@ export function EditorShell(props: EditorShellProps) {
     [consoleFilter, logs],
   );
 
-  const instrumentToLibraryItem = (instrument: any) => ({
-    id: `instrument:${instrument.name}:${instrument.assembly}`,
-    name: instrument.name,
-    category: "Instruments",
-    type: "instrument",
-    description: `Instrument from ${instrument.assembly}`,
-    baseType: instrument.baseType,
-    assembly: instrument.assembly,
-    defaultProps: [
-      {
-        key: "instrumentName",
-        label: "Instrument Name",
-        type: "string",
-        value: instrument.name,
-        group: "Instrument",
-      },
-      {
-        key: "baseType",
-        label: "Base Type",
-        type: "string",
-        value: instrument.baseType,
-        group: "Instrument",
-      },
-      {
-        key: "assembly",
-        label: "Assembly",
-        type: "string",
-        value: instrument.assembly,
-        group: "Instrument",
-      },
-    ],
-  });
-
   const propertiesPanel = (
     <PropertiesPanel
       selectedStep={selectedStep}
       selectedId={selectedId}
       plan={plan}
       instruments={instruments}
+      resources={resourcePlans}
       testSteps={displayLibrary}
       setPlan={setPlan}
       setSelectedId={setSelectedId}
@@ -965,6 +955,7 @@ export function EditorShell(props: EditorShellProps) {
         setShowPluginMgr={setShowPluginMgr}
         setShowInstrumentsPanel={setShowInstrumentsPanel}
         setShowDutsPanel={setShowDutsPanel}
+        setShowConnectionsPanel={setShowConnectionsPanel}
         handleSave={handleSaveAndMarkClean}
         handleRun={handleRun}
         handleStop={handleStop}
@@ -1082,6 +1073,17 @@ export function EditorShell(props: EditorShellProps) {
         />
       )}
 
+      {showConnectionsPanel && (
+        <ConnectionsPanel
+          connections={filteredConnections}
+          search={connectionSearch}
+          setSearch={setConnectionSearch}
+          isLoading={isConnectionsLoading}
+          isError={isConnectionsError}
+          onClose={() => setShowConnectionsPanel(false)}
+        />
+      )}
+
       {showResourcesPanel && (
         <ResourcesPanel
           resources={filteredResourcePlans}
@@ -1157,6 +1159,7 @@ export function EditorShell(props: EditorShellProps) {
         addStepIdx={addStepIdx}
         instruments={instruments}
         duts={duts}
+        connections={connections}
         showPluginMgr={showPluginMgr}
         setShowPluginMgr={setShowPluginMgr}
         plugins={plugins}

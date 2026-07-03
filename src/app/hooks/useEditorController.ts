@@ -8,14 +8,11 @@ import { addToParent, deleteIn, flatAll, makeSequence, makeStep, moveIn, nowTs, 
 import { removePlugin, uploadPlugin } from "../api/plugin";
 import { installPackage, uninstallPackage } from "../api/package";
 import { useAvailablePackages } from "./usePackage";
-import { useInstalledPlugins, useDuts, usePlugins, useInstruments } from "./usePlugin";
+import { useInstalledPlugins, useDuts, usePlugins, useInstruments,useConnections } from "./usePlugin";
 import { useWindowWidth } from "./useWindowWidth";
 import { useDebounce } from "./useDebounce";
 import { moveStepToPosition } from "../utils/editor";
-import { usePackages } from "./usePackage";
-import { usePackageUpload } from "./usePackageUpload";
-
-import { composeTestPlan, createTestPlan, runTestPlan } from "../api/plugin";
+import { composeTestPlan, runTestPlan } from "../api/plugin";
 
 
 
@@ -202,6 +199,7 @@ export function useEditorController() {
 
   const { data: instruments, isLoading: isInstrumentsLoading, isError: isInstrumentsError } = useInstruments();
   const { data: duts, isLoading: isDutsLoading, isError: isDutsError } = useDuts();
+  const { data: connections, isLoading: isConnectionsLoading, isError: isConnectionsError } = useConnections();
 
   const selectedStep = selectedId ? flatAll(plan).find(step => step.id === selectedId) : null;
   const toggleExpand = (id: string) => setExpanded(prev => {
@@ -536,13 +534,13 @@ export function useEditorController() {
 
   const handleSave = async () => {
     const jsonData = {
-      outputPath: "D:\\plans\\SamplePlan.TapPlan",
+      outputPath: `D:\\plans\\${planMeta.name}.TapPlan`,
       overwrite: true,
       steps: plan.map(formatStepForCompose),
     };
     console.log(JSON.stringify(jsonData, null, 2));
     try {
-      const response = await composeTestPlan(jsonData);
+      const response = await composeTestPlan(jsonData);``
       addLog("INFO", "TestPlans", `Saved: ${jsonData.outputPath}`);
       setIsSaved(true);
       return response;
@@ -759,6 +757,7 @@ export function useEditorController() {
     isInstrumentsLoading,
     isInstrumentsError,
     duts: duts ?? [],
+    connections: connections ?? [],
     isDutsLoading,
     isDutsError,
     plan,

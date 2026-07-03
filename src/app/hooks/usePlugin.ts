@@ -1,8 +1,8 @@
 // hooks/useUsers.js
 import { useQuery } from "@tanstack/react-query";
-import { getInstalledPlugins, getInstruments, getDuts, getSteps } from "../api/plugin";
+import { getInstalledPlugins, getInstruments, getDuts, getSteps, getConnections } from "../api/plugin";
 import { getTestPlans } from "../api/testplans";
-import type { DutItem, InstrumentItem, LibraryItem, TestPlanItem } from "../types/editor";
+import type { ConnectionItem, DutItem, InstrumentItem, LibraryItem, TestPlanItem } from "../types/editor";
 
 
 export const usePlugins = () => {
@@ -89,3 +89,22 @@ export const useTestPlans = (rootPath?: string, enabled = true) => {
   });
 };
 
+
+export const useConnections = () => {
+  return useQuery<ConnectionItem[]>({
+    queryKey: ["connections"],
+    queryFn: async () => {
+      const data = await getConnections();
+      if (Array.isArray(data)) {
+        return data.map((item: any) => ({
+          name: String(item.name ?? ""),
+          assembly: String(item.assembly ?? ""),
+          baseType: String(item.baseType ?? ""),
+          canCreateInstance: Boolean(item.canCreateInstance),
+          isBrowsable: Boolean(item.isBrowsable),
+        }));
+      }
+      return [];
+    },
+  });
+};

@@ -50,6 +50,13 @@ export interface InstrumentItem {
   canCreateInstance: boolean;
   isBrowsable: boolean;
 }
+export interface ConnectionItem {
+  name: string;
+  assembly: string;
+  baseType: string;
+  canCreateInstance: boolean;
+  isBrowsable: boolean;
+}
 
 export interface DutItem {
   name: string;

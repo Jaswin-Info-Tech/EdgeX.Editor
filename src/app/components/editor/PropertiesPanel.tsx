@@ -20,6 +20,7 @@ interface PropertiesPanelProps {
   selectedId: any;
   plan: any[];
   instruments: any[];
+  resources?: any[];
   testSteps: any[];
   setPlan: any;
   setSelectedId: any;
@@ -33,13 +34,15 @@ export function PropertiesPanel({
   selectedId,
   plan,
   instruments,
+  resources = [],
   testSteps,
   setPlan,
   updateProperty,
 }: PropertiesPanelProps) {
-const dispatch = useAppDispatch();
+  const dispatch = useAppDispatch();
   const [schemaPropertyValues, setSchemaPropertyValues] = useState<Record<string, any>>({});
-
+  // console.log("PropertiesPanel selectedStep:", selectedStep);
+  // console.log("PropertiesPanel resources:", resources);
   // Reads from the `properties` slice
   const resolvedTypeNames = useAppSelector((state: any) => state.properties.resolvedTypeNames);
   const schemaCache = useAppSelector((state: any) => state.properties.cache);
@@ -52,24 +55,16 @@ const dispatch = useAppDispatch();
     return type === "object" || type === "json";
   };
 
-  const editorContext = useMemo<EditorContext>(() => ({
-    instrumentOptions: instruments
-      .filter((instrument: any) => instrument?.canCreateInstance !== false && instrument?.isBrowsable !== false)
-      .filter((instrument: any) => instrument?.name)
-      .map(toBackendRecordOption),
-    testStepOptions: testSteps
-      .filter((step: any) => step?.canCreateInstance !== false && step?.isBrowsable !== false)
-      .filter((step: any) => step?.name)
-      .map(toBackendRecordOption),
-    planStepOptions: flatAll(plan || [])
-      .filter((step: any) => step.id !== selectedStep?.id)
-      .map((step: any) => ({
-        label: step.name,
-        value: step.id,
-        description: step.type,
-      })),
-  }), [instruments, testSteps, plan, selectedStep?.id]);
+  // helper: is this resource a DUT or connection? (exclude from instrument dropdown)
+const isConnectionOrDut = (type: string = "") =>
+  /connection/i.test(type) || /dut/i.test(type);
 
+  // helper: classify a resource's "family" from its backend type string
+  const getInstrumentFamily = (type: string = "") => {
+    if (/rest/i.test(type)) return "rest";
+    if (/scpi/i.test(type)) return "scpi";
+    return "other";
+  };
 
   const stepTypeName = useMemo(() => {
     if (!selectedStep) return null;
@@ -83,6 +78,56 @@ const dispatch = useAppDispatch();
       selectedStep.name
     );
   }, [selectedStep?.id, resolvedTypeNames]);
+
+  // derive which family the *selected step* expects, from its resolved type name
+  const stepInstrumentFamily = useMemo(() => {
+    const name = String(stepTypeName || selectedStep?.name || "");
+    if (/rest/i.test(name)) return "rest";
+    if (/scpi/i.test(name)) return "scpi";
+    return null; // unknown -> don't filter by family
+  }, [stepTypeName, selectedStep?.name]);
+
+const editorContext = useMemo<EditorContext>(() => {
+  const instrumentOptions = (resources ?? [])
+    .filter((r: any) => r?.name)
+    .filter((r: any) => !isConnectionOrDut(r.type || r.instrument))
+    .filter((r: any) =>
+      !stepInstrumentFamily ||
+      getInstrumentFamily(r.type || r.instrument) === stepInstrumentFamily
+    )
+    .map((r: any) => ({
+      label: r.name,
+      value: r.name,
+      description: [r?.instrument, r?.status].filter(Boolean).join(" | "),
+    }));
+
+  // console.log("computed instrumentOptions:", instrumentOptions); // 👈 temp debug
+
+  return {
+    instrumentOptions,
+    resourceOptions: (resources ?? [])
+      .filter((resource: any) => resource?.name)
+      .map((resource: any) => ({
+        label: String(resource.name),
+        value: String(resource.name),
+        description: [resource?.instrument, resource?.status].filter(Boolean).join(" | "),
+      })),
+    testStepOptions: testSteps
+      .filter((step: any) => step?.canCreateInstance !== false && step?.isBrowsable !== false)
+      .filter((step: any) => step?.name)
+      .map(toBackendRecordOption),
+    planStepOptions: flatAll(plan || [])
+      .filter((step: any) => step.id !== selectedStep?.id)
+      .map((step: any) => ({
+        label: step.name,
+        value: step.id,
+        description: step.type,
+      })),
+  };
+}, [resources, testSteps, plan, selectedStep?.id, stepInstrumentFamily]);
+
+
+
 
 
   useEffect(() => {
@@ -104,36 +149,50 @@ const dispatch = useAppDispatch();
   const schemaRecords = useMemo(() => getSchemaRecords(schemaResponse), [schemaResponse]);
   const schemaProperties = useMemo(() => schemaRecords[0]?.properties ?? [], [schemaRecords]);
 
-  useEffect(() => {
-    if (!selectedStep) { setSchemaPropertyValues({}); return; }
-    const values: Record<string, any> = {};
-    schemaProperties.forEach((prop: any) => {
-      const key = getSchemaPropertyKey(prop);
-      const existing = selectedStep.properties?.find((item: any) => item.key === key);
-      const value = existing?.value;
+useEffect(() => {
+  if (!selectedStep) {
+    setSchemaPropertyValues({});
+    return;
+  }
+  const values: Record<string, any> = {};
+  schemaProperties.forEach((prop: any) => {
+    const key = getSchemaPropertyKey(prop);
+    const existing = selectedStep.properties?.find(
+      (item: any) => item.key === key,
+    );
+    const value = existing?.value;
 
-      const isEnabledWrapper =
-        prop.propertyType?.includes("OpenTap.Enabled") ||
-        prop.fullTypeName?.includes("OpenTap.Enabled");
+    const isEnabledWrapper =
+      prop.propertyType?.includes("OpenTap.Enabled") ||
+      prop.fullTypeName?.includes("OpenTap.Enabled");
 
-      if (isEnabledWrapper && value && typeof value === "object") {
-        values[prop.name] = value.Value ?? "";
-      } else if (
-        prop.editorType === "instrument-selector" &&
-        value &&
-        typeof value === "object"
-      ) {
-        values[prop.name] = value.Name ?? "";
-      } else if (prop.name === "CommandType") {
-        values[prop.name] = Array.isArray(value) ? value : [];
-      } else if (isObjectLikeEditor(prop)) {
-        values[prop.name] = value ?? null;
-      } else {
-        values[prop.name] = value ?? (prop.editorType === "checkbox" ? false : "");
-      }
-    });
-    setSchemaPropertyValues(values);
-  }, [selectedStep, schemaProperties]);
+    const isNameProp =
+      String(prop.name || prop.displayName || "").toLowerCase() === "name";
+
+    if (isEnabledWrapper && value && typeof value === "object") {
+      values[prop.name] = value.Value ?? "";
+    } else if (
+      prop.editorType === "instrument-selector" &&
+      value &&
+      typeof value === "object"
+    ) {
+      values[prop.name] = value.Name ?? "";
+    } else if (prop.name === "CommandType") {
+      values[prop.name] = Array.isArray(value) ? value : [];
+    } else if (isObjectLikeEditor(prop)) {
+      values[prop.name] = value ?? null;
+    } else if (isNameProp) {
+      // Fall back to the step's real name instead of blanking it out,
+      // and self-heal any previously-saved empty value.
+      const hasRealValue = value != null && String(value).trim() !== "";
+      values[prop.name] = hasRealValue ? value : (selectedStep.name ?? "");
+    } else {
+      values[prop.name] =
+        value ?? (prop.editorType === "checkbox" ? false : "");
+    }
+  });
+  setSchemaPropertyValues(values);
+}, [selectedStep, schemaProperties]);
 
 
   const getTypedValue = (prop: any, value: any) => {
@@ -439,20 +498,20 @@ const dispatch = useAppDispatch();
                   : "No configurable properties."}
               </div>
             )}
-            
+
           </>
         )}
         {selectedStep && (
-              <div className="px-3 py-3 border-t border-border mt-1">
-                <button
-                  onClick={commitSchemaProperties}
-                  className="w-full h-8 text-[12px] font-mono bg-info hover:bg-secondary/80 text-foreground flex items-center justify-center gap-1.5 border border-border transition-colors"
-                >
-                  <Plug size={11} />
-                  Save Properties
-                </button>
-              </div>
-            )}
+          <div className="px-3 py-3 border-t border-border mt-1">
+            <button
+              onClick={commitSchemaProperties}
+              className="w-full h-8 text-[12px] font-mono bg-info hover:bg-secondary/80 text-foreground flex items-center justify-center gap-1.5 border border-border transition-colors"
+            >
+              <Plug size={11} />
+              Save Properties
+            </button>
+          </div>
+        )}
 
 
       </div>

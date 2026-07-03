@@ -29,6 +29,7 @@ export type SelectOption = string | { label: string; value: string; description?
 
 export interface EditorContext {
   instrumentOptions: SelectOption[];
+  resourceOptions: SelectOption[];
   testStepOptions: SelectOption[];
   planStepOptions: SelectOption[];
 }
@@ -47,6 +48,12 @@ export const toBackendRecordOption = (item: any): SelectOption => ({
   label: String(item?.name ?? ""),
   value: String(item?.name ?? ""),
   description: [item?.baseType, item?.assembly].filter(Boolean).join(" | "),
+});
+
+export const toResourceRecordOption = (item: any): SelectOption => ({
+  label: String(item?.name ?? ""),
+  value: String(item?.name ?? ""),
+  description: [item?.instrument, item?.status].filter(Boolean).join(" | "),
 });
 
 export const getSchemaRecords = (response: any) => {
@@ -515,39 +522,44 @@ export function renderEditor(
   const propWithContext = (() => {
     const hasStaticOptions = (prop.enumValues?.length ?? 0) > 0 || (prop.options?.length ?? 0) > 0;
     if (hasStaticOptions) return prop;
-    if (editorType === "instrument-selector") return { ...prop, options: context.instrumentOptions };
+    if (editorType === "instrument-selector") {
+      return {
+        ...prop,
+        options: context.instrumentOptions ?? [],
+      };
+    }
     if (editorType === "test-step") return { ...prop, options: context.testStepOptions };
     if (editorType === "step-selector") return { ...prop, options: context.planStepOptions };
     return prop;
   })();
 
   switch (editorType) {
-    case "text":               return <TextEditor         key={prop.name} prop={propWithContext} value={value} onChange={onChange} />;
-    case "textarea":           return <TextareaEditor     key={prop.name} prop={propWithContext} value={value} onChange={onChange} />;
-    case "number":             return <NumberEditor       key={prop.name} prop={propWithContext} value={value} onChange={onChange} />;
-    case "integer":            return <IntegerEditor      key={prop.name} prop={propWithContext} value={value} onChange={onChange} />;
-    case "checkbox":           return <CheckboxEditor     key={prop.name} prop={propWithContext} value={value} onChange={onChange} />;
+    case "text": return <TextEditor key={prop.name} prop={propWithContext} value={value} onChange={onChange} />;
+    case "textarea": return <TextareaEditor key={prop.name} prop={propWithContext} value={value} onChange={onChange} />;
+    case "number": return <NumberEditor key={prop.name} prop={propWithContext} value={value} onChange={onChange} />;
+    case "integer": return <IntegerEditor key={prop.name} prop={propWithContext} value={value} onChange={onChange} />;
+    case "checkbox": return <CheckboxEditor key={prop.name} prop={propWithContext} value={value} onChange={onChange} />;
     case "select":
     case "dropdown":
     case "instrument-selector":
     case "test-step":
     case "dut-selector":
     case "result-listener-selector":
-                               return <SelectEditor       key={prop.name} prop={propWithContext} value={value} onChange={onChange} />;
-    case "multiselect":        return <MultiselectEditor  key={prop.name} prop={propWithContext} value={value} onChange={onChange} />;
-    case "datetime":           return <DateTimeEditor     key={prop.name} prop={propWithContext} value={value} onChange={onChange} />;
-    case "date":               return <DateEditor         key={prop.name} prop={propWithContext} value={value} onChange={onChange} />;
-    case "time":               return <TimeEditor         key={prop.name} prop={propWithContext} value={value} onChange={onChange} />;
-    case "duration":           return <DurationEditor     key={prop.name} prop={propWithContext} value={value} onChange={onChange} />;
-    case "array":              return <ArrayEditor        key={prop.name} prop={propWithContext} value={value} onChange={onChange} />;
-    case "keyvalue":           return <KeyValueEditor     key={prop.name} prop={propWithContext} value={value} onChange={onChange} />;
+      return <SelectEditor key={prop.name} prop={propWithContext} value={value} onChange={onChange} />;
+    case "multiselect": return <MultiselectEditor key={prop.name} prop={propWithContext} value={value} onChange={onChange} />;
+    case "datetime": return <DateTimeEditor key={prop.name} prop={propWithContext} value={value} onChange={onChange} />;
+    case "date": return <DateEditor key={prop.name} prop={propWithContext} value={value} onChange={onChange} />;
+    case "time": return <TimeEditor key={prop.name} prop={propWithContext} value={value} onChange={onChange} />;
+    case "duration": return <DurationEditor key={prop.name} prop={propWithContext} value={value} onChange={onChange} />;
+    case "array": return <ArrayEditor key={prop.name} prop={propWithContext} value={value} onChange={onChange} />;
+    case "keyvalue": return <KeyValueEditor key={prop.name} prop={propWithContext} value={value} onChange={onChange} />;
     case "object":
-    case "json":               return <ObjectEditor       key={prop.name} prop={propWithContext} value={value} onChange={onChange} />;
-    case "step-selector":      return <StepSelectorEditor key={prop.name} prop={propWithContext} value={value} onChange={onChange} />;
-    case "file":               return <FileEditor         key={prop.name} prop={propWithContext} value={value} onChange={onChange} />;
-    case "folder":             return <FolderEditor       key={prop.name} prop={propWithContext} value={value} onChange={onChange} />;
-    case "readonly":           return <ReadonlyEditor     key={prop.name} prop={propWithContext} value={value} />;
-    case "hidden":             return null;
-    default:                   return <UnknownEditor      key={prop.name} prop={propWithContext} value={value} onChange={onChange} />;
+    case "json": return <ObjectEditor key={prop.name} prop={propWithContext} value={value} onChange={onChange} />;
+    case "step-selector": return <StepSelectorEditor key={prop.name} prop={propWithContext} value={value} onChange={onChange} />;
+    case "file": return <FileEditor key={prop.name} prop={propWithContext} value={value} onChange={onChange} />;
+    case "folder": return <FolderEditor key={prop.name} prop={propWithContext} value={value} onChange={onChange} />;
+    case "readonly": return <ReadonlyEditor key={prop.name} prop={propWithContext} value={value} />;
+    case "hidden": return null;
+    default: return <UnknownEditor key={prop.name} prop={propWithContext} value={value} onChange={onChange} />;
   }
 }
