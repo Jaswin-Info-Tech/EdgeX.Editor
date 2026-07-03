@@ -8,6 +8,27 @@ export interface Resource {
   [key: string]: any;
 }
 
+/**
+ * Normalize a properties payload into a flat { propName: value } map,
+ * regardless of whether the backend sends it as an array of
+ * { name, value } objects (new schema-style format) or as a plain object
+ * (old format).
+ */
+const propsArrayToMap = (properties: any): Record<string, any> => {
+  if (Array.isArray(properties)) {
+    return properties.reduce((acc: Record<string, any>, prop: any) => {
+      if (prop && typeof prop === "object" && "name" in prop) {
+        acc[prop.name] = prop.value;
+      }
+      return acc;
+    }, {});
+  }
+  if (properties && typeof properties === "object") {
+    return properties;
+  }
+  return {};
+};
+
 export const getResources = async (): Promise<Resource[]> => {
   try {
     const response = await axiosClient.get('plugins/resources');
@@ -16,17 +37,19 @@ export const getResources = async (): Promise<Resource[]> => {
 
     // Instruments
     if (data.instruments && Array.isArray(data.instruments)) {
-      combined.push(
-        ...data.instruments.map((instrument: any, index: number) => ({
+
+      return data.instruments.map((instrument: any, index: number) => {
+        const propsMap = propsArrayToMap(instrument.properties);
+        return {
           id: instrument.name || `instrument-${index}`,
           name: instrument.name || "Unnamed",
           instrument: extractTypeName(instrument.type),
-          status: instrument.properties?.Error ? "Error" : "Active",
-          error: instrument.properties?.Error || "",
+          status: propsMap.Error ? "Error" : "Active",
+          error: propsMap.Error || "",
           type: instrument.type,
-          properties: instrument.properties || {},
-        })),
-      );
+          properties: propsMap,
+        };
+      });
     }
 
     // Connections
@@ -45,7 +68,6 @@ if (Array.isArray(connections)) {
     })),
   );
 }
-
 
     // DUTs
     if (data.duts && Array.isArray(data.duts)) {
@@ -78,25 +100,32 @@ if (Array.isArray(connections)) {
       return combined;
     }
 
-    // Fallbacks (array, or {resources: [...]})
     if (Array.isArray(data)) {
-      return data.map((item: any, index: number) => ({
-        id: item.id || item.name || `resource-${index}`,
-        name: item.name || "Unnamed",
-        instrument: item.instrument || extractTypeName(item.type),
-        status: item.status || "Active",
-        ...item,
-      }));
+      return data.map((item: any, index: number) => {
+        const propsMap = propsArrayToMap(item.properties);
+        return {
+          id: item.id || item.name || `resource-${index}`,
+          name: item.name || "Unnamed",
+          instrument: item.instrument || extractTypeName(item.type),
+          status: item.status || (propsMap.Error ? "Error" : "Active"),
+          ...item,
+          properties: propsMap,
+        };
+      });
     }
 
     if (data.resources && Array.isArray(data.resources)) {
-      return data.resources.map((resource: any, index: number) => ({
-        id: resource.id || resource.name || `resource-${index}`,
-        name: resource.name || "Unnamed",
-        instrument: resource.instrument || extractTypeName(resource.type),
-        status: resource.status || "Active",
-        ...resource,
-      }));
+      return data.resources.map((resource: any, index: number) => {
+        const propsMap = propsArrayToMap(resource.properties);
+        return {
+          id: resource.id || resource.name || `resource-${index}`,
+          name: resource.name || "Unnamed",
+          instrument: resource.instrument || extractTypeName(resource.type),
+          status: resource.status || (propsMap.Error ? "Error" : "Active"),
+          ...resource,
+          properties: propsMap,
+        };
+      });
     }
 
     return [];
@@ -104,12 +133,6 @@ if (Array.isArray(connections)) {
     throw error;
   }
 };
-
-/**
- * Extract the type name from a fully qualified type name
- * Example: "OpenTap.Plugins.BasicSteps.GenericScpiInstrument" -> "GenericScpiInstrument"
- */
-// resources.ts
 
 export const extractTypeName = (fullType: string): string => {
   if (!fullType) return "";
@@ -121,7 +144,9 @@ export interface ResourceSchemaProperty {
   name: string;
   displayName: string;
   type: string;
+  editorType?: string;
   isEditable: boolean;
+  isReadable?: boolean;
   value: any;
   enumValues: string[];
 }
@@ -184,4 +209,3 @@ export const getResourceSchema = async (
     throw error;
   }
 };
-
