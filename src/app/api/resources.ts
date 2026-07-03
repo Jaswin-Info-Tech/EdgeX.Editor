@@ -29,10 +29,12 @@ export const getResources = async (): Promise<Resource[]> => {
       );
     }
 
+    // Connections
+   const connections = data.connections ?? data.conections;
 
-if (data.connections && Array.isArray(data.connections)) {
+if (Array.isArray(connections)) {
   combined.push(
-    ...data.connections.map((connection: any, index: number) => ({
+    ...connections.map((connection: any, index: number) => ({
       id: connection.name || `connection-${index}`,
       name: connection.name || "Unnamed",
       instrument: extractTypeName(connection.type),
@@ -168,7 +170,7 @@ export const deleteResource = async (payload: DeleteResourcePayload) => {
 
 export const getResourceSchema = async (
   pluginTypeName: string,
-resourceKind: string = 'instrument',
+  resourceKind: string = 'instrument',
 ): Promise<ResourceSchema> => {
   try {
     const response = await axiosClient.get('plugins/resources/schema', {
