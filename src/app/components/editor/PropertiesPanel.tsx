@@ -41,7 +41,8 @@ export function PropertiesPanel({
 }: PropertiesPanelProps) {
   const dispatch = useAppDispatch();
   const [schemaPropertyValues, setSchemaPropertyValues] = useState<Record<string, any>>({});
-
+  // console.log("PropertiesPanel selectedStep:", selectedStep);
+  // console.log("PropertiesPanel resources:", resources);
   // Reads from the `properties` slice
   const resolvedTypeNames = useAppSelector((state: any) => state.properties.resolvedTypeNames);
   const schemaCache = useAppSelector((state: any) => state.properties.cache);
@@ -54,11 +55,56 @@ export function PropertiesPanel({
     return type === "object" || type === "json";
   };
 
-  const editorContext = useMemo<EditorContext>(() => ({
-    instrumentOptions: instruments
-      .filter((instrument: any) => instrument?.canCreateInstance !== false && instrument?.isBrowsable !== false)
-      .filter((instrument: any) => instrument?.name)
-      .map(toBackendRecordOption),
+  // helper: is this resource a DUT or connection? (exclude from instrument dropdown)
+const isConnectionOrDut = (type: string = "") =>
+  /connection/i.test(type) || /dut/i.test(type);
+
+  // helper: classify a resource's "family" from its backend type string
+  const getInstrumentFamily = (type: string = "") => {
+    if (/rest/i.test(type)) return "rest";
+    if (/scpi/i.test(type)) return "scpi";
+    return "other";
+  };
+
+  const stepTypeName = useMemo(() => {
+    if (!selectedStep) return null;
+    const locked = resolvedTypeNames[selectedStep.id];
+    if (locked) return locked;
+    return (
+      selectedStep.stepTypeName ??
+      selectedStep.typeName ??
+      selectedStep.fullName ??
+      selectedStep.className ??
+      selectedStep.name
+    );
+  }, [selectedStep?.id, resolvedTypeNames]);
+
+  // derive which family the *selected step* expects, from its resolved type name
+  const stepInstrumentFamily = useMemo(() => {
+    const name = String(stepTypeName || selectedStep?.name || "");
+    if (/rest/i.test(name)) return "rest";
+    if (/scpi/i.test(name)) return "scpi";
+    return null; // unknown -> don't filter by family
+  }, [stepTypeName, selectedStep?.name]);
+
+const editorContext = useMemo<EditorContext>(() => {
+  const instrumentOptions = (resources ?? [])
+    .filter((r: any) => r?.name)
+    .filter((r: any) => !isConnectionOrDut(r.type || r.instrument))
+    .filter((r: any) =>
+      !stepInstrumentFamily ||
+      getInstrumentFamily(r.type || r.instrument) === stepInstrumentFamily
+    )
+    .map((r: any) => ({
+      label: r.name,
+      value: r.name,
+      description: [r?.instrument, r?.status].filter(Boolean).join(" | "),
+    }));
+
+  // console.log("computed instrumentOptions:", instrumentOptions); // 👈 temp debug
+
+  return {
+    instrumentOptions,
     resourceOptions: (resources ?? [])
       .filter((resource: any) => resource?.name)
       .map((resource: any) => ({
@@ -77,21 +123,11 @@ export function PropertiesPanel({
         value: step.id,
         description: step.type,
       })),
-  }), [instruments, resources, testSteps, plan, selectedStep?.id]);
+  };
+}, [resources, testSteps, plan, selectedStep?.id, stepInstrumentFamily]);
 
 
-  const stepTypeName = useMemo(() => {
-    if (!selectedStep) return null;
-    const locked = resolvedTypeNames[selectedStep.id];
-    if (locked) return locked;
-    return (
-      selectedStep.stepTypeName ??
-      selectedStep.typeName ??
-      selectedStep.fullName ??
-      selectedStep.className ??
-      selectedStep.name
-    );
-  }, [selectedStep?.id, resolvedTypeNames]);
+
 
 
   useEffect(() => {
