@@ -52,8 +52,22 @@ export const getResources = async (): Promise<Resource[]> => {
       });
     }
 
-    // If response is directly an array of resources
+    // Connections
+   const connections = data.connections ?? data.conections;
 
+if (Array.isArray(connections)) {
+  combined.push(
+    ...connections.map((connection: any, index: number) => ({
+      id: connection.name || `connection-${index}`,
+      name: connection.name || "Unnamed",
+      instrument: extractTypeName(connection.type),
+      status: connection.properties?.Error ? "Error" : "Active",
+      error: connection.properties?.Error || "",
+      type: connection.type,
+      properties: connection.properties || {},
+    })),
+  );
+}
 
     // DUTs
     if (data.duts && Array.isArray(data.duts)) {
