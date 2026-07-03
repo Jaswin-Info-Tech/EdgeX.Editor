@@ -33,12 +33,12 @@ export const getResources = async (): Promise<Resource[]> => {
   try {
     const response = await axiosClient.get('plugins/resources');
     const data = response.data;
+
     const combined: Resource[] = [];
 
     // Instruments
     if (data.instruments && Array.isArray(data.instruments)) {
-
-      return data.instruments.map((instrument: any, index: number) => {
+      const mappedInstruments = data.instruments.map((instrument: any, index: number) => {
         const propsMap = propsArrayToMap(instrument.properties);
         return {
           id: instrument.name || `instrument-${index}`,
@@ -50,50 +50,55 @@ export const getResources = async (): Promise<Resource[]> => {
           properties: propsMap,
         };
       });
+      combined.push(...mappedInstruments);
     }
 
     // Connections
-   const connections = data.connections ?? data.conections;
+    const connections = data.connections ?? data.conections;
 
-if (Array.isArray(connections)) {
-  combined.push(
-    ...connections.map((connection: any, index: number) => ({
-      id: connection.name || `connection-${index}`,
-      name: connection.name || "Unnamed",
-      instrument: extractTypeName(connection.type),
-      status: connection.properties?.Error ? "Error" : "Active",
-      error: connection.properties?.Error || "",
-      type: connection.type,
-      properties: connection.properties || {},
-    })),
-  );
-}
+    if (Array.isArray(connections)) {
+      const mappedConnections = connections.map((connection: any, index: number) => {
+        const propsMap = propsArrayToMap(connection.properties);
+        return {
+          id: connection.name || `connection-${index}`,
+          name: connection.name || "Unnamed",
+          instrument: extractTypeName(connection.type),
+          status: propsMap.Error ? "Error" : "Active",
+          error: propsMap.Error || "",
+          type: connection.type,
+          properties: propsMap,
+        };
+      });
+      combined.push(...mappedConnections);
+    }
 
     // DUTs
     if (data.duts && Array.isArray(data.duts)) {
-      combined.push(
-        ...data.duts.map((resource: any, index: number) => ({
+      const mappedDuts = data.duts.map((resource: any, index: number) => {
+        const propsMap = propsArrayToMap(resource.properties);
+        const mapped = {
           id: String(resource.id ?? resource.name ?? resource.dutName ?? `dut-${index}`),
           name:
             String(
               resource.name ||
-              resource.properties?.Name ||
-              resource.properties?.name ||
+              propsMap.Name ||
+              propsMap.name ||
               resource.dutName ||
               resource.model ||
-              extractTypeName(resource.type ?? resource.properties?.type ?? "")
+              extractTypeName(resource.type ?? propsMap.type ?? "")
             ) || `DUT ${index}`,
           instrument: String(
-            resource.instrument ?? extractTypeName(resource.type ?? resource.properties?.type ?? ""),
+            resource.instrument ?? extractTypeName(resource.type ?? propsMap.type ?? ""),
           ),
           status:
             String(resource.status ?? "").trim() ||
-            (resource.properties?.Error ? "Error" : "Active"),
-          type: String(resource.type ?? resource.properties?.type ?? ""),
-          properties: resource.properties ?? {},
-          ...resource,
-        })),
-      );
+            (propsMap.Error ? "Error" : "Active"),
+          type: String(resource.type ?? propsMap.type ?? ""),
+          properties: propsMap,
+        };
+        return mapped;
+      });
+      combined.push(...mappedDuts);
     }
 
     if (combined.length > 0) {
@@ -101,7 +106,7 @@ if (Array.isArray(connections)) {
     }
 
     if (Array.isArray(data)) {
-      return data.map((item: any, index: number) => {
+      const mapped = data.map((item: any, index: number) => {
         const propsMap = propsArrayToMap(item.properties);
         return {
           id: item.id || item.name || `resource-${index}`,
@@ -112,10 +117,11 @@ if (Array.isArray(connections)) {
           properties: propsMap,
         };
       });
+      return mapped;
     }
 
     if (data.resources && Array.isArray(data.resources)) {
-      return data.resources.map((resource: any, index: number) => {
+      const mapped = data.resources.map((resource: any, index: number) => {
         const propsMap = propsArrayToMap(resource.properties);
         return {
           id: resource.id || resource.name || `resource-${index}`,
@@ -126,6 +132,8 @@ if (Array.isArray(connections)) {
           properties: propsMap,
         };
       });
+
+      return mapped;
     }
 
     return [];

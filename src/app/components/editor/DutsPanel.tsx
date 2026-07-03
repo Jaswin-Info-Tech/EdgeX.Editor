@@ -93,7 +93,7 @@ export function DutsPanel({
 }: DutsPanelProps) {
   const [selectedKey, setSelectedKey] = useState("");
   const [resourceName, setResourceName] = useState("");
-console.log(duts, "duts");
+
   // ─── Schema state (property definitions for the selected DUT type) ────────
   const [schemaProperties, setSchemaProperties] = useState<
     ResourceSchemaProperty[]
@@ -103,7 +103,7 @@ console.log(duts, "duts");
   >({});
   const [schemaLoading, setSchemaLoading] = useState(false);
   const [schemaError, setSchemaError] = useState(false);
-  console.log(resourceName, "lllllll");
+
   // ─── Resource (existing DUT instance) state ────────────────────────────────
   const [resources, setResources] = useState<Resource[]>([]);
   const [resourcesLoading, setResourcesLoading] = useState(false);
@@ -290,7 +290,6 @@ console.log(duts, "duts");
 
   const handleSaveDut = async () => {
     const pluginTypeName = selectedDutType;
-    console.log("Selected DUT type:", pluginTypeName);
     const trimmedResourceName = (resourceNameInputRef.current?.value ?? resourceName).trim();
     if (!pluginTypeName || !trimmedResourceName) return;
 
@@ -451,6 +450,7 @@ console.log(duts, "duts");
                     <button
                       key={key}
                       onClick={() => selectDut(dut)}
+                      title={dut.name}
                       className={`flex w-full items-center gap-2 border-b border-border/60 px-3 py-2.5 text-left transition-colors ${isSelected
                         ? "bg-secondary text-foreground"
                         : "text-muted-foreground hover:bg-secondary/60 hover:text-foreground"
@@ -498,7 +498,7 @@ console.log(duts, "duts");
                 {/* ─── Existing resource cards for this DUT type ─── */}
                 {selectedDut && (
                   <div>
-                    <div className="mb-2 text-[10px] font-mono font-semibold uppercase tracking-wider text-muted-foreground">
+                    <div className="mb-2 truncate text-[10px] font-mono font-semibold uppercase tracking-wider text-muted-foreground" title={`Existing ${selectedDutTypeName || selectedDut.name} Instances`}>
                       Existing {selectedDutTypeName || selectedDut.name} Instances
                     </div>
 
@@ -519,12 +519,14 @@ console.log(duts, "duts");
                         {matchingResources.map((resource) => {
                           const isSelected = resource.id === selectedResourceId;
                           const hasError = resource.status === "Error";
+                          const displayName = getResourceDisplayName(resource) || "Unnamed DUT";
 
                           return (
                             <button
                               key={resource.id}
                               onClick={() => selectResource(resource)}
-                              className={`flex items-center gap-2 border px-3 py-2 text-left transition-colors ${isSelected
+                              title={displayName}
+                              className={`flex max-w-[85px] items-center gap-2 border px-3 py-2 text-left transition-colors ${isSelected
                                 ? "border-primary bg-secondary"
                                 : "border-border bg-background hover:bg-secondary/60"
                                 }`}
@@ -542,7 +544,7 @@ console.log(duts, "duts");
                               )}
                               <div className="min-w-0">
                                 <div className="truncate text-[12px] font-mono font-semibold text-foreground">
-                                  {getResourceDisplayName(resource) || "Unnamed DUT"}
+                                  {displayName}
                                 </div>
                                 <div
                                   className={`text-[10px] font-mono ${hasError
@@ -568,7 +570,8 @@ console.log(duts, "duts");
                     value={resourceName}
                     onChange={(e) => setResourceName(e.target.value)}
                     placeholder="Resource name"
-                    className="h-9 w-full bg-background border border-border px-3 text-[12px] font-mono text-foreground placeholder:text-muted-foreground outline-none focus:border-primary transition-colors"
+                    title={resourceName}
+                    className="h-9 w-full truncate bg-background border border-border px-3 text-[12px] font-mono text-foreground placeholder:text-muted-foreground outline-none focus:border-primary transition-colors"
                     disabled={!selectedDut}
                   />
                 </div>
