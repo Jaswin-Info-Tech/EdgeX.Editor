@@ -66,36 +66,39 @@ export function ResourcesPanel({
   return (
     <>
       <div
-        className="fixed inset-0 bg-black/75 flex items-center justify-center z-50"
+        className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-[1px]"
         onClick={closePanel}
       >
         <div
-          className="bg-card border border-border w-[760px] max-w-[92vw] h-[540px] max-h-[85vh] flex flex-col shadow-2xl"
+          className="flex h-[620px] max-h-[88vh] w-[980px] max-w-[95vw] flex-col overflow-hidden border border-border bg-card shadow-2xl"
           onClick={(e) => e.stopPropagation()}
         >
-          <div className="flex items-center justify-between px-5 py-3 border-b border-border bg-muted/30">
-            <div className="flex items-center gap-2">
-              <span className="text-[13px] font-semibold text-foreground">
+          <div className="flex h-14 items-center justify-between border-b border-border bg-muted/30 px-5">
+            <div className="min-w-0">
+              <span className="block text-[15px] font-semibold text-foreground">
                 Resources
+              </span>
+              <span className="block text-[12px] font-mono text-muted-foreground">
+                Create, edit, and maintain bench resources
               </span>
             </div>
             <button
               onClick={closePanel}
-              className="text-muted-foreground hover:text-foreground"
+              className="flex h-8 w-8 items-center justify-center border border-transparent text-muted-foreground transition-colors hover:border-border hover:bg-secondary hover:text-foreground"
             >
               <X size={14} />
             </button>
           </div>
 
-          <div className="px-5 py-3 border-b border-border shrink-0">
+          <div className="shrink-0 border-b border-border px-5 py-3">
             <div className="flex items-center gap-3">
-              <div className="flex min-w-0 flex-1 items-center gap-2 border border-border px-2.5 py-2 bg-background">
+              <div className="flex min-w-0 flex-1 items-center gap-2 border border-border bg-background px-2.5 py-2.5">
                 <Search size={13} className="text-muted-foreground shrink-0" />
                 <input
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder="Search resources..."
-                  className="flex-1 bg-transparent text-[12px] font-mono text-foreground placeholder:text-muted-foreground outline-none"
+                  className="flex-1 bg-transparent text-[13px] font-mono text-foreground placeholder:text-muted-foreground outline-none"
                 />
                 {search && (
                   <button
@@ -108,37 +111,37 @@ export function ResourcesPanel({
               </div>
               <button
                 onClick={() => setShowCreateResource(true)}
-                className="flex h-[34px] items-center gap-2 px-3 bg-primary text-primary-foreground text-[12px] font-mono font-semibold hover:bg-primary/90 transition-colors"
+                className="flex h-9 items-center gap-2 border border-primary/30 bg-primary px-3.5 text-[13px] font-mono font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
               >
-                <Plus size={12} /> Create New Resource
+                <Plus size={13} /> Create Resource
               </button>
             </div>
           </div>
 
           <div className="flex-1 overflow-y-auto">
-            <div className="grid grid-cols-[1.4fr_1fr_0.7fr_0.7fr] gap-3 px-5 py-3 border-b border-border bg-muted/20 text-[11px] font-mono font-semibold uppercase tracking-wider text-muted-foreground">
+            <div className="grid grid-cols-[1.5fr_1fr_0.8fr_0.8fr] gap-3 border-b border-border bg-muted/20 px-5 py-3 text-[12px] font-mono font-semibold uppercase tracking-wider text-muted-foreground">
               <div>Name</div>
               <div>Instrument</div>
               <div>Status</div>
               <div>Actions</div>
             </div>
             {isLoading ? (
-              <div className="px-5 py-8 text-center text-[12px] font-mono text-muted-foreground">
+              <div className="px-5 py-10 text-center text-[13px] font-mono text-muted-foreground">
                 Loading resources...
               </div>
             ) : isError ? (
-              <div className="px-5 py-8 text-center text-[12px] font-mono text-destructive">
+              <div className="px-5 py-10 text-center text-[13px] font-mono text-destructive">
                 Unable to load resources.
               </div>
             ) : resources.length === 0 ? (
-              <div className="px-5 py-8 text-center text-[12px] font-mono text-muted-foreground">
+              <div className="px-5 py-10 text-center text-[13px] font-mono text-muted-foreground">
                 {search ? "No matching resources." : "No resources available."}
               </div>
             ) : (
               resources.map((resource) => (
                 <div
                   key={resource.id}
-                  className="grid grid-cols-[1.4fr_1fr_0.7fr_0.7fr] gap-3 px-5 py-4 border-b border-border text-[12px] font-mono"
+                  className="grid grid-cols-[1.5fr_1fr_0.8fr_0.8fr] gap-3 border-b border-border px-5 py-3.5 text-[13px] font-mono transition-colors hover:bg-secondary/30"
                 >
                   <div className="min-w-0 truncate font-semibold text-foreground" title={resource.name}>
                     {resource.name}
@@ -147,26 +150,26 @@ export function ResourcesPanel({
                     {resource.instrument}
                   </div>
                   <div
-                    className={`font-semibold ${
+                    className={`inline-flex w-fit items-center border px-2 py-0.5 font-semibold ${
                       resource.status === "Error"
-                        ? "text-red-500"
-                        : "text-emerald-500"
+                        ? "border-red-500/30 bg-red-500/10 text-red-500"
+                        : "border-emerald-500/30 bg-emerald-500/10 text-emerald-600"
                     }`}
                     title={resource.error}
                   >
                     {resource.status}
                   </div>
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2">
                     <button
                       onClick={() => onEdit(resource)}
-                      className="text-primary hover:text-primary/80"
+                      className="flex h-8 w-8 items-center justify-center border border-transparent text-primary transition-colors hover:border-primary/30 hover:bg-primary/10 hover:text-primary/80"
                       title="Edit resource"
                     >
                       <Pencil size={13} />
                     </button>
                     <button
                       onClick={() => onDelete(resource.id)}
-                      className="text-red-500 hover:text-red-400"
+                      className="flex h-8 w-8 items-center justify-center border border-transparent text-red-500 transition-colors hover:border-red-500/30 hover:bg-red-500/10 hover:text-red-400"
                       title="Delete resource"
                     >
                       <Trash2 size={13} />
@@ -177,7 +180,7 @@ export function ResourcesPanel({
             )}
           </div>
 
-          <div className="px-4 py-2 border-t border-border bg-muted/20 text-[11px] text-muted-foreground font-mono flex items-center">
+          <div className="flex items-center border-t border-border bg-muted/20 px-4 py-2 text-[12px] font-mono text-muted-foreground">
             <span>{resources.length} resources</span>
             <div className="ml-auto flex items-center gap-3">
               <button
@@ -200,99 +203,101 @@ export function ResourcesPanel({
 
       {showCreateResource && (
         <div
-          className="fixed inset-0 bg-background-200/75 flex items-center justify-center z-[60]"
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/75 backdrop-blur-[1px]"
           onClick={onCloseCreate}
         >
           <div
-            className="bg-card border border-border w-[760px] max-w-[92vw]  h-[540px] max-h-[88vh] flex flex-col shadow-2xl"
+            className="flex h-[620px] max-h-[88vh] w-[980px] max-w-[95vw] flex-col overflow-hidden border border-border bg-card shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between px-5 py-3 border-b border-border bg-muted/30">
-              <span className="text-[13px] font-semibold text-foreground">
+            <div className="flex h-14 items-center justify-between border-b border-border bg-muted/30 px-5">
+              <span className="text-[15px] font-semibold text-foreground">
                 Create {selectedResourceInstrument || "Resource"}
               </span>
               <button
                 onClick={onCloseCreate}
-                className="text-muted-foreground hover:text-foreground"
+                className="flex h-8 w-8 items-center justify-center border border-transparent text-muted-foreground transition-colors hover:border-border hover:bg-secondary hover:text-foreground"
               >
                 <X size={14} />
               </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
-              <div>
-                <label className="block text-[11px] font-mono font-semibold text-muted-foreground mb-1 uppercase tracking-wider">
+            <div className="flex-1 overflow-y-auto px-5 py-4">
+              <div className="mb-4 grid gap-4 md:grid-cols-2">
+                <div>
+                  <label className="mb-1 block text-[12px] font-mono font-semibold uppercase tracking-wider text-muted-foreground">
                   Instrument
-                </label>
-                <select
-                  value={selectedResourceInstrument}
-                  onChange={(event) => {
-                    const selected = browsableResourceInstruments.find(
-                      (inst: any) => inst.name === event.target.value,
-                    );
-                    if (selected) {
-                      setSelectedResourceInstrument(selected.name);
-                    }
-                  }}
-                  className="w-full bg-background border border-border px-2.5 py-2 text-[12px] font-mono text-foreground outline-none focus:border-primary transition-colors"
-                >
-                  <option value="">Select instrument</option>
-                  {browsableResourceInstruments.map((instrument: any) => (
-                    <option
-                      key={`${instrument.name}:${instrument.assembly}`}
-                      value={instrument.name}
-                    >
-                      {instrument.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
+                  </label>
+                  <select
+                    value={selectedResourceInstrument}
+                    onChange={(event) => {
+                      const selected = browsableResourceInstruments.find(
+                        (inst: any) => inst.name === event.target.value,
+                      );
+                      if (selected) {
+                        setSelectedResourceInstrument(selected.name);
+                      }
+                    }}
+                    className="h-10 w-full border border-border bg-background px-2.5 text-[13px] font-mono text-foreground outline-none transition-colors focus:border-primary"
+                  >
+                    <option value="">Select instrument</option>
+                    {browsableResourceInstruments.map((instrument: any) => (
+                      <option
+                        key={`${instrument.name}:${instrument.assembly}`}
+                        value={instrument.name}
+                      >
+                        {instrument.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
 
-              <div>
-                <label className="block text-[11px] font-mono font-semibold text-muted-foreground mb-1 uppercase tracking-wider">
+                <div>
+                  <label className="mb-1 block text-[12px] font-mono font-semibold uppercase tracking-wider text-muted-foreground">
                   Plan Name
-                </label>
-                <input
-                  value={resourcePlanName}
-                  onChange={(event) => setResourcePlanName(event.target.value)}
-                  placeholder="Enter plan name"
-                  className="w-full bg-background border border-border px-2.5 py-2 text-[12px] font-mono text-foreground placeholder:text-muted-foreground outline-none focus:border-primary transition-colors"
-                />
+                  </label>
+                  <input
+                    value={resourcePlanName}
+                    onChange={(event) => setResourcePlanName(event.target.value)}
+                    placeholder="Enter plan name"
+                    className="h-10 w-full border border-border bg-background px-2.5 text-[13px] font-mono text-foreground placeholder:text-muted-foreground outline-none transition-colors focus:border-primary"
+                  />
+                </div>
               </div>
 
               {isResourceSchemaLoading ? (
-                <div className="py-8 text-center text-[12px] font-mono text-muted-foreground">
+                <div className="border border-dashed border-border bg-muted/20 py-10 text-center text-[13px] font-mono text-muted-foreground">
                   Loading resource schema...
                 </div>
               ) : selectedResourceInstrument ? (
                 <>
                   {resourceSchemaError && (
-                    <div className="border border-yellow-500/30 bg-yellow-500/10 px-3 py-2 text-[12px] font-mono text-muted-foreground">
+                    <div className="mb-4 border border-yellow-500/30 bg-yellow-500/10 px-3 py-2 text-[13px] font-mono text-muted-foreground">
                       {resourceSchemaError}
                     </div>
                   )}
-                  <div className="grid grid-cols-2 gap-x-4 gap-y-4">
+                  <div className="grid grid-cols-1 gap-x-4 gap-y-4 md:grid-cols-2">
                     {resourceSchemaProperties.map(renderResourceSchemaField)}
                   </div>
                 </>
               ) : (
-                <div className="py-8 text-center text-[12px] font-mono text-muted-foreground">
+                <div className="border border-dashed border-border bg-muted/20 py-10 text-center text-[13px] font-mono text-muted-foreground">
                   Select an instrument to load resource fields.
                 </div>
               )}
             </div>
 
-            <div className="flex justify-end gap-2 px-5 py-3 border-t border-border bg-muted/20">
+            <div className="flex justify-end gap-2 border-t border-border bg-muted/20 px-5 py-3">
               <button
                 onClick={onCloseCreate}
-                className="h-8 px-4 border border-border text-[12px] font-mono font-semibold text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+                className="h-8 border border-border px-4 text-[13px] font-mono font-semibold text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
               >
                 Close
               </button>
               <button
                 onClick={onSave}
                 disabled={!selectedResourceInstrument || isResourceSchemaLoading}
-                className="h-8 px-4 bg-primary text-primary-foreground text-[12px] font-mono font-semibold hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 transition-colors"
+                className="flex h-8 items-center gap-2 bg-primary px-4 text-[13px] font-mono font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <Save size={12} /> Save
               </button>

@@ -1,5 +1,7 @@
+import * as React from "react";
 import {
   Check,
+  ChevronRight,
   Database,
   Filter,
   FolderPlus,
@@ -113,6 +115,15 @@ export function LeftPanel({
   setContextMenu,
   toggleExpand,
 }: LeftPanelProps) {
+  const rowAccentColors = [
+    "#3b82f6",
+    "#10b981",
+    "#f59e0b",
+    "#a855f7",
+    "#ef4444",
+    "#06b6d4",
+  ];
+
   return (
     <>
       <div className="flex border-b border-border shrink-0">
@@ -204,8 +215,10 @@ export function LeftPanel({
               <Search size={11} className="text-muted-foreground shrink-0" />
               <input
                 value={libSearch}
-                onChange={(e) => setLibSearch(e.target.value)}
-                placeholder="Search steps..."
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                  setLibSearch(e.target.value)
+                }
+                placeholder="Search step library..."
                 className="flex-1 bg-transparent text-[12px] font-mono text-foreground placeholder:text-muted-foreground outline-none"
               />
               {libSearch && (
@@ -232,7 +245,9 @@ export function LeftPanel({
               {libFilterOpen && (
                 <div
                   className="absolute right-0 top-9 bg-popover border border-border shadow-xl z-50 w-44 py-1"
-                  onClick={(e) => e.stopPropagation()}
+                  onClick={(e: React.MouseEvent<HTMLDivElement>) =>
+                    e.stopPropagation()
+                  }
                 >
                   <div className="px-3 py-1.5 text-[10px] font-mono font-bold text-muted-foreground uppercase tracking-widest border-b border-border mb-1">
                     Filter by Category
@@ -306,7 +321,18 @@ export function LeftPanel({
             </div>
           )}
           <div className="flex-1 overflow-y-auto">
-            {filteredLib.map((item) => (
+            <div className="sticky top-0 z-10 border-b border-border bg-card/95 px-3 py-1.5 backdrop-blur">
+              <div className="flex items-center gap-2 text-[10px] font-mono uppercase tracking-wider text-muted-foreground">
+                <span className="min-w-0 flex-1">Step</span>
+                <span className="shrink-0">Details</span>
+              </div>
+            </div>
+            {filteredLib.length === 0 && (
+              <div className="px-4 py-8 text-center text-[11px] font-mono text-muted-foreground">
+                No steps match your search or filter.
+              </div>
+            )}
+            {filteredLib.map((item, index) => (
               <div
                 key={item.id}
                 draggable
@@ -325,28 +351,42 @@ export function LeftPanel({
                     selectedStep?.type === "sequence" ? selectedId : null,
                   );
                 }}
-                className="flex items-start gap-2.5 px-3 py-2.5 cursor-grab group border-b border-border/30 transition-colors"
+                className="group cursor-grab border-b border-l-2 border-l-transparent border-border/40 px-3 py-2.5 transition-colors hover:border-l-primary/60 hover:bg-secondary/40"
               >
-                <div
-                  className="w-[3px] h-4 mt-0.5 shrink-0"
-                  style={{ background: TYPE_STRIPE[item.type] || "#64748b" }}
-                />
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-[12px] font-mono text-foreground group-hover:text-primary transition-colors">
-                      {item.name}
-                    </span>
-                    {item.pluginId && (
-                      <span className="text-[9px] font-mono text-primary border border-primary/30 px-1 shrink-0">
-                        plugin
+                <div className="flex items-start gap-2.5">
+                  <div
+                    className="mt-0.5 h-4 w-[3px] shrink-0"
+                    style={{
+                      background:
+                        rowAccentColors[index % rowAccentColors.length] ||
+                        TYPE_STRIPE[item.type] ||
+                        "#64748b",
+                    }}
+                  />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex min-w-0 items-center gap-1.5">
+                      <span className="truncate text-[12px] font-semibold text-foreground transition-colors group-hover:text-primary">
+                        {item.name}
                       </span>
-                    )}
-                  </div>
-                  <div className="text-[11px] text-muted-foreground mt-0.5 leading-tight">
-                    Base Type: {item.baseType}
-                  </div>
-                  <div className="text-[11px] text-muted-foreground mt-0.5 leading-tight">
-                    Assembly: {item.assembly}
+                      {item.pluginId && (
+                        <span className="shrink-0 border border-primary/30 bg-primary/10 px-1 text-[9px] font-mono text-primary">
+                          plugin
+                        </span>
+                      )}
+                      <ChevronRight size={12} className="ml-auto shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
+                    </div>
+                    <div className="mt-1 flex min-w-0 items-center gap-1 text-[10px] font-mono text-muted-foreground">
+                      <span className="shrink-0 uppercase tracking-wide text-muted-foreground/80">Base</span>
+                      <span className="truncate" title={item.baseType || "-"}>{item.baseType || "-"}</span>
+                      <span className="shrink-0 text-muted-foreground/50">|</span>
+                      <span className="shrink-0 uppercase tracking-wide text-muted-foreground/80">Asm</span>
+                      <span
+                        className="min-w-0 truncate"
+                        title={item.assembly || "-"}
+                      >
+                        {item.assembly || "-"}
+                      </span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -356,8 +396,8 @@ export function LeftPanel({
             <span className="text-[10px] font-mono text-muted-foreground">
               {filteredLib.length} steps
             </span>
-            <span className="ml-auto text-[10px] font-mono text-primary/60">
-              drag or double-click
+            <span className="ml-auto text-[10px] font-mono text-muted-foreground/80">
+              drag or double-click to add
             </span>
           </div>
         </>

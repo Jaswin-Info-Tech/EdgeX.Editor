@@ -1,4 +1,4 @@
-import { AlertTriangle, ChevronRight, Loader2, Search, X } from "lucide-react";
+import { AlertTriangle, ChevronRight, ClipboardList, Loader2, Search, X } from "lucide-react";
 
 interface TestPlansPanelProps {
   testPlans: any[];
@@ -35,25 +35,30 @@ export function TestPlansPanel({
   onCancelUnsavedWarning,
   onSaveUnsavedChanges,
 }: TestPlansPanelProps) {
+  const filteredLabel = hasSearched && query.trim().length > 0
+    ? `${testPlans.length} matching test plans`
+    : `${testPlans.length} test plans`;
+
   return (
     <div
       className="fixed inset-0 bg-black/75 flex items-center justify-center z-50"
       onClick={onClose}
     >
-      <div
-        className="bg-card border border-border w-[760px] max-w-[92vw] h-[540px] max-h-[85vh] flex flex-col shadow-2xl"
-        onClick={(e) => e.stopPropagation()}
-      >
+      <div className="bg-card border border-border w-[820px] max-w-[94vw] h-[620px] max-h-[88vh] flex flex-col shadow-2xl" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 py-3 border-b border-border bg-muted/30">
-          <div className="flex items-center gap-2">
-            <span className="text-[13px] font-semibold text-foreground">
-              Test Plans
-            </span>
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="flex h-8 w-8 items-center justify-center border border-primary/30 bg-primary/10 text-primary shrink-0">
+              <ClipboardList size={16} />
+            </div>
+            <div className="min-w-0">
+              <div className="text-[15px] font-semibold text-foreground truncate">Test Plans</div>
+              <div className="text-[12px] font-mono text-muted-foreground truncate">Browse and open plans from disk paths</div>
+            </div>
           </div>
           <div className="flex items-center gap-2">
             <button
               onClick={onClose}
-              className="text-muted-foreground hover:text-foreground"
+              className="flex h-8 w-8 items-center justify-center border border-transparent text-muted-foreground transition-colors hover:border-border hover:bg-secondary hover:text-foreground"
             >
               <X size={14} />
             </button>
@@ -61,7 +66,7 @@ export function TestPlansPanel({
         </div>
         <div className="px-3 py-3 border-b border-border shrink-0">
           <div className="flex w-full items-center gap-2">
-            <div className="flex flex-1 items-center gap-2 border border-border px-2.5 py-2 bg-background">
+            <div className="flex h-[36px] flex-1 items-center gap-2 border border-border px-2.5 bg-background">
               <Search size={13} className="text-muted-foreground shrink-0" />
               <input
                 value={query}
@@ -76,8 +81,9 @@ export function TestPlansPanel({
                 <button
                   onClick={() => setQuery("")}
                   className="text-muted-foreground hover:text-foreground shrink-0"
+                  title="Clear search"
                 >
-                  <X size={10} />
+                  <X size={12} />
                 </button>
               )}
             </div>
@@ -87,6 +93,10 @@ export function TestPlansPanel({
             >
               <Search size={12} /> Search
             </button>
+          </div>
+          <div className="mt-2 flex items-center justify-between text-[11px] font-mono text-muted-foreground">
+            <span>{filteredLabel}</span>
+            <span>Press Enter to search</span>
           </div>
         </div>
         {showUnsavedWarning && (
@@ -134,7 +144,7 @@ export function TestPlansPanel({
           )}
           {isLoading ? (
             <div className="px-5 py-8 text-center text-[12px] font-mono text-muted-foreground">
-              Searching Test Plans..
+              Searching test plans...
             </div>
           ) : isError ? (
             <div className="px-5 py-8 text-center text-[12px] font-mono text-destructive">
@@ -142,56 +152,57 @@ export function TestPlansPanel({
             </div>
           ) : hasSearched && testPlans.length === 0 ? (
             <div className="px-5 py-8 text-center text-[12px] font-mono text-muted-foreground">
-              No testplans found.
+              No test plans found.
             </div>
           ) : (
-            testPlans.map((plan: any, index: number) => {
-              const isOpening = openingPath === plan.path;
-              return (
-                <button
-                  key={`${plan.path}:${index}`}
-                  onClick={() => onOpen(plan)}
-                  disabled={!!openingPath}
-                  title={String(plan.path ?? "").replace(/\\/g, "\\\\")}
-                  className="relative w-full text-left px-5 py-4 border-b border-border transition-colors group hover:bg-secondary/60 focus:bg-primary/8 focus:outline-none disabled:cursor-wait disabled:opacity-60"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="min-w-0 flex-1 flex flex-col gap-1">
-                      <span className="text-[13px] font-semibold text-foreground group-hover:text-primary transition-colors truncate">
+            <>
+              <div className="sticky top-0 z-10 grid grid-cols-[minmax(0,1fr)_90px_190px_20px] items-center gap-2 border-b border-border bg-card px-5 py-2 text-[10px] font-mono uppercase tracking-wider text-muted-foreground">
+                <span>Name / Path</span>
+                <span className="text-right">Steps</span>
+                <span>Last Modified</span>
+                <span />
+              </div>
+              {testPlans.map((plan: any, index: number) => {
+                const isOpening = openingPath === plan.path;
+                return (
+                  <button
+                    key={`${plan.path}:${index}`}
+                    onClick={() => onOpen(plan)}
+                    disabled={!!openingPath}
+                    title={String(plan.path ?? "").replace(/\\/g, "\\\\")}
+                    className="relative grid w-full grid-cols-[minmax(0,1fr)_90px_190px_20px] items-center gap-2 border-b border-l-2 border-l-transparent border-border px-5 py-4 text-left transition-colors group hover:border-l-primary/60 hover:bg-secondary/50 focus:bg-primary/10 focus:outline-none disabled:cursor-wait disabled:opacity-60"
+                  >
+                    <div className="min-w-0 flex flex-col gap-1">
+                      <span className="truncate text-[14px] font-semibold text-foreground transition-colors group-hover:text-primary">
                         {plan.name}
                       </span>
-                      <span className="text-[12px] text-muted-foreground truncate group-hover:text-foreground/70 transition-colors">
+                      <span className="truncate text-[12px] text-muted-foreground transition-colors group-hover:text-foreground/70">
                         {String(plan.path ?? "").replace(/\\/g, "\\\\")}
                       </span>
                     </div>
-                    <div className="flex items-center gap-2 shrink-0">
-                      <span className="text-[11px] font-mono text-muted-foreground border border-border px-2 py-0.5 whitespace-nowrap">
-                        {plan.stepCount} steps
-                      </span>
-                      <span className="text-[11px] font-mono text-muted-foreground border border-border px-2 py-0.5 whitespace-nowrap">
-                        {new Date(plan.lastModified).toLocaleString()}
-                      </span>
-                      <ChevronRight
-                        size={14}
-                        className="text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
-                      />
-                    </div>
-                  </div>
-                  {isOpening && (
-                    <div className="absolute inset-0 flex items-center justify-center bg-card/80 backdrop-blur-[1px]">
-                      <Loader2 size={16} className="animate-spin text-primary" />
-                      <span className="ml-2 text-[12px] font-mono text-primary">
-                        Opening...
-                      </span>
-                    </div>
-                  )}
-                </button>
-              );
-            })
+                    <span className="justify-self-end whitespace-nowrap border border-border px-2 py-0.5 text-[11px] font-mono text-muted-foreground">
+                      {plan.stepCount} steps
+                    </span>
+                    <span className="whitespace-nowrap border border-border px-2 py-0.5 text-[11px] font-mono text-muted-foreground">
+                      {new Date(plan.lastModified).toLocaleString()}
+                    </span>
+                    <ChevronRight size={14} className="shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
+                    {isOpening && (
+                      <div className="absolute inset-0 flex items-center justify-center bg-card/80 backdrop-blur-[1px]">
+                        <Loader2 size={16} className="animate-spin text-primary" />
+                        <span className="ml-2 text-[12px] font-mono text-primary">
+                          Opening...
+                        </span>
+                      </div>
+                    )}
+                  </button>
+                );
+              })}
+            </>
           )}
         </div>
         <div className="px-4 py-2 border-t border-border bg-muted/20 text-[11px] text-muted-foreground font-mono">
-          {testPlans.length} test plans
+          {filteredLabel}
         </div>
       </div>
     </div>

@@ -1,13 +1,9 @@
 import { Moon, PanelLeftOpen, PanelRightOpen, Sun, Check } from "lucide-react";
 
 const MENU_ITEMS: Record<string, string[]> = {
-  File: ["New Test Plan", "Open...", "-", "Save", "Save As...","Import Plan...","Export Plan...", "-", "Exit"],
-  Edit: ["Undo", "Redo", "-", "Cut", "Copy", "Paste", "-", "Select All"],
+  File: ["Import Plan","Export Plan"],
   View: ["Step Library", "Properties", "Console", "-", "Reset Layout"],
-  Run: ["Run All", "Run Selected", "-", "Pause", "Stop", "-", "Reset Plan"],
   Bench: ["Instruments", "DUTs", "Connections"],
-  Plugins: ["Plugin Manager", "-", "Reload Plugins"],
-  Help: ["Documentation", "About EdgeX", "-", "Check for Updates"],
 };
 
 interface MenuBarProps {
@@ -103,7 +99,7 @@ export function MenuBar({
         <span className="text-[14px] font-black tracking-[0.15em] font-mono">
           <span className="text-foreground">EDGE</span><span className="text-primary">X</span>
         </span>
-        <span className="text-[10px] font-mono text-muted-foreground border border-border px-1.5 ml-0.5">v2.4</span>
+        <span className="text-[10px] font-mono text-muted-foreground border border-border px-1.5 ml-0.5">v1.0</span>
       </div>
 
       {Object.keys(MENU_ITEMS).map(menu => (

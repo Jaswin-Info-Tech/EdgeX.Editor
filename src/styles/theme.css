@@ -1,7 +1,7 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  --font-size: 14px;
+  --font-size: 16px;
   --background: #f4f6f9;
   --foreground: #111827;
   --card: #ffffff;
@@ -179,5 +179,97 @@
     font-size: var(--text-base);
     font-weight: var(--font-weight-normal);
     line-height: 1.5;
+  }
+}
+
+@layer utilities {
+  @keyframes blade-slide-in {
+    from {
+      opacity: 0;
+      transform: translateX(28px);
+    }
+
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+
+  @keyframes blade-slide-in-soft {
+    from {
+      opacity: 0;
+      transform: translateX(16px);
+    }
+
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+
+  .blade-enter {
+    animation: blade-slide-in 220ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .blade-enter-soft {
+    animation: blade-slide-in-soft 180ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .blade-enter,
+    .blade-enter-soft {
+      animation: none;
+    }
+  }
+
+  .operator-readable {
+    line-height: 1.4;
+  }
+
+  .operator-readable .text-\[10px\] {
+    font-size: 12px;
+  }
+
+  .operator-readable .text-\[11px\] {
+    font-size: 13px;
+  }
+
+  .operator-readable .text-\[12px\] {
+    font-size: 14px;
+  }
+
+  .operator-readable .text-\[13px\] {
+    font-size: 15px;
+  }
+
+  .operator-readable .text-xs {
+    font-size: 13px;
+  }
+
+  .operator-readable .text-sm {
+    font-size: 15px;
+  }
+
+  .operator-readable.compact-layout .px-5 {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+
+  .operator-readable.compact-layout .py-3 {
+    padding-top: 0.625rem;
+    padding-bottom: 0.625rem;
+  }
+
+  .operator-readable.compact-layout .py-8 {
+    padding-top: 1.5rem;
+    padding-bottom: 1.5rem;
+  }
+
+  .operator-readable.compact-layout .space-y-4 > :not([hidden]) ~ :not([hidden]) {
+    margin-top: 0.75rem;
+  }
+
+  .operator-readable.compact-layout .gap-4 {
+    gap: 0.75rem;
   }
 }

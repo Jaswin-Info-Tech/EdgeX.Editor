@@ -929,7 +929,7 @@ export function EditorShell(props: EditorShellProps) {
 
   return (
     <div
-      className="h-screen w-screen flex flex-col bg-background text-foreground overflow-hidden"
+      className="operator-readable compact-layout h-screen w-screen flex flex-col bg-background text-foreground overflow-hidden"
       style={{ fontFamily: "'Inter', system-ui, sans-serif" }}
       onClick={() => {
         setActiveMenu(null);

@@ -80,9 +80,7 @@ export function EditorToolbar({
       <ToolBtn onClick={() => setShowTestPlansPanel(true)} title="Test Plans">
         <FolderPlus size={14} />{!isTablet && "Test Plans"}
       </ToolBtn>
-      <ToolBtn onClick={() => setShowResourcesPanel(true)} title="Resources">
-        <Database size={14} />{!isTablet && "Resources"}
-      </ToolBtn>
+      
 
       <div className="ml-auto flex items-center gap-3 font-mono text-[12px] text-muted-foreground shrink-0">
         {hasPlan && (

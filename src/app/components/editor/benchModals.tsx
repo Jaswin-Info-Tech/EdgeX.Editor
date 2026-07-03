@@ -1,14 +1,17 @@
 import { useEffect, useMemo, useRef, useState, type ReactElement } from "react";
 import {
+  ArrowRight,
   Cable,
-  CheckCircle2,
   Cpu,
   DatabaseZap,
+  FileText,
+  FolderKanban,
+  MousePointerClick,
   Plus,
   Search,
+  SlidersHorizontal,
   Trash2,
   X,
-  XCircle,
   Zap,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -236,7 +239,7 @@ function GenericResourcePanel({
   const [resourceName, setResourceName] = useState("");
   const resourceNameInputRef = useRef<HTMLInputElement>(null);
 
-  const [isEditorOpen, setIsEditorOpen] = useState(false);
+  const [activeBlade, setActiveBlade] = useState<"types" | "resources" | "editor">("types");
   const [schemaProperties, setSchemaProperties] = useState<ResourceSchemaProperty[]>([]);
   const [schemaPropertyValues, setSchemaPropertyValues] = useState<Record<string, any>>({});
   const [schemaLoading, setSchemaLoading] = useState(false);
@@ -244,7 +247,11 @@ function GenericResourcePanel({
   const [resources, setResources] = useState<Resource[]>([]);
   const [resourcesLoading, setResourcesLoading] = useState(false);
   const [resourcesError, setResourcesError] = useState(false);
+  const [instanceSearch, setInstanceSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "error">("all");
   const [selectedResourceId, setSelectedResourceId] = useState<string>("");
+  const [showBasicsPanel, setShowBasicsPanel] = useState(true);
+  const [showConfigPanel, setShowConfigPanel] = useState(false);
   const [saveResourceLoading, setSaveResourceLoading] = useState(false);
   const [saveResourceError, setSaveResourceError] = useState("");
   const [deleteResourceLoading, setDeleteResourceLoading] = useState(false);
@@ -252,32 +259,24 @@ function GenericResourcePanel({
   const [resourcePendingDelete, setResourcePendingDelete] = useState<Resource | null>(null);
 
   const selectedItem = useMemo(
-    () =>
-      items.find((item) => `${item.name}:${item.assembly}` === selectedKey) ??
-      items[0],
+    () => items.find((item) => `${item.name}:${item.assembly}` === selectedKey) ?? null,
     [items, selectedKey],
   );
 
   const selectedTypeName = useMemo(
-    () => config.resolveTypeName(selectedItem),
+    () => (selectedItem ? config.resolveTypeName(selectedItem) : ""),
     [config, selectedItem],
   );
 
   useEffect(() => {
     if (!selectedItem) {
-      setSelectedKey("");
+      if (selectedKey) setSelectedKey("");
       setResourceName("");
+      setSelectedResourceId("");
+      setActiveBlade("types");
       return;
     }
-
-    const key = `${selectedItem.name}:${selectedItem.assembly}`;
-    if (selectedKey !== key) setSelectedKey(key);
-    setResourceName("");
-    setSelectedResourceId(""); // reset resource selection when switching type
-    setSaveResourceError("");
-    setDeleteResourceError("");
-    setIsEditorOpen(false);
-  }, [selectedItem?.name, selectedItem?.assembly]);
+  }, [selectedItem, selectedKey]);
 
   useEffect(() => {
     if (!selectedTypeName) {
@@ -348,19 +347,40 @@ function GenericResourcePanel({
     );
   }, [resources, selectedTypeName, selectedItem, config]);
 
+  const filteredResources = useMemo(() => {
+    const searchLower = instanceSearch.trim().toLowerCase();
+    return matchingResources.filter((resource) => {
+      if (statusFilter === "active" && resource.status !== "Active") return false;
+      if (statusFilter === "error" && resource.status !== "Error") return false;
+      if (!searchLower) return true;
+
+      const displayName = config.getDisplayName(resource) || resource.name || "";
+      const typeName = extractTypeName(String(resource.type ?? ""));
+      return (
+        displayName.toLowerCase().includes(searchLower) ||
+        String(typeName).toLowerCase().includes(searchLower)
+      );
+    });
+  }, [matchingResources, instanceSearch, statusFilter, config]);
+
   const selectedResource = useMemo(
     () => matchingResources.find((r) => r.id === selectedResourceId) ?? null,
     [matchingResources, selectedResourceId],
   );
 
   const closePanel = () => {
+    setActiveBlade("types");
     onClose();
     setSearch("");
   };
 
   const selectItem = (item: any) => {
     setSelectedKey(`${item.name}:${item.assembly}`);
+    setActiveBlade("resources");
     setResourceName("");
+    setSelectedResourceId("");
+    setInstanceSearch("");
+    setStatusFilter("all");
     setSaveResourceError("");
     setDeleteResourceError("");
   };
@@ -378,14 +398,19 @@ function GenericResourcePanel({
   // ─── "Add New" button on the instances grid opens a blank editor modal ───
   const openAddModal = () => {
     resetToBlank();
+    setShowBasicsPanel(true);
+    setShowConfigPanel(false);
     setSaveResourceError("");
     setDeleteResourceError("");
-    setIsEditorOpen(true);
+    setActiveBlade("editor");
   };
 
   const selectResource = (resource: Resource) => {
     setSelectedResourceId(resource.id);
+    setShowBasicsPanel(true);
+    setShowConfigPanel(true);
     setResourceName(resource.name);
+    setActiveBlade("editor");
     setSaveResourceError("");
     setDeleteResourceError("");
 
@@ -408,17 +433,24 @@ function GenericResourcePanel({
       });
       return next;
     });
-
-    setIsEditorOpen(true);
   };
 
   const closeEditorModal = () => {
-    setIsEditorOpen(false);
+    setShowBasicsPanel(true);
+    setShowConfigPanel(false);
+    setActiveBlade("resources");
     setSaveResourceError("");
     setDeleteResourceError("");
   };
 
   const editableProperties = schemaProperties.filter((p) => p.isEditable);
+
+  useEffect(() => {
+    if (activeBlade !== "editor") return;
+    if (resourceName.trim() && !showConfigPanel) {
+      setShowConfigPanel(true);
+    }
+  }, [activeBlade, resourceName, showConfigPanel]);
 
   const handleSave = async () => {
     const pluginTypeName = selectedTypeName;
@@ -468,7 +500,7 @@ function GenericResourcePanel({
           : `${trimmedResourceName} created successfully`,
         { id: toastId },
       );
-      setIsEditorOpen(false);
+      setActiveBlade("resources");
       resetToBlank();
     } catch (error) {
       const message =
@@ -511,7 +543,7 @@ function GenericResourcePanel({
       setResources(updatedResources);
       if (resourceToDelete.id === selectedResourceId) {
         resetToBlank();
-        setIsEditorOpen(false);
+        setActiveBlade("resources");
       }
       toast.success(`${resourceToDelete.name} deleted successfully`, { id: toastId });
       setResourcePendingDelete(null);
@@ -532,23 +564,30 @@ function GenericResourcePanel({
 
   return (
     <div
-      className="fixed inset-0 bg-black/75 flex items-center justify-center z-50"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-[1px]"
       onClick={closePanel}
     >
       <div
-        className="bg-card border border-border w-[720px] max-w-[92vw] h-[520px] max-h-[85vh] flex flex-col shadow-2xl"
+        className="flex h-[620px] max-h-[88vh] w-[980px] max-w-[95vw] flex-col overflow-hidden border border-border bg-card shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex h-11 items-center justify-between border-b border-border bg-muted/30 px-4">
-          <div className="flex items-center gap-2">
-            <DatabaseZap size={15} className="text-primary" />
-            <span className="text-[13px] font-semibold text-foreground">
-              {config.panelTitle}
-            </span>
+        <div className="flex h-14 items-center justify-between border-b border-border bg-muted/30 px-5">
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="flex h-8 w-8 items-center justify-center border border-primary/30 bg-primary/10 text-primary">
+              <DatabaseZap size={16} className="text-primary" />
+            </div>
+            <div className="min-w-0">
+              <div className="truncate text-[15px] font-semibold text-foreground">
+                {config.panelTitle}
+              </div>
+              <div className="truncate text-[12px] font-mono text-muted-foreground">
+                Manage {config.itemLabelSingular} templates and existing instances
+              </div>
+            </div>
           </div>
           <button
             onClick={closePanel}
-            className="text-muted-foreground hover:text-foreground"
+            className="flex h-8 w-8 items-center justify-center border border-transparent text-muted-foreground transition-colors hover:border-border hover:bg-secondary hover:text-foreground"
             title="Close"
           >
             <X size={14} />
@@ -556,180 +595,527 @@ function GenericResourcePanel({
         </div>
 
         <div className="flex min-h-0 flex-1">
-          <aside className="flex w-[210px] shrink-0 flex-col border-r border-border bg-muted/10">
-            <div className="border-b border-border p-3">
-              <div className="flex h-8 items-center gap-2 border border-border bg-background px-2">
-                <Search size={12} className="shrink-0 text-muted-foreground" />
-                <input
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Search..."
-                  className="min-w-0 flex-1 bg-transparent text-[12px] font-mono text-foreground placeholder:text-muted-foreground outline-none"
-                />
-                {search && (
-                  <button
-                    onClick={() => setSearch("")}
-                    className="shrink-0 text-muted-foreground hover:text-foreground"
-                    title="Clear search"
-                  >
-                    <X size={10} />
-                  </button>
+          <section className="flex min-w-0 flex-1 flex-col bg-card">
+            <div className="border-b border-border bg-muted/20 px-5 py-2.5">
+              <div className="flex items-center gap-1 text-[12px] font-mono">
+                <button
+                  onClick={() => setActiveBlade("types")}
+                  className={`transition-colors ${activeBlade === "types" ? "text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+                >
+                  {config.itemLabelCapitalized} Types
+                </button>
+                {selectedItem && (
+                  <>
+                    <span className="text-muted-foreground">/</span>
+                    <button
+                      onClick={() => setActiveBlade("resources")}
+                      className={`max-w-[220px] truncate transition-colors ${activeBlade === "resources" ? "text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+                    >
+                      {selectedItem.name} Resources
+                    </button>
+                  </>
+                )}
+                {activeBlade === "editor" && (
+                  <>
+                    <span className="text-muted-foreground">/</span>
+                    <span className="text-foreground">Configuration</span>
+                  </>
                 )}
               </div>
             </div>
 
-            <div className="min-h-0 flex-1 overflow-y-auto">
-              {isLoading ? (
-                <div className="px-4 py-8 text-center text-[12px] font-mono text-muted-foreground">
-                  {config.loadingItemsMessage}
+            <div className="min-h-0 flex flex-1 overflow-hidden bg-muted/5">
+              {activeBlade === "types" && (
+                <div className="flex h-full w-[290px] shrink-0 flex-col border-r border-border bg-card">
+                <div className="border-b border-border px-3 py-3">
+                  <div className="mb-2 text-[11px] font-mono uppercase tracking-wider text-muted-foreground">
+                    {config.itemLabelCapitalized} Types
+                  </div>
+                  <div className="flex h-9 items-center gap-2 border border-border bg-background px-2.5">
+                    <Search size={12} className="shrink-0 text-muted-foreground" />
+                    <input
+                      value={search}
+                      onChange={(e) => setSearch(e.target.value)}
+                      placeholder={`Search ${config.itemLabelSingular} type...`}
+                      className="min-w-0 flex-1 bg-transparent text-[13px] font-mono text-foreground placeholder:text-muted-foreground outline-none"
+                    />
+                    {search && (
+                      <button
+                        onClick={() => setSearch("")}
+                        className="shrink-0 text-muted-foreground hover:text-foreground"
+                        title="Clear search"
+                      >
+                        <X size={10} />
+                      </button>
+                    )}
+                  </div>
                 </div>
-              ) : isError ? (
-                <div className="px-4 py-8 text-center text-[12px] font-mono text-destructive">
-                  {config.errorItemsMessage}
+                <div className="border-b border-border px-3 py-2 text-[11px] font-mono text-muted-foreground">
+                  {items.length} types
                 </div>
-              ) : items.length === 0 ? (
-                <div className="px-4 py-8 text-center text-[12px] font-mono text-muted-foreground">
-                  {search ? config.itemsEmptyMessageFiltered : config.itemsEmptyMessage}
+                <div className="min-h-0 flex-1 overflow-y-auto p-2">
+                  {isLoading ? (
+                    <div className="px-3 py-8 text-center text-[13px] font-mono text-muted-foreground">
+                      {config.loadingItemsMessage}
+                    </div>
+                  ) : isError ? (
+                    <div className="px-3 py-8 text-center text-[13px] font-mono text-destructive">
+                      {config.errorItemsMessage}
+                    </div>
+                  ) : items.length === 0 ? (
+                    <div className="px-3 py-8 text-center text-[13px] font-mono text-muted-foreground">
+                      {search ? config.itemsEmptyMessageFiltered : config.itemsEmptyMessage}
+                    </div>
+                  ) : (
+                    items.map((item) => {
+                      const key = `${item.name}:${item.assembly}`;
+                      const isSelected = key === selectedKey;
+                      return (
+                        <button
+                          key={key}
+                          onClick={() => selectItem(item)}
+                          title={item.name}
+                          className={`mb-1 flex w-full items-start gap-2.5 border px-2.5 py-2.5 text-left transition-colors ${isSelected
+                            ? "border-primary/40 bg-primary/10"
+                            : "border-transparent hover:border-border hover:bg-secondary/40"
+                            }`}
+                        >
+                          <Icon size={15} className="mt-0.5 shrink-0 text-primary" />
+                          <div className="min-w-0">
+                            <div className="truncate text-[13px] font-semibold text-foreground">{item.name}</div>
+                            <div className="mt-1 truncate text-[11px] font-mono text-muted-foreground">
+                              {item.assembly || config.baseTypeFallback}
+                            </div>
+                          </div>
+                        </button>
+                      );
+                    })
+                  )}
                 </div>
-              ) : (
-                items.map((item) => {
-                  const key = `${item.name}:${item.assembly}`;
-                  const isSelected = key === selectedKey;
-
-                  return (
-                    <button
-                      key={key}
-                      onClick={() => selectItem(item)}
-                      title={item.name}
-                      className={`flex w-full items-center gap-2 border-b border-border/60 px-3 py-2.5 text-left transition-colors ${isSelected
-                        ? "bg-secondary text-foreground"
-                        : "text-muted-foreground hover:bg-secondary/60 hover:text-foreground"
-                        }`}
-                    >
-                      <Icon size={15} className="text-primary shrink-0" />
-                      <span className="min-w-0 flex-1 truncate text-[12px] font-semibold">
-                        {item.name}
-                      </span>
-                    </button>
-                  );
-                })
+              </div>
               )}
-            </div>
-          </aside>
 
-          <section className="flex min-w-0 flex-1 flex-col bg-card">
-            <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
-              {!selectedItem ? (
-                <div className="py-8 text-center text-[12px] font-mono text-muted-foreground">
-                  Select a{/^[aeiou]/i.test(config.itemLabelSingular) ? "n" : ""}{" "}
-                  {config.itemLabelSingular} type.
+              {activeBlade === "types" && (
+                <div className="blade-enter-soft flex min-w-0 flex-1 flex-col bg-card">
+                  <div className="border-b border-border bg-muted/20 px-6 py-4">
+                    <div className="text-[15px] font-semibold text-foreground">Resource Setup Flow</div>
+                    <div className="mt-1 text-[12px] font-mono text-muted-foreground">
+                      Select a type on the left to open resource instances and configuration.
+                    </div>
+                  </div>
+
+                  <div className="min-h-0 flex-1 overflow-y-auto p-6">
+                    <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+                      <div className="border border-border bg-background p-4">
+                        <div className="flex items-center gap-2 text-[13px] font-semibold text-foreground">
+                          <MousePointerClick size={15} className="text-primary" />
+                          Step 1: Pick Type
+                        </div>
+                        <div className="mt-2 text-[12px] font-mono text-muted-foreground">
+                          Choose instrument/DUT/connection type from the left blade.
+                        </div>
+                      </div>
+
+                      <div className="border border-border bg-background p-4">
+                        <div className="flex items-center gap-2 text-[13px] font-semibold text-foreground">
+                          <FolderKanban size={15} className="text-primary" />
+                          Step 2: Manage Instances
+                        </div>
+                        <div className="mt-2 text-[12px] font-mono text-muted-foreground">
+                          View existing instances, search quickly, filter by status, or add new.
+                        </div>
+                      </div>
+
+                      <div className="border border-border bg-background p-4">
+                        <div className="flex items-center gap-2 text-[13px] font-semibold text-foreground">
+                          <SlidersHorizontal size={15} className="text-primary" />
+                          Step 3: Configure
+                        </div>
+                        <div className="mt-2 text-[12px] font-mono text-muted-foreground">
+                          Open configuration blade, edit properties, then save.
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="mt-5 border border-border bg-muted/10 p-4">
+                      <div className="flex items-center gap-2 text-[13px] font-semibold text-foreground">
+                        <FileText size={15} className="text-primary" />
+                        What Happens Next
+                      </div>
+                      <div className="mt-2 flex items-center gap-2 text-[12px] font-mono text-muted-foreground">
+                        <span>Select type</span>
+                        <ArrowRight size={12} />
+                        <span>Resource instances blade</span>
+                        <ArrowRight size={12} />
+                        <span>Configuration blade</span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
-              ) : (
-                <div>
-                  <div className="mb-3 flex items-center justify-between">
-                    <div
-                      className="truncate text-[10px] font-mono font-semibold uppercase tracking-wider text-muted-foreground"
-                      title={`Existing ${selectedItem.name} Instances`}
-                    >
-                      Existing {selectedItem.name} Instances
+              )}
+
+              {selectedItem && activeBlade === "resources" && (
+                <div className="blade-enter-soft flex h-full min-w-0 flex-1 border-r border-border bg-card">
+                  <div className="flex min-w-0 flex-1 flex-col">
+                    <div className="border-b border-border bg-muted/20 px-4 py-3">
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="truncate text-[12px] font-mono font-semibold uppercase tracking-wider text-muted-foreground">
+                            {selectedItem.name} Instances
+                          </div>
+                          <div className="mt-1 truncate text-[13px] text-foreground">
+                            {selectedTypeName || config.baseTypeFallback}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => setActiveBlade("types")}
+                            className="flex h-8 items-center gap-1.5 border border-border px-2.5 text-[11px] font-mono font-semibold text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+                            title="Back to instrument types"
+                          >
+                            <X size={13} />
+                            Back to Types
+                          </button>
+                          <button
+                            onClick={openAddModal}
+                            className="flex h-8 items-center gap-1.5 border border-primary/30 bg-primary px-3 text-[12px] font-mono font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
+                          >
+                            <Plus size={12} />
+                            Add
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="mt-2 flex flex-wrap items-center gap-2">
+                        <div className="flex h-8 min-w-[200px] flex-1 items-center gap-2 border border-border bg-background px-2.5">
+                          <Search size={12} className="shrink-0 text-muted-foreground" />
+                          <input
+                            value={instanceSearch}
+                            onChange={(e) => setInstanceSearch(e.target.value)}
+                            placeholder="Search instances..."
+                            className="min-w-0 flex-1 bg-transparent text-[12px] font-mono text-foreground placeholder:text-muted-foreground outline-none"
+                          />
+                        </div>
+                        {[
+                          { id: "all", label: "All" },
+                          { id: "active", label: "Active" },
+                          { id: "error", label: "Error" },
+                        ].map((filter) => (
+                          <button
+                            key={filter.id}
+                            onClick={() => setStatusFilter(filter.id as "all" | "active" | "error")}
+                            className={`h-8 border px-2.5 text-[11px] font-mono font-semibold transition-colors ${statusFilter === filter.id
+                              ? "border-primary/40 bg-primary/10 text-foreground"
+                              : "border-border text-muted-foreground hover:bg-secondary hover:text-foreground"
+                              }`}
+                          >
+                            {filter.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-[2fr_1fr_0.7fr_40px] gap-2 border-b border-border bg-muted/10 px-4 py-2 text-[10px] font-mono font-semibold uppercase tracking-wider text-muted-foreground">
+                      <span>Name</span>
+                      <span>Type</span>
+                      <span>Status</span>
+                      <span></span>
+                    </div>
+
+                    <div className="min-h-0 flex flex-1 flex-col overflow-y-auto">
+                      {resourcesLoading ? (
+                        <div className="px-4 py-8 text-center text-[13px] font-mono text-muted-foreground">
+                          Loading resources...
+                        </div>
+                      ) : resourcesError ? (
+                        <div className="px-4 py-8 text-center text-[13px] font-mono text-destructive">
+                          Unable to load resources.
+                        </div>
+                      ) : matchingResources.length === 0 ? (
+                        <div className="px-4 py-8 text-center text-[13px] font-mono text-muted-foreground">
+                          {config.noInstancesMessage}
+                        </div>
+                      ) : filteredResources.length === 0 ? (
+                        <div className="px-4 py-8 text-center text-[13px] font-mono text-muted-foreground">
+                          No resources match the current filters.
+                        </div>
+                      ) : (
+                        <>
+                          {filteredResources.map((resource) => {
+                            const isSelected = resource.id === selectedResourceId;
+                            const hasError = resource.status === "Error";
+                            const displayName =
+                              config.getDisplayName(resource) ||
+                              `Unnamed ${config.itemLabelCapitalized}`;
+
+                            return (
+                              <div
+                                key={resource.id}
+                                role="button"
+                                tabIndex={0}
+                                title={displayName}
+                                onClick={() => selectResource(resource)}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter" || e.key === " ") {
+                                    e.preventDefault();
+                                    selectResource(resource);
+                                  }
+                                }}
+                                className={`grid cursor-pointer grid-cols-[2fr_1fr_0.7fr_40px] items-center gap-2 border-b border-border/70 px-4 py-2 transition-colors ${isSelected
+                                  ? "bg-primary/10"
+                                  : "hover:bg-secondary/40"
+                                  }`}
+                              >
+                                <div className="truncate text-[13px] font-semibold text-foreground">{displayName}</div>
+                                <div className="truncate text-[11px] font-mono text-muted-foreground">
+                                  {extractTypeName(String(resource.type ?? "")) || resource.type}
+                                </div>
+                                <div>
+                                  <span
+                                    className={`inline-flex border px-2 py-0.5 text-[11px] font-mono ${hasError
+                                      ? "border-destructive/30 bg-destructive/10 text-destructive"
+                                      : "border-emerald-500/30 bg-emerald-500/10 text-emerald-600"
+                                      }`}
+                                  >
+                                    {resource.status}
+                                  </span>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+
+                            <div className="flex flex-1 border-t border-border bg-muted/5 px-4 py-4">
+                              {selectedResource ? (
+                                <div className="grid w-full grid-cols-1 gap-4 lg:grid-cols-[1.4fr_1fr]">
+                                  <div className="border border-border bg-background p-4">
+                                    <div className="text-[11px] font-mono font-semibold uppercase tracking-wider text-muted-foreground">
+                                      Selected Instance
+                                    </div>
+                                    <div className="mt-2 text-[16px] font-semibold text-foreground">
+                                      {config.getDisplayName(selectedResource) || selectedResource.name}
+                                    </div>
+                                    <div className="mt-3 grid grid-cols-1 gap-2 text-[12px] font-mono text-muted-foreground md:grid-cols-2">
+                                      <div className="border border-border bg-muted/10 px-2.5 py-2">
+                                        <div className="text-[10px] uppercase tracking-wider">Type</div>
+                                        <div className="mt-1 truncate text-[12px] text-foreground">
+                                          {extractTypeName(String(selectedResource.type ?? "")) || selectedResource.type}
+                                        </div>
+                                      </div>
+                                      <div className="border border-border bg-muted/10 px-2.5 py-2">
+                                        <div className="text-[10px] uppercase tracking-wider">Status</div>
+                                        <div className="mt-1 text-[12px] text-foreground">{selectedResource.status}</div>
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  <div className="flex flex-col justify-between border border-border bg-background p-4">
+                                    <div>
+                                      <div className="text-[11px] font-mono font-semibold uppercase tracking-wider text-muted-foreground">
+                                        Next Action
+                                      </div>
+                                      <div className="mt-2 text-[12px] font-mono text-muted-foreground">
+                                        Open configuration blade to edit properties and save changes.
+                                      </div>
+                                    </div>
+
+                                    <button
+                                      onClick={() => setActiveBlade("editor")}
+                                      className="mt-4 flex h-9 items-center justify-center gap-2 border border-primary/30 bg-primary px-3 text-[12px] font-mono font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
+                                    >
+                                      <SlidersHorizontal size={12} />
+                                      Open Configuration
+                                    </button>
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="flex w-full items-center justify-center border border-dashed border-border bg-background px-6 text-center">
+                                  <div>
+                                    <div className="text-[14px] font-semibold text-foreground">No instance selected</div>
+                                    <div className="mt-2 text-[12px] font-mono text-muted-foreground">
+                                      Select a resource row above to view details and configure it.
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                                    requestDelete(resource);
+                                  }}
+                                  disabled={deleteResourceLoading}
+                                  className="ml-auto flex h-7 w-7 items-center justify-center border border-transparent text-destructive transition-colors hover:border-destructive/30 hover:bg-destructive/10 disabled:cursor-not-allowed disabled:opacity-50"
+                                >
+                                  <DeleteIcon size={13} />
+                                </button>
+                              </div>
+                            );
+                          })}
+
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {activeBlade === "editor" && selectedItem && (
+                <aside className="blade-enter flex h-full min-w-0 flex-1 flex-col bg-card">
+                  <div className="flex h-12 items-center justify-between border-b border-border bg-muted/30 px-4">
+                    <div className="flex items-center gap-2">
+                      <Icon size={14} className="text-primary shrink-0" />
+                      <span className="text-[14px] font-semibold text-foreground">
+                        {selectedResource
+                          ? `Edit ${selectedResource.name}`
+                          : `New ${config.itemLabelCapitalized}`}
+                      </span>
                     </div>
                     <button
-                      onClick={openAddModal}
-                      className="flex h-7 items-center gap-1.5 bg-primary px-3 text-[11px] font-mono font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
+                      onClick={closeEditorModal}
+                      className="flex h-8 items-center gap-1.5 border border-border px-2.5 text-[11px] font-mono font-semibold text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+                      title="Back to resource instances"
                     >
-                      <Plus size={12} />
-                      Add New
+                      <X size={13} />
+                      Back to Instances
                     </button>
                   </div>
 
-                  {resourcesLoading ? (
-                    <div className="py-3 text-[11px] font-mono text-muted-foreground">
-                      Loading resources...
-                    </div>
-                  ) : resourcesError ? (
-                    <div className="py-3 text-[11px] font-mono text-destructive">
-                      Unable to load resources.
-                    </div>
-                  ) : matchingResources.length === 0 ? (
-                    <div className="py-3 text-[11px] font-mono text-muted-foreground">
-                      {config.noInstancesMessage}
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-2 gap-4">
-                      {matchingResources.map((resource) => {
-                        const isSelected = resource.id === selectedResourceId;
-                        const hasError = resource.status === "Error";
-                        const displayName =
-                          config.getDisplayName(resource) ||
-                          `Unnamed ${config.itemLabelCapitalized}`;
+                  <div className="min-h-0 flex-1 overflow-y-auto space-y-3 p-4">
+                    <section className="border border-border bg-background">
+                      <button
+                        type="button"
+                        onClick={() => setShowBasicsPanel((prev) => !prev)}
+                        className="flex w-full items-center justify-between border-b border-border px-4 py-3 text-left"
+                      >
+                        <span className="text-[12px] font-mono font-semibold uppercase tracking-wider text-muted-foreground">
+                          Basic Details
+                        </span>
+                        <span className="text-[12px] font-mono text-muted-foreground">
+                          {showBasicsPanel ? "Hide" : "Show"}
+                        </span>
+                      </button>
 
-                        return (
-                          <div
-                            key={resource.id}
-                            role="button"
-                            tabIndex={0}
-                            title={displayName}
-                            onClick={() => selectResource(resource)}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter" || e.key === " ") {
-                                e.preventDefault();
-                                selectResource(resource);
-                              }
-                            }}
-                            className={`flex h-28 w-full cursor-pointer items-center gap-3 border px-5 py-5 text-left transition-colors ${isSelected
-                              ? "border-primary bg-secondary"
-                              : "border-border bg-background hover:bg-secondary/60"
-                              }`}
-                          >
-                            {hasError ? (
-                              <XCircle size={22} className="shrink-0 text-destructive" />
-                            ) : (
-                              <CheckCircle2 size={22} className="shrink-0 text-emerald-500" />
-                            )}
-                            <div className="min-w-0 flex-1">
-                              <div className="truncate text-[14px] font-mono font-semibold text-foreground">
-                                {displayName}
-                              </div>
-                              <div className="mt-0.5 truncate text-[11px] font-mono text-muted-foreground/80">
-                                {extractTypeName(String(resource.type ?? "")) || resource.type}
-                              </div>
-                              <div
-                                className={`mt-1 text-[12px] font-mono ${hasError ? "text-destructive" : "text-muted-foreground"
-                                  }`}
-                              >
-                                {resource.status}
-                              </div>
-                            </div>
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                requestDelete(resource);
-                              }}
-                              disabled={deleteResourceLoading}
-                              className="ml-2 flex h-8 w-8 shrink-0 items-center justify-center text-primary text-destructive transition-colors  disabled:cursor-not-allowed disabled:opacity-50"
-                            >
-                              <DeleteIcon size={15} />
-                            </button>
+                      {showBasicsPanel && (
+                        <div className="p-4">
+                          <label className={labelCls}>Resource Name</label>
+                          <input
+                            ref={config.useNameInputRef ? resourceNameInputRef : undefined}
+                            value={resourceName}
+                            onChange={(e) => setResourceName(e.target.value)}
+                            placeholder="Resource name"
+                            title={resourceName}
+                            autoFocus
+                            className="h-10 w-full truncate border border-border bg-background px-3 text-[13px] font-mono text-foreground placeholder:text-muted-foreground outline-none transition-colors focus:border-primary"
+                          />
+                        </div>
+                      )}
+                    </section>
+
+                    <section className="border border-border bg-background">
+                      <button
+                        type="button"
+                        onClick={() => setShowConfigPanel((prev) => !prev)}
+                        className="flex w-full items-center justify-between border-b border-border px-4 py-3 text-left"
+                      >
+                        <span className="text-[12px] font-mono font-semibold uppercase tracking-wider text-muted-foreground">
+                          Configuration
+                        </span>
+                        <span className="text-[12px] font-mono text-muted-foreground">
+                          {showConfigPanel ? "Hide" : "Show"}
+                        </span>
+                      </button>
+
+                      {showConfigPanel && (
+                        <div className="p-4">
+                          <div className="mb-3 text-[11px] font-mono font-semibold uppercase tracking-wider text-muted-foreground">
+                            {selectedResource ? `Properties - ${selectedResource.name}` : "Default Parameters"}
                           </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
+
+                          {schemaLoading ? (
+                            <div className="py-6 text-center text-[13px] font-mono text-muted-foreground">
+                              Loading parameters...
+                            </div>
+                          ) : schemaError ? (
+                            <div className="py-6 text-center text-[13px] font-mono text-destructive">
+                              Unable to load parameters for this {config.itemLabelSingular}.
+                            </div>
+                          ) : editableProperties.length === 0 ? (
+                            <div className="py-6 text-center text-[13px] font-mono text-muted-foreground">
+                              No configurable parameters.
+                            </div>
+                          ) : (
+                            <div className="-mx-1">
+                              {editableProperties.map((property) =>
+                                renderEditor(
+                                  toEditorProp(property),
+                                  schemaPropertyValues,
+                                  setSchemaPropertyValues,
+                                  emptyEditorContext,
+                                ),
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </section>
+
+                    {saveResourceError && (
+                      <div className="border border-destructive/30 bg-destructive/10 px-3 py-2 text-[13px] font-mono text-destructive">
+                        {saveResourceError}
+                      </div>
+                    )}
+
+                    {deleteResourceError && (
+                      <div className="border border-destructive/30 bg-destructive/10 px-3 py-2 text-[13px] font-mono text-destructive">
+                        {deleteResourceError}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex items-center justify-end gap-2 border-t border-border bg-muted/20 p-3">
+                    <button
+                      onClick={closeEditorModal}
+                      className="h-8 border border-border px-4 text-[13px] font-mono font-semibold text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleSave}
+                      disabled={
+                        !resourceName.trim() ||
+                        schemaLoading ||
+                        schemaError ||
+                        saveResourceLoading ||
+                        deleteResourceLoading
+                      }
+                      className="flex h-8 items-center gap-2 bg-primary px-4 text-[13px] font-mono font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <Zap size={12} />
+                      {saveResourceLoading
+                        ? selectedResource
+                          ? "Updating..."
+                          : "Adding..."
+                        : selectedResource
+                          ? `Update ${config.itemLabelCapitalized}`
+                          : `Add ${config.itemLabelCapitalized}`}
+                    </button>
+                  </div>
+                </aside>
               )}
             </div>
           </section>
         </div>
 
         <div className="flex h-12 items-center border-t border-border bg-muted/20 px-4">
-          <span className="text-[11px] font-mono text-muted-foreground">
-            Select an existing instance to edit it, or add a new one.
+          <span className="text-[12px] font-mono text-muted-foreground">
+            {activeBlade === "types"
+              ? `Choose a ${config.itemLabelSingular} type to continue.`
+              : activeBlade === "resources"
+                ? "Select an existing instance to edit it, or add a new one."
+                : `Configure and save the ${config.itemLabelSingular} resource.`}
           </span>
           <div className="ml-auto flex items-center gap-2">
             <button
               onClick={closePanel}
-              className="h-8 px-4 border border-border text-[12px] font-mono font-semibold text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors"
+              className="h-8 border border-border px-4 text-[13px] font-mono font-semibold text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
             >
               Close
             </button>
@@ -737,142 +1123,18 @@ function GenericResourcePanel({
         </div>
       </div>
 
-      {/* ─── Nested Add / Edit modal ─────────────────────────────────── */}
-      {isEditorOpen && selectedItem && (
-        <div
-          className="fixed inset-0 bg-black-700/75 flex items-center justify-center z-[60]"
-          onClick={closeEditorModal}
-        >
-          <div
-            className="bg-card border border-border w-[720px] max-w-[92vw] h-[520px] max-h-[85vh] flex flex-col shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex h-11 items-center justify-between border-b border-border bg-muted/30 px-4">
-              <div className="flex items-center gap-2">
-                <Icon size={15} className="text-primary shrink-0" />
-                <span className="text-[13px] font-semibold text-foreground">
-                  {selectedResource
-                    ? `Edit ${selectedResource.name}`
-                    : `New ${config.itemLabelCapitalized}`}
-                </span>
-              </div>
-              <button
-                onClick={closeEditorModal}
-                className="text-muted-foreground hover:text-foreground"
-                title="Close"
-              >
-                <X size={14} />
-              </button>
-            </div>
-
-            <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
-              <div className="space-y-5">
-                <div>
-                  <label className={labelCls}>Resource Name</label>
-                  <input
-                    ref={config.useNameInputRef ? resourceNameInputRef : undefined}
-                    value={resourceName}
-                    onChange={(e) => setResourceName(e.target.value)}
-                    placeholder="Resource name"
-                    title={resourceName}
-                    autoFocus
-                    className="h-9 w-full truncate bg-background border border-border px-3 text-[12px] font-mono text-foreground placeholder:text-muted-foreground outline-none focus:border-primary transition-colors"
-                  />
-                </div>
-
-                <div>
-                  <div className="mb-3 border-t border-border pt-3 text-[10px] font-mono font-semibold uppercase tracking-wider text-muted-foreground">
-                    {selectedResource ? `Properties — ${selectedResource.name}` : "Default Parameters"}
-                  </div>
-
-                  {saveResourceError && (
-                    <div className="mb-3 border border-destructive/30 bg-destructive/10 px-3 py-2 text-[12px] font-mono text-destructive">
-                      {saveResourceError}
-                    </div>
-                  )}
-
-                  {deleteResourceError && (
-                    <div className="mb-3 border border-destructive/30 bg-destructive/10 px-3 py-2 text-[12px] font-mono text-destructive">
-                      {deleteResourceError}
-                    </div>
-                  )}
-
-                  {schemaLoading ? (
-                    <div className="py-6 text-center text-[12px] font-mono text-muted-foreground">
-                      Loading parameters...
-                    </div>
-                  ) : schemaError ? (
-                    <div className="py-6 text-center text-[12px] font-mono text-destructive">
-                      Unable to load parameters for this {config.itemLabelSingular}.
-                    </div>
-                  ) : editableProperties.length === 0 ? (
-                    <div className="py-6 text-center text-[12px] font-mono text-muted-foreground">
-                      No configurable parameters.
-                    </div>
-                  ) : (
-                    <div className="-mx-1">
-                      {editableProperties.map((property) =>
-                        renderEditor(
-                          toEditorProp(property),
-                          schemaPropertyValues,
-                          setSchemaPropertyValues,
-                          emptyEditorContext,
-                        ),
-                      )}
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            <div className="flex h-12 items-center border-t border-border bg-muted/20 px-4">
-              <span className="text-[11px] font-mono text-muted-foreground">
-                {selectedResource ? config.footerUpdatedMessage : config.footerAddedMessage}
-              </span>
-              <div className="ml-auto flex items-center gap-2">
-                <button
-                  onClick={closeEditorModal}
-                  className="h-8 px-4 border border-border text-[12px] font-mono font-semibold text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleSave}
-                  disabled={
-                    !resourceName.trim() ||
-                    schemaLoading ||
-                    saveResourceLoading ||
-                    deleteResourceLoading
-                  }
-                  className="flex h-8 items-center gap-2 bg-primary px-4 text-[12px] font-mono font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  <Zap size={12} />
-                  {saveResourceLoading
-                    ? selectedResource
-                      ? "Updating..."
-                      : "Adding..."
-                    : selectedResource
-                      ? `Update ${config.itemLabelCapitalized}`
-                      : `Add ${config.itemLabelCapitalized}`}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* ─── Delete confirmation popup ───────────────────────────────── */}
       {resourcePendingDelete && (
         <div
-          className="fixed inset-0 bg-black/75 flex items-center justify-center z-[70]"
+          className="fixed inset-0 z-[70] flex items-center justify-center bg-black/75 backdrop-blur-[1px]"
           onClick={cancelDelete}
         >
           <div
-            className="bg-card border border-border w-[380px] max-w-[90vw] shadow-2xl"
+            className="w-[420px] max-w-[92vw] border border-border bg-card shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex h-11 items-center justify-between border-b border-border bg-muted/30 px-4">
-              <span className="text-[13px] font-semibold text-foreground">
+              <span className="text-[14px] font-semibold text-foreground">
                 Confirm Delete
               </span>
               <button
@@ -885,19 +1147,19 @@ function GenericResourcePanel({
             </div>
 
             <div className="px-5 py-5">
-              <p className="text-[13px] text-foreground">
+              <p className="text-[14px] text-foreground">
                 Are you sure you want to delete{" "}
                 <span className="font-mono font-semibold">
                   {config.getDisplayName(resourcePendingDelete) || resourcePendingDelete.name}
                 </span>
                 ?
               </p>
-              <p className="mt-1.5 text-[11px] text-muted-foreground">
+              <p className="mt-1.5 text-[12px] text-muted-foreground">
                 This action cannot be undone.
               </p>
 
               {deleteResourceError && (
-                <div className="mt-3 border border-destructive/30 bg-destructive/10 px-3 py-2 text-[12px] font-mono text-destructive">
+                <div className="mt-3 border border-destructive/30 bg-destructive/10 px-3 py-2 text-[13px] font-mono text-destructive">
                   {deleteResourceError}
                 </div>
               )}
@@ -907,14 +1169,14 @@ function GenericResourcePanel({
               <button
                 onClick={cancelDelete}
                 disabled={deleteResourceLoading}
-                className="h-8 px-4 border border-border text-[12px] font-mono font-semibold text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+                className="h-8 border border-border px-4 text-[13px] font-mono font-semibold text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
               >
                 No
               </button>
               <button
                 onClick={confirmDelete}
                 disabled={deleteResourceLoading}
-                className="flex h-8 items-center gap-2 bg-destructive px-4 text-[12px] bg-primary font-mono font-semibold text-destructive-foreground transition-colors  disabled:cursor-not-allowed disabled:opacity-50"
+                className="flex h-8 items-center gap-2 bg-destructive px-4 text-[13px] font-mono font-semibold text-destructive-foreground transition-colors disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <DeleteIcon size={12} />
                 {deleteResourceLoading ? "Deleting..." : "Yes, Delete"}
