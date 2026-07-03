@@ -24,10 +24,6 @@ import {
 } from "../../api/resources"; // adjust path
 import { renderEditor, type EditorContext } from "./PropertyEditors"; // adjust path
 
-/* ────────────────────────────────────────────────────────────────────────
- * Shared helpers (identical across the original three panels)
- * ──────────────────────────────────────────────────────────────────────── */
-
 const labelCls =
   "block text-[10px] font-mono font-semibold text-muted-foreground uppercase tracking-wider mb-1.5";
 
@@ -81,8 +77,6 @@ const getBlankValue = (property: ResourceSchemaProperty): any => {
   }
 };
 
-// Only needed by the Connections flavor: some backends send a numeric index
-// (or numeric-looking string) instead of the enum label itself.
 const coercePropertyValue = (property: ResourceSchemaProperty, rawValue: any): any => {
   const enumValues = property.enumValues ?? [];
   if (enumValues.length > 0) {
@@ -107,11 +101,6 @@ const getResourceDisplayName = (resource: Resource) =>
   resource.properties?.name ||
   String((resource as any).dutName ?? (resource as any).model ?? resource.type ?? "");
 
-/* ────────────────────────────────────────────────────────────────────────
- * Per-kind configuration — this is the only thing that differs between
- * Instruments / DUTs / Connections. Everything else is shared logic below.
- * ──────────────────────────────────────────────────────────────────────── */
-
 type ResourceKind = "instrument" | "duts" | "connections";
 
 interface KindConfig {
@@ -129,15 +118,10 @@ interface KindConfig {
   footerAddedMessage: string; // "Will be added to the Instruments panel"
   footerUpdatedMessage: string; // "Will update the selected instrument resource"
   deleteIcon: (props: { size: number; className?: string }) => ReactElement;
-  /** Resolve the pluginTypeName / schema key used to fetch schema + save. */
   resolveTypeName: (item: any) => string;
-  /** Predicate to decide whether a Resource belongs to the selected item. */
   matchesResource: (resource: Resource, item: any, typeName: string) => boolean;
-  /** Display name shown on a resource "chip". */
   getDisplayName: (resource: Resource) => string;
-  /** Whether to coerce enum values coming back from the API (Connections only). */
   coerceEnums?: boolean;
-  /** Whether the name input uses an uncontrolled ref fallback on save. */
   useNameInputRef?: boolean;
 }
 
@@ -216,7 +200,7 @@ const CONFIGS: Record<ResourceKind, KindConfig> = {
     noInstancesMessage: "No existing instances of this connection.",
     footerAddedMessage: "Will be added to the Connections panel",
     footerUpdatedMessage: "Will update the selected connection resource",
-    deleteIcon: (p) => <XCircle {...p} />,
+    deleteIcon: (p) => <Trash2 {...p} />,
     resolveTypeName: (item) => String(item?.name ?? "").trim(),
     matchesResource: (resource, item) => {
       const selectedType = extractTypeName(String(item?.name ?? "")).toLowerCase();
@@ -228,10 +212,6 @@ const CONFIGS: Record<ResourceKind, KindConfig> = {
     useNameInputRef: false,
   },
 };
-
-/* ────────────────────────────────────────────────────────────────────────
- * Generic panel — implements the shared behavior for all three kinds
- * ──────────────────────────────────────────────────────────────────────── */
 
 interface GenericResourcePanelProps {
   config: KindConfig;
@@ -256,16 +236,11 @@ function GenericResourcePanel({
   const [resourceName, setResourceName] = useState("");
   const resourceNameInputRef = useRef<HTMLInputElement>(null);
 
-  // ─── Nested add/edit modal visibility ─────────────────────────────────
   const [isEditorOpen, setIsEditorOpen] = useState(false);
-
-  // ─── Schema state (property definitions for the selected item type) ──────
   const [schemaProperties, setSchemaProperties] = useState<ResourceSchemaProperty[]>([]);
   const [schemaPropertyValues, setSchemaPropertyValues] = useState<Record<string, any>>({});
   const [schemaLoading, setSchemaLoading] = useState(false);
   const [schemaError, setSchemaError] = useState(false);
-
-  // ─── Resource (existing instance) state ───────────────────────────────────
   const [resources, setResources] = useState<Resource[]>([]);
   const [resourcesLoading, setResourcesLoading] = useState(false);
   const [resourcesError, setResourcesError] = useState(false);
@@ -302,10 +277,8 @@ function GenericResourcePanel({
     setSaveResourceError("");
     setDeleteResourceError("");
     setIsEditorOpen(false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedItem?.name, selectedItem?.assembly]);
 
-  // ─── Fetch schema whenever the selected item type changes ────────────────
   useEffect(() => {
     if (!selectedTypeName) {
       setSchemaProperties([]);
@@ -410,7 +383,6 @@ function GenericResourcePanel({
     setIsEditorOpen(true);
   };
 
-  // ─── Clicking a resource card loads its live values and opens the editor ─
   const selectResource = (resource: Resource) => {
     setSelectedResourceId(resource.id);
     setResourceName(resource.name);
@@ -954,12 +926,6 @@ function GenericResourcePanel({
     </div>
   );
 }
-
-/* ────────────────────────────────────────────────────────────────────────
- * Public components — same names/props as the original three files, so
- * existing imports (e.g. `import { InstrumentsPanel } from ".../InstrumentsPanel"`)
- * keep working if you just re-point them at this file.
- * ──────────────────────────────────────────────────────────────────────── */
 
 interface InstrumentsPanelProps {
   instruments: any[];
