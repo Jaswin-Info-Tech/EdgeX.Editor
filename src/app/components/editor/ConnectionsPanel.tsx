@@ -126,12 +126,6 @@ export function ConnectionsPanel({
         setDeleteResourceError("");
     }, [selectedConnection?.name, selectedConnection?.assembly]);
 
-useEffect(() => {
-  console.log("selectedConnection.name:", selectedConnection?.name);
-  console.log("all resources:", resources);
-  console.log("resource types seen:", resources.map(r => r.type));
-}, [resources, selectedConnection]);
-
     const getBlankValue = (property: ResourceSchemaProperty): any => {
         const hasEnum = (property.enumValues?.length ?? 0) > 0;
         if (hasEnum) return "";
@@ -141,6 +135,23 @@ useEffect(() => {
             default:
                 return "";
         }
+    };
+
+    const coercePropertyValue = (property: ResourceSchemaProperty, rawValue: any): any => {
+        const enumValues = property.enumValues ?? [];
+        if (enumValues.length > 0) {
+            if (typeof rawValue === "number" && enumValues[rawValue] !== undefined) {
+                return enumValues[rawValue];
+            }
+            // Some backends send a numeric-looking string ("0") instead of a number
+            if (typeof rawValue === "string" && /^\d+$/.test(rawValue) && enumValues[Number(rawValue)] !== undefined) {
+                
+                return enumValues[Number(rawValue)];
+            }
+            // Already a valid label, or unrecognized — pass through as-is
+            return rawValue;
+        }
+        return rawValue;
     };
 
     // ─── Fetch schema whenever the selected connection type changes ──────────
@@ -240,6 +251,7 @@ useEffect(() => {
 
     // ─── Clicking a resource card loads its live values into the editors ─────
     const selectResource = (resource: Resource) => {
+
         // Clicking the already-selected resource deselects it and blanks the form
         if (resource.id === selectedResourceId) {
             setSelectedResourceId("");
@@ -258,8 +270,14 @@ useEffect(() => {
         setSchemaPropertyValues((prev) => {
             const next = { ...prev };
             schemaProperties.forEach((property) => {
-                if (resource.properties && property.name in resource.properties) {
-                    next[property.name] = resource.properties[property.name] ?? getBlankValue(property);
+                const hasProp = !!resource.properties && property.name in resource.properties;
+
+                if (hasProp) {
+                    const rawValue = resource.properties[property.name];
+                    next[property.name] =
+                        rawValue !== null && rawValue !== undefined
+                            ? coercePropertyValue(property, rawValue)
+                            : getBlankValue(property);
                 } else {
                     next[property.name] = getBlankValue(property);
                 }
@@ -503,10 +521,11 @@ useEffect(() => {
                                                         <button
                                                             key={resource.id}
                                                             onClick={() => selectResource(resource)}
-                                                            className={`flex items-center gap-2 border px-3 py-2 text-left transition-colors ${isSelected
+                                                            className={`flex max-w-[85px] items-center gap-2 border px-3 py-2 text-left transition-colors ${isSelected
                                                                 ? "border-primary bg-secondary"
                                                                 : "border-border bg-background hover:bg-secondary/60"
                                                                 }`}
+                                                            title={resource.name}
                                                         >
                                                             {hasError ? (
                                                                 <XCircle size={13} className="shrink-0 text-destructive" />
