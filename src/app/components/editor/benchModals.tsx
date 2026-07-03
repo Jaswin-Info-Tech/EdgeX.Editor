@@ -274,6 +274,7 @@ function GenericResourcePanel({
   const [saveResourceError, setSaveResourceError] = useState("");
   const [deleteResourceLoading, setDeleteResourceLoading] = useState(false);
   const [deleteResourceError, setDeleteResourceError] = useState("");
+  const [resourcePendingDelete, setResourcePendingDelete] = useState<Resource | null>(null);
 
   const selectedItem = useMemo(
     () =>
@@ -511,25 +512,37 @@ function GenericResourcePanel({
     }
   };
 
-  const handleDelete = async () => {
-    if (!selectedResource) return;
+  const requestDelete = (resource: Resource) => {
+    setResourcePendingDelete(resource);
+  };
+
+  const cancelDelete = () => {
+    setResourcePendingDelete(null);
+  };
+
+  const confirmDelete = async () => {
+    const resourceToDelete = resourcePendingDelete;
+    if (!resourceToDelete) return;
 
     setDeleteResourceLoading(true);
     setDeleteResourceError("");
     setSaveResourceError("");
-    const toastId = toast.loading(`Deleting ${selectedResource.name}...`);
+    const toastId = toast.loading(`Deleting ${resourceToDelete.name}...`);
 
     try {
       await deleteResource({
         resourceKind: config.resourceKind,
-        name: selectedResource.name,
+        name: resourceToDelete.name,
       });
 
       const updatedResources = await getResources();
       setResources(updatedResources);
-      resetToBlank();
-      setIsEditorOpen(false);
-      toast.success(`${selectedResource.name} deleted successfully`, { id: toastId });
+      if (resourceToDelete.id === selectedResourceId) {
+        resetToBlank();
+        setIsEditorOpen(false);
+      }
+      toast.success(`${resourceToDelete.name} deleted successfully`, { id: toastId });
+      setResourcePendingDelete(null);
     } catch (error) {
       const message =
         error instanceof Error
@@ -679,11 +692,19 @@ function GenericResourcePanel({
                           `Unnamed ${config.itemLabelCapitalized}`;
 
                         return (
-                          <button
+                          <div
                             key={resource.id}
+                            role="button"
+                            tabIndex={0}
                             title={displayName}
                             onClick={() => selectResource(resource)}
-                            className={`flex h-24 w-full items-center gap-3 border px-5 py-5 text-left transition-colors ${isSelected
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" || e.key === " ") {
+                                e.preventDefault();
+                                selectResource(resource);
+                              }
+                            }}
+                            className={`flex h-28 w-full cursor-pointer items-center gap-3 border px-5 py-5 text-left transition-colors ${isSelected
                               ? "border-primary bg-secondary"
                               : "border-border bg-background hover:bg-secondary/60"
                               }`}
@@ -697,6 +718,9 @@ function GenericResourcePanel({
                               <div className="truncate text-[14px] font-mono font-semibold text-foreground">
                                 {displayName}
                               </div>
+                              <div className="mt-0.5 truncate text-[11px] font-mono text-muted-foreground/80">
+                                {extractTypeName(String(resource.type ?? "")) || resource.type}
+                              </div>
                               <div
                                 className={`mt-1 text-[12px] font-mono ${hasError ? "text-destructive" : "text-muted-foreground"
                                   }`}
@@ -704,7 +728,18 @@ function GenericResourcePanel({
                                 {resource.status}
                               </div>
                             </div>
-                          </button>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                requestDelete(resource);
+                              }}
+                              disabled={deleteResourceLoading}
+                              className="ml-2 flex h-8 w-8 shrink-0 items-center justify-center text-primary text-destructive transition-colors  disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              <DeleteIcon size={15} />
+                            </button>
+                          </div>
                         );
                       })}
                     </div>
@@ -823,16 +858,6 @@ function GenericResourcePanel({
                 {selectedResource ? config.footerUpdatedMessage : config.footerAddedMessage}
               </span>
               <div className="ml-auto flex items-center gap-2">
-                {selectedResource && (
-                  <button
-                    onClick={handleDelete}
-                    disabled={deleteResourceLoading || saveResourceLoading}
-                    className="flex h-8 items-center gap-2 border border-destructive/50 px-4 text-[12px] font-mono font-semibold text-destructive transition-colors hover:bg-destructive/10 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    <DeleteIcon size={12} />
-                    {deleteResourceLoading ? "Deleting..." : "Delete"}
-                  </button>
-                )}
                 <button
                   onClick={closeEditorModal}
                   className="h-8 px-4 border border-border text-[12px] font-mono font-semibold text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors"
@@ -859,6 +884,69 @@ function GenericResourcePanel({
                       : `Add ${config.itemLabelCapitalized}`}
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── Delete confirmation popup ───────────────────────────────── */}
+      {resourcePendingDelete && (
+        <div
+          className="fixed inset-0 bg-black/75 flex items-center justify-center z-[70]"
+          onClick={cancelDelete}
+        >
+          <div
+            className="bg-card border border-border w-[380px] max-w-[90vw] shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex h-11 items-center justify-between border-b border-border bg-muted/30 px-4">
+              <span className="text-[13px] font-semibold text-foreground">
+                Confirm Delete
+              </span>
+              <button
+                onClick={cancelDelete}
+                className="text-muted-foreground hover:text-foreground"
+                title="Close"
+              >
+                <X size={14} />
+              </button>
+            </div>
+
+            <div className="px-5 py-5">
+              <p className="text-[13px] text-foreground">
+                Are you sure you want to delete{" "}
+                <span className="font-mono font-semibold">
+                  {config.getDisplayName(resourcePendingDelete) || resourcePendingDelete.name}
+                </span>
+                ?
+              </p>
+              <p className="mt-1.5 text-[11px] text-muted-foreground">
+                This action cannot be undone.
+              </p>
+
+              {deleteResourceError && (
+                <div className="mt-3 border border-destructive/30 bg-destructive/10 px-3 py-2 text-[12px] font-mono text-destructive">
+                  {deleteResourceError}
+                </div>
+              )}
+            </div>
+
+            <div className="flex h-12 items-center justify-end gap-2 border-t border-border bg-muted/20 px-4">
+              <button
+                onClick={cancelDelete}
+                disabled={deleteResourceLoading}
+                className="h-8 px-4 border border-border text-[12px] font-mono font-semibold text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                No
+              </button>
+              <button
+                onClick={confirmDelete}
+                disabled={deleteResourceLoading}
+                className="flex h-8 items-center gap-2 bg-destructive px-4 text-[12px] bg-primary font-mono font-semibold text-destructive-foreground transition-colors  disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <DeleteIcon size={12} />
+                {deleteResourceLoading ? "Deleting..." : "Yes, Delete"}
+              </button>
             </div>
           </div>
         </div>
