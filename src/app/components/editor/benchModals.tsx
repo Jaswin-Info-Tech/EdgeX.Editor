@@ -219,15 +219,9 @@ const CONFIGS: Record<ResourceKind, KindConfig> = {
     deleteIcon: (p) => <XCircle {...p} />,
     resolveTypeName: (item) => String(item?.name ?? "").trim(),
     matchesResource: (resource, item) => {
-      const selectedNameLower = String(item?.name ?? "").toLowerCase();
-      const typeName = extractTypeName(String(resource.type ?? "")).toLowerCase();
-      const instrumentName = String((resource as any).instrument ?? "").toLowerCase();
-      const rawType = String(resource.type ?? "").toLowerCase();
-      return (
-        typeName === selectedNameLower ||
-        instrumentName === selectedNameLower ||
-        rawType.includes(selectedNameLower)
-      );
+      const selectedType = extractTypeName(String(item?.name ?? "")).toLowerCase();
+      const resourceType = extractTypeName(String(resource.type ?? "")).toLowerCase();
+      return resourceType === selectedType;
     },
     getDisplayName: (resource) => resource.name,
     coerceEnums: true,
@@ -676,7 +670,7 @@ function GenericResourcePanel({
                       {config.noInstancesMessage}
                     </div>
                   ) : (
-                    <div className="flex flex-wrap gap-3">
+                    <div className="grid grid-cols-2 gap-4">
                       {matchingResources.map((resource) => {
                         const isSelected = resource.id === selectedResourceId;
                         const hasError = resource.status === "Error";
@@ -689,22 +683,22 @@ function GenericResourcePanel({
                             key={resource.id}
                             title={displayName}
                             onClick={() => selectResource(resource)}
-                            className={`flex w-[160px] items-center gap-3 border px-4 py-4 text-left transition-colors ${isSelected
+                            className={`flex h-24 w-full items-center gap-3 border px-5 py-5 text-left transition-colors ${isSelected
                               ? "border-primary bg-secondary"
                               : "border-border bg-background hover:bg-secondary/60"
                               }`}
                           >
                             {hasError ? (
-                              <XCircle size={18} className="shrink-0 text-destructive" />
+                              <XCircle size={22} className="shrink-0 text-destructive" />
                             ) : (
-                              <CheckCircle2 size={18} className="shrink-0 text-emerald-500" />
+                              <CheckCircle2 size={22} className="shrink-0 text-emerald-500" />
                             )}
                             <div className="min-w-0 flex-1">
-                              <div className="truncate text-[13px] font-mono font-semibold text-foreground">
+                              <div className="truncate text-[14px] font-mono font-semibold text-foreground">
                                 {displayName}
                               </div>
                               <div
-                                className={`mt-0.5 text-[11px] font-mono ${hasError ? "text-destructive" : "text-muted-foreground"
+                                className={`mt-1 text-[12px] font-mono ${hasError ? "text-destructive" : "text-muted-foreground"
                                   }`}
                               >
                                 {resource.status}
@@ -739,11 +733,11 @@ function GenericResourcePanel({
       {/* ─── Nested Add / Edit modal ─────────────────────────────────── */}
       {isEditorOpen && selectedItem && (
         <div
-          className="fixed inset-0 bg-black/75 flex items-center justify-center z-[60]"
+          className="fixed inset-0 bg-black-700/75 flex items-center justify-center z-[60]"
           onClick={closeEditorModal}
         >
           <div
-            className="bg-card border border-border w-[560px] max-w-[92vw] h-[480px] max-h-[85vh] flex flex-col shadow-2xl"
+            className="bg-card border border-border w-[720px] max-w-[92vw] h-[520px] max-h-[85vh] flex flex-col shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex h-11 items-center justify-between border-b border-border bg-muted/30 px-4">
