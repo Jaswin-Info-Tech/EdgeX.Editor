@@ -217,20 +217,21 @@ export function ConnectionsPanel({
     }, []);
 
     // ─── Resources that match the currently selected connection type ─────────
-    const matchingResources = useMemo(() => {
-        if (!selectedConnection?.name) return [];
-        const selectedNameLower = String(selectedConnection.name ?? "").toLowerCase();
-        return resources.filter((resource) => {
-            const typeName = extractTypeName(String(resource.type ?? "")).toLowerCase();
-            const instrumentName = String(resource.instrument ?? "").toLowerCase();
-            const rawType = String(resource.type ?? "").toLowerCase();
-            return (
-                typeName === selectedNameLower ||
-                instrumentName === selectedNameLower ||
-                rawType.includes(selectedNameLower)
-            );
-        });
-    }, [resources, selectedConnection?.name]);
+const matchingResources = useMemo(() => {
+  if (!selectedConnection) return [];
+
+  const selectedType = extractTypeName(
+    String(selectedConnection.name)
+  ).toLowerCase();
+
+  return resources.filter((resource) => {
+    const resourceType = extractTypeName(
+      String(resource.type ?? "")
+    ).toLowerCase();
+
+    return resourceType === selectedType;
+  });
+}, [resources, selectedConnection]);
 
     const selectedResource = useMemo(
         () => matchingResources.find((r) => r.id === selectedResourceId) ?? null,
