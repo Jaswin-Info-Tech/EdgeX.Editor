@@ -32,12 +32,12 @@ const propsArrayToMap = (properties: any): Record<string, any> => {
 export const getResources = async (): Promise<Resource[]> => {
   try {
     const response = await axiosClient.get('plugins/resources');
-    
-    // Handle the API response structure
     const data = response.data;
-    
-    // If response has instruments array
+    const combined: Resource[] = [];
+
+    // Instruments
     if (data.instruments && Array.isArray(data.instruments)) {
+
       return data.instruments.map((instrument: any, index: number) => {
         const propsMap = propsArrayToMap(instrument.properties);
         return {
@@ -53,6 +53,39 @@ export const getResources = async (): Promise<Resource[]> => {
     }
 
     // If response is directly an array of resources
+
+
+    // DUTs
+    if (data.duts && Array.isArray(data.duts)) {
+      combined.push(
+        ...data.duts.map((resource: any, index: number) => ({
+          id: String(resource.id ?? resource.name ?? resource.dutName ?? `dut-${index}`),
+          name:
+            String(
+              resource.name ||
+              resource.properties?.Name ||
+              resource.properties?.name ||
+              resource.dutName ||
+              resource.model ||
+              extractTypeName(resource.type ?? resource.properties?.type ?? "")
+            ) || `DUT ${index}`,
+          instrument: String(
+            resource.instrument ?? extractTypeName(resource.type ?? resource.properties?.type ?? ""),
+          ),
+          status:
+            String(resource.status ?? "").trim() ||
+            (resource.properties?.Error ? "Error" : "Active"),
+          type: String(resource.type ?? resource.properties?.type ?? ""),
+          properties: resource.properties ?? {},
+          ...resource,
+        })),
+      );
+    }
+
+    if (combined.length > 0) {
+      return combined;
+    }
+
     if (Array.isArray(data)) {
       return data.map((item: any, index: number) => {
         const propsMap = propsArrayToMap(item.properties);
@@ -67,7 +100,6 @@ export const getResources = async (): Promise<Resource[]> => {
       });
     }
 
-    // If response is a single object with resources
     if (data.resources && Array.isArray(data.resources)) {
       return data.resources.map((resource: any, index: number) => {
         const propsMap = propsArrayToMap(resource.properties);
@@ -149,7 +181,7 @@ export const deleteResource = async (payload: DeleteResourcePayload) => {
 
 export const getResourceSchema = async (
   pluginTypeName: string,
-  resourceKind: string = 'Instrument',
+  resourceKind: string = 'instrument',
 ): Promise<ResourceSchema> => {
   try {
     const response = await axiosClient.get('plugins/resources/schema', {
