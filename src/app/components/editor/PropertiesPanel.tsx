@@ -149,36 +149,50 @@ const editorContext = useMemo<EditorContext>(() => {
   const schemaRecords = useMemo(() => getSchemaRecords(schemaResponse), [schemaResponse]);
   const schemaProperties = useMemo(() => schemaRecords[0]?.properties ?? [], [schemaRecords]);
 
-  useEffect(() => {
-    if (!selectedStep) { setSchemaPropertyValues({}); return; }
-    const values: Record<string, any> = {};
-    schemaProperties.forEach((prop: any) => {
-      const key = getSchemaPropertyKey(prop);
-      const existing = selectedStep.properties?.find((item: any) => item.key === key);
-      const value = existing?.value;
+useEffect(() => {
+  if (!selectedStep) {
+    setSchemaPropertyValues({});
+    return;
+  }
+  const values: Record<string, any> = {};
+  schemaProperties.forEach((prop: any) => {
+    const key = getSchemaPropertyKey(prop);
+    const existing = selectedStep.properties?.find(
+      (item: any) => item.key === key,
+    );
+    const value = existing?.value;
 
-      const isEnabledWrapper =
-        prop.propertyType?.includes("OpenTap.Enabled") ||
-        prop.fullTypeName?.includes("OpenTap.Enabled");
+    const isEnabledWrapper =
+      prop.propertyType?.includes("OpenTap.Enabled") ||
+      prop.fullTypeName?.includes("OpenTap.Enabled");
 
-      if (isEnabledWrapper && value && typeof value === "object") {
-        values[prop.name] = value.Value ?? "";
-      } else if (
-        prop.editorType === "instrument-selector" &&
-        value &&
-        typeof value === "object"
-      ) {
-        values[prop.name] = value.Name ?? "";
-      } else if (prop.name === "CommandType") {
-        values[prop.name] = Array.isArray(value) ? value : [];
-      } else if (isObjectLikeEditor(prop)) {
-        values[prop.name] = value ?? null;
-      } else {
-        values[prop.name] = value ?? (prop.editorType === "checkbox" ? false : "");
-      }
-    });
-    setSchemaPropertyValues(values);
-  }, [selectedStep, schemaProperties]);
+    const isNameProp =
+      String(prop.name || prop.displayName || "").toLowerCase() === "name";
+
+    if (isEnabledWrapper && value && typeof value === "object") {
+      values[prop.name] = value.Value ?? "";
+    } else if (
+      prop.editorType === "instrument-selector" &&
+      value &&
+      typeof value === "object"
+    ) {
+      values[prop.name] = value.Name ?? "";
+    } else if (prop.name === "CommandType") {
+      values[prop.name] = Array.isArray(value) ? value : [];
+    } else if (isObjectLikeEditor(prop)) {
+      values[prop.name] = value ?? null;
+    } else if (isNameProp) {
+      // Fall back to the step's real name instead of blanking it out,
+      // and self-heal any previously-saved empty value.
+      const hasRealValue = value != null && String(value).trim() !== "";
+      values[prop.name] = hasRealValue ? value : (selectedStep.name ?? "");
+    } else {
+      values[prop.name] =
+        value ?? (prop.editorType === "checkbox" ? false : "");
+    }
+  });
+  setSchemaPropertyValues(values);
+}, [selectedStep, schemaProperties]);
 
 
   const getTypedValue = (prop: any, value: any) => {
