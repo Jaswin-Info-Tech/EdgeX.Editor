@@ -17,6 +17,25 @@ import { TYPE_LABEL, TYPE_STRIPE } from "../../constants/editor";
 import { deleteIn, formatFreq, moveIn, updateIn } from "../../utils/editor";
 import { StatusIcon, StatusPill, TypeIcon } from "./atoms";
 
+function canAcceptChildSteps(step: TestStep) {
+  const rawTypeText = [
+    step.stepTypeName,
+    step.typeName,
+    step.fullName,
+    step.className,
+    step.name,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+
+  return (
+    step.type === "sequence" ||
+    Array.isArray(step.children) ||
+    /sequence|dialog|parallel|if|lock|flow|group/.test(rawTypeText)
+  );
+}
+
 interface DropTarget {
   parentId: string | null;
   idx: number;
@@ -28,6 +47,7 @@ interface SequenceStepProps {
   step: TestStep;
   parentId: string | null;
   idx: number;
+  orderPath: string;
   selectedId: any;
   expanded: any;
   renaming: any;
@@ -42,11 +62,6 @@ interface SequenceStepProps {
   isTablet: any;
   setRightOpen: any;
   dragLibItem: any;
-  dropIdx: any;
-  setDropIdx: any;
-  dragOverSequenceId: string | null;
-  setDragOverSequenceId: (id: string | null) => void;
-  handleSeqDrop: any;
   setPlan: any;
   setAddStepParentId: any;
   setAddStepIdx: any;
@@ -55,6 +70,10 @@ interface SequenceStepProps {
   setDraggedStepId: (id: string | null) => void;
   dropTarget: DropTarget | null;
   onStepDragStart: (stepId: string, e: React.MouseEvent) => void;
+  onLibraryDragOverStep: (rowId: string, clientY: number, rowEl: HTMLElement) => void;
+  onLibraryDropOnStep: (event: React.DragEvent, rowId: string, clientY: number, rowEl: HTMLElement) => void;
+  onLibraryDragOverChildLane: (rowId: string) => void;
+  onLibraryDropOnChildLane: (event: React.DragEvent, rowId: string) => void;
   handleStepReorder: (
     stepId: string,
     newParentId: string | null,
@@ -67,6 +86,7 @@ export function SequenceStep(props: SequenceStepProps) {
     step,
     parentId,
     idx,
+    orderPath,
     selectedId,
     expanded,
     renaming,
@@ -81,11 +101,6 @@ export function SequenceStep(props: SequenceStepProps) {
     isTablet,
     setRightOpen,
     dragLibItem,
-    dropIdx,
-    setDropIdx,
-    dragOverSequenceId,
-    setDragOverSequenceId,
-    handleSeqDrop,
     setPlan,
     setAddStepParentId,
     setAddStepIdx,
@@ -93,6 +108,10 @@ export function SequenceStep(props: SequenceStepProps) {
     draggedStepId,
     dropTarget,
     onStepDragStart,
+    onLibraryDragOverStep,
+    onLibraryDropOnStep,
+    onLibraryDragOverChildLane,
+    onLibraryDropOnChildLane,
   } = props;
 
   const renderSeqStep = (
@@ -104,21 +123,20 @@ export function SequenceStep(props: SequenceStepProps) {
     const hasKids = !!step.children?.length;
     const isExp = expanded.has(step.id);
     const stripe = TYPE_STRIPE[step.type] || "#64748b";
-    const isSequence = step.type === "sequence";
+    const canHaveChildren = canAcceptChildSteps(step);
 
     const rowRef = useRef<HTMLDivElement>(null);
 
     const isBeingDragged = draggedStepId === step.id;
     const isAnyDragActive = !!dragLibItem;
-    const isLibDropTargetRow =
-      isSequence && isAnyDragActive && dragOverSequenceId === step.id;
-
     const isReorderDropBefore =
       dropTarget?.rowId === step.id && dropTarget.mode === "before";
     const isReorderDropAfter =
       dropTarget?.rowId === step.id && dropTarget.mode === "after";
     const isReorderDropInto =
       dropTarget?.rowId === step.id && dropTarget.mode === "into";
+    const isActiveLibraryTarget = isAnyDragActive && dropTarget?.rowId === step.id;
+    const showChildLane = canHaveChildren && isActiveLibraryTarget;
 
     const summaryProp =
       step.properties.find((p: any) => p.key?.includes("inst")) ??
@@ -136,27 +154,8 @@ export function SequenceStep(props: SequenceStepProps) {
           ? formatFreq(value as number)
           : `${value ?? ""}${summaryProp?.unit ? ` ${summaryProp.unit}` : ""}`;
 
-    const onLibDrop = (
-      e: any,
-      targetParentId: string | null,
-      targetIdx: number,
-    ) => {
-      e.stopPropagation();
-      if (dragLibItem) handleSeqDrop(e, targetParentId, targetIdx);
-    };
-
     return (
-      <div key={step.id} ref={rowRef} data-step-row={step.id}>
-          <div
-            className={`
-        overflow-hidden
-        transition-all
-        duration-150
-        ${isReorderDropBefore ? "h-8" : "h-0"}
-    `}
-          >
-            <div className="h-[2px] bg-primary mt-3 rounded-full " />
-          </div>
+      <div key={step.id} ref={rowRef} data-step-row={step.id} className="relative">
         <div
           onClick={(e) => {
             e.stopPropagation();
@@ -172,35 +171,46 @@ export function SequenceStep(props: SequenceStepProps) {
             setSelectedId(step.id);
           }}
           onDragOver={(e) => {
-            if (isSequence && isAnyDragActive) {
+            if (isAnyDragActive && rowRef.current) {
               e.preventDefault();
               e.stopPropagation();
-              setDragOverSequenceId(step.id);
-            }
-          }}
-          onDragLeave={(e) => {
-            if (isSequence && dragOverSequenceId === step.id) {
-              e.stopPropagation();
-              setDragOverSequenceId(null);
+              e.dataTransfer.dropEffect = "copy";
+              onLibraryDragOverStep(step.id, e.clientY, rowRef.current);
             }
           }}
           onDrop={(e) => {
-            if (isSequence && isAnyDragActive) {
+            if (isAnyDragActive && rowRef.current) {
               e.preventDefault();
-              onLibDrop(e, step.id, step.children?.length ?? 0);
-              setDragOverSequenceId(null);
-              setDropIdx(null);
+              e.stopPropagation();
+              onLibraryDropOnStep(e, step.id, e.clientY, rowRef.current);
             }
           }}
-          className={`flex items-stretch border-b border-border cursor-pointer group transition-colors
+          className={`relative flex items-stretch border-b border-border cursor-pointer group transition-colors
             ${isSel ? "bg-primary/8" : "hover:bg-secondary/60"}
-            ${isLibDropTargetRow || isReorderDropInto ? "bg-primary/15 ring-1 ring-inset ring-primary" : ""}
+            ${isReorderDropInto ? "bg-primary/15 ring-1 ring-inset ring-primary" : ""}
             ${isBeingDragged ? "opacity-30" : ""}
             ${step.status === "running" ? "bg-yellow-500/5" : ""}
             ${step.status === "passed" ? "bg-emerald-500/5" : ""}
             ${step.status === "failed" ? "bg-red-500/5" : ""}
             ${!step.enabled ? "opacity-40" : ""}`}
         >
+          {isReorderDropBefore && (
+            <div className="pointer-events-none absolute inset-x-0 top-0 z-20 -translate-y-1/2 px-2">
+              <div className="flex items-center gap-2">
+                <div className="h-[2px] flex-1 rounded-full bg-primary" />
+                <span className="shrink-0 border border-primary/30 bg-primary/10 px-2 py-0.5 text-[10px] font-mono font-semibold text-primary shadow-sm">
+                  Insert before
+                </span>
+              </div>
+            </div>
+          )}
+          {isReorderDropInto && (
+            <div className="pointer-events-none absolute inset-x-6 top-1 z-10 flex justify-center">
+              <span className="border border-primary/30 bg-primary/10 px-2 py-0.5 text-[10px] font-mono font-semibold text-primary shadow-sm">
+                Add as child
+              </span>
+            </div>
+          )}
           <div
             className="w-[3px] shrink-0 transition-colors"
             style={{
@@ -240,6 +250,10 @@ export function SequenceStep(props: SequenceStepProps) {
               />
             </div>
             <TypeIcon type={step.type} size={13} />
+
+            <span className={`shrink-0 border px-1.5 py-0 text-[10px] font-mono ${isSel ? "border-primary/40 bg-primary/10 text-primary" : "border-border bg-background text-muted-foreground"}`}>
+              {orderPath}
+            </span>
 
             {step.breakpoint && (
               <span
@@ -301,6 +315,32 @@ export function SequenceStep(props: SequenceStepProps) {
             <button
               onClick={(e) => {
                 e.stopPropagation();
+                setAddStepParentId(parentId);
+                setAddStepIdx(idx + 1);
+                setShowAddStep(true);
+              }}
+              className="p-1 text-muted-foreground hover:text-foreground hover:bg-secondary"
+              title="Add step after"
+            >
+              <Plus size={11} />
+            </button>
+            {canHaveChildren && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setAddStepParentId(step.id);
+                  setAddStepIdx(step.children?.length ?? 0);
+                  setShowAddStep(true);
+                }}
+                className="p-1 text-muted-foreground hover:text-foreground hover:bg-secondary"
+                title="Add child step"
+              >
+                <Plus size={11} className="text-primary" />
+              </button>
+            )}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
                 setPlan((prev: any) => moveIn(prev, step.id, "up"));
               }}
               className="p-1 text-muted-foreground hover:text-foreground hover:bg-secondary"
@@ -351,17 +391,58 @@ export function SequenceStep(props: SequenceStepProps) {
               <Trash2 size={11} />
             </button>
           </div>
+          {isReorderDropAfter && (
+            <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 translate-y-1/2 px-2">
+              <div className="flex items-center gap-2">
+                <div className="h-[2px] flex-1 rounded-full bg-primary" />
+                <span className="shrink-0 border border-primary/30 bg-primary/10 px-2 py-0.5 text-[10px] font-mono font-semibold text-primary shadow-sm">
+                  Insert after
+                </span>
+              </div>
+            </div>
+          )}
         </div>
+        {showChildLane && (
           <div
-            className={`
-        overflow-hidden
-        transition-all
-        duration-150
-        ${isReorderDropAfter ? "h-8" : "h-0"}
-    `}
+            data-child-drop-lane={step.id}
+            onDragOver={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              e.dataTransfer.dropEffect = "copy";
+              onLibraryDragOverChildLane(step.id);
+            }}
+            onDrop={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onLibraryDropOnChildLane(e, step.id);
+            }}
+            className={`ml-6 border-b px-3 py-2 transition-all duration-150 ${
+              isReorderDropInto
+                ? "border-primary/40 bg-primary/10"
+                : "border-transparent bg-transparent hover:border-primary/20 hover:bg-primary/[0.03]"
+            }`}
           >
-            <div className="h-[2px] bg-primary mt-3 rounded-full" />
+            <div
+              className={`ml-3 flex items-center gap-2 border border-dashed px-3 py-2 ${
+                isReorderDropInto
+                  ? "border-primary/40 bg-primary/10 shadow-[inset_0_0_0_1px_rgba(59,130,246,0.08)]"
+                  : "border-border/60 bg-muted/10"
+              }`}
+            >
+              <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-sm border border-border/70 bg-background text-[10px] font-mono text-muted-foreground">
+                +
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className={`text-[10px] font-mono font-semibold uppercase tracking-wider ${isReorderDropInto ? "text-primary" : "text-muted-foreground"}`}>
+                  {isReorderDropInto ? "Drop to add child step" : "Add child step"}
+                </div>
+                <div className="text-[10px] font-mono text-muted-foreground/80">
+                  Nested under {step.name}
+                </div>
+              </div>
+            </div>
           </div>
+        )}
 
         {/* Children */}
         {hasKids && isExp && (
@@ -373,6 +454,7 @@ export function SequenceStep(props: SequenceStepProps) {
                 step={c}
                 parentId={step.id}
                 idx={ci}
+                orderPath={`${orderPath}.${ci + 1}`}
               />
             ))}
 

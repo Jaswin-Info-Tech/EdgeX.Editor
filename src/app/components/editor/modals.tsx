@@ -152,7 +152,7 @@ export function NewPlanModal({ onClose, onCreate }: { onClose: () => void; onCre
             <button
               onClick={handleCreate}
               disabled={!canCreate}
-              className="flex items-center gap-1 px-4 h-8 bg-emerald-600 text-white text-[12px] font-mono font-semibold transition-colors hover:bg-emerald-600/90 disabled:cursor-not-allowed disabled:opacity-50"
+              className="flex items-center gap-1 px-4 h-8 bg-primary text-primary-foreground text-[12px] font-mono font-semibold transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
             >
               <Check size={12} />
               Create Plan

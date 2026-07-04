@@ -40,6 +40,25 @@ interface DropTarget {
   rowId: string;
 }
 
+function canAcceptChildSteps(step: any) {
+  const rawTypeText = [
+    step?.stepTypeName,
+    step?.typeName,
+    step?.fullName,
+    step?.className,
+    step?.name,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+
+  return (
+    step?.type === "sequence" ||
+    Array.isArray(step?.children) ||
+    /sequence|dialog|parallel|if|lock|flow|group/.test(rawTypeText)
+  );
+}
+
 function flattenVisible(
   steps: any[],
   expanded: Set<string>,
@@ -53,6 +72,92 @@ function flattenVisible(
     }
   });
   return out;
+}
+
+function getDropTargetForRow(
+  rowId: string,
+  clientY: number,
+  rowEl: HTMLElement,
+  flatItems: { id: string; parentId: string | null; idx: number }[],
+  stepById: Map<string, any>,
+): DropTarget | null {
+  const item = flatItems.find((entry) => entry.id === rowId);
+  const step = stepById.get(rowId);
+  if (!item || !step) return null;
+
+  const rect = rowEl.getBoundingClientRect();
+  const relY = (clientY - rect.top) / rect.height;
+  const canHaveChildren = canAcceptChildSteps(step);
+
+  if (canHaveChildren) {
+    if (relY < 0.22) {
+      return {
+        parentId: item.parentId,
+        idx: item.idx,
+        mode: "before",
+        rowId,
+      };
+    }
+    if (relY > 0.78) {
+      return {
+        parentId: item.parentId,
+        idx: item.idx + 1,
+        mode: "after",
+        rowId,
+      };
+    }
+    return {
+      parentId: step.id,
+      idx: step.children?.length ?? 0,
+      mode: "into",
+      rowId,
+    };
+  }
+
+  if (relY < 0.5) {
+    return {
+      parentId: item.parentId,
+      idx: item.idx,
+      mode: "before",
+      rowId,
+    };
+  }
+
+  return {
+    parentId: item.parentId,
+    idx: item.idx + 1,
+    mode: "after",
+    rowId,
+  };
+}
+
+function getSiblingDropTargetForRow(
+  rowId: string,
+  clientY: number,
+  rowEl: HTMLElement,
+  flatItems: { id: string; parentId: string | null; idx: number }[],
+): DropTarget | null {
+  const item = flatItems.find((entry) => entry.id === rowId);
+  if (!item) return null;
+
+  const rect = rowEl.getBoundingClientRect();
+  const relY = (clientY - rect.top) / rect.height;
+
+  if (relY < 0.5) {
+    return {
+      parentId: item.parentId,
+      idx: item.idx,
+      mode: "before",
+      rowId,
+    };
+  }
+
+  return {
+    parentId: item.parentId,
+    idx: item.idx + 1,
+    mode: "after",
+    rowId,
+  };
 }
 
 export function SequenceEditor({
@@ -75,13 +180,8 @@ export function SequenceEditor({
   draggedStepId,
   handleStepReorder,
 }: SequenceEditorProps) {
-  const selectedStep = selectedId
-    ? flatAll(plan).find((step) => step.id === selectedId)
-    : null;
-  const targetParentId = selectedStep ? selectedId : null;
-  const targetIdx = selectedStep
-    ? (selectedStep.children?.length ?? 0)
-    : plan.length;
+  const targetParentId = null;
+  const targetIdx = plan.length;
 
   const expanded: Set<string> = sequenceStepProps.expanded;
   const setDraggedStepId: (id: string | null) => void =
@@ -105,6 +205,7 @@ export function SequenceEditor({
   } | null>(null);
   const [dropTarget, setDropTarget] = useState<DropTarget | null>(null);
   const dropTargetRef = useRef<DropTarget | null>(null);
+  const libDropTargetRef = useRef<DropTarget | null>(null);
   const ghostRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const autoScrollSpeedRef = useRef(0);
@@ -158,10 +259,10 @@ export function SequenceEditor({
         if (item && step && rowEl) {
           const rect = rowEl.getBoundingClientRect();
           const relY = (e.clientY - rect.top) / rect.height;
-          const isSequence = step.type === "sequence";
+          const canHaveChildren = canAcceptChildSteps(step);
 
           let next: DropTarget;
-          if (isSequence) {
+          if (canHaveChildren) {
             if (relY < 0.25) {
               next = {
                 parentId: item.parentId,
@@ -264,14 +365,72 @@ export function SequenceEditor({
     setDraggedStepId,
   ]);
 
-  const handleBackgroundDrop = (e: any) => {
-    e.stopPropagation();
-    if (dragLibItem) {
-      handleSeqDrop(e, targetParentId, targetIdx);
-    }
-  };
-
   const activeStepName = activeDrag ? stepById.get(activeDrag.id)?.name : null;
+  const showRootDropHint = Boolean(dragLibItem) && !dropTarget;
+
+  const setLibraryDropTargetForRow = useCallback((rowId: string, clientY: number, rowEl: HTMLElement) => {
+    const target = getSiblingDropTargetForRow(rowId, clientY, rowEl, flatItems);
+    libDropTargetRef.current = target;
+    setDropTarget(target);
+  }, [flatItems]);
+
+  const setLibraryDropTargetForChild = useCallback((rowId: string) => {
+    const step = stepById.get(rowId);
+    if (!step) return;
+
+    const target: DropTarget = {
+      parentId: rowId,
+      idx: step.children?.length ?? 0,
+      mode: "into",
+      rowId,
+    };
+
+    libDropTargetRef.current = target;
+    setDropTarget(target);
+  }, [stepById]);
+
+  const handleLibraryDropOnRow = useCallback((event: DragEvent, rowId: string, clientY: number, rowEl: HTMLElement) => {
+    if (!dragLibItem) return;
+    const target = getSiblingDropTargetForRow(rowId, clientY, rowEl, flatItems);
+    libDropTargetRef.current = target;
+
+    const parentId = target?.parentId ?? null;
+    const idx = target?.idx ?? plan.length;
+
+    handleSeqDrop(event, parentId, idx);
+    libDropTargetRef.current = null;
+    setDropTarget(null);
+  }, [dragLibItem, flatItems, handleSeqDrop, plan.length]);
+
+  const handleLibraryDropOnChild = useCallback((event: DragEvent, rowId: string) => {
+    if (!dragLibItem) return;
+    const step = stepById.get(rowId);
+    if (!step) return;
+
+    const target: DropTarget = {
+      parentId: rowId,
+      idx: step.children?.length ?? 0,
+      mode: "into",
+      rowId,
+    };
+
+    libDropTargetRef.current = target;
+    handleSeqDrop(event, rowId, step.children?.length ?? 0);
+    libDropTargetRef.current = null;
+    setDropTarget(null);
+  }, [dragLibItem, handleSeqDrop, stepById]);
+
+  const resolveDropTargetFromPoint = useCallback((clientX: number, clientY: number): DropTarget | null => {
+    const el = document.elementFromPoint(clientX, clientY) as HTMLElement | null;
+    const rowEl = el?.closest("[data-step-row]") as HTMLElement | null;
+    const rowId = rowEl?.getAttribute("data-step-row") ?? null;
+
+    if (!rowId) return null;
+
+    return rowEl
+      ? getDropTargetForRow(rowId, clientY, rowEl, flatItems, stepById)
+      : null;
+  }, [flatItems, stepById]);
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-background">
@@ -304,11 +463,41 @@ export function SequenceEditor({
         onDragOver={(e) => {
           if (dragLibItem) {
             e.preventDefault();
-            e.stopPropagation();
+            e.dataTransfer.dropEffect = "copy";
+            const el = document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null;
+            const inExplicitZone = Boolean(
+              el?.closest("[data-step-row]") || el?.closest("[data-child-drop-lane]"),
+            );
+            if (!inExplicitZone) {
+              libDropTargetRef.current = null;
+              setDropTarget(null);
+            }
             setDropIdx(targetIdx);
           }
         }}
-        onDrop={handleBackgroundDrop}
+        onDragLeave={(e) => {
+          if (!dragLibItem) return;
+          const nextTarget = e.relatedTarget as Node | null;
+          if (!nextTarget || !scrollContainerRef.current?.contains(nextTarget)) {
+            libDropTargetRef.current = null;
+            setDropTarget(null);
+          }
+        }}
+        onDrop={(e) => {
+          if (!dragLibItem) return;
+          e.preventDefault();
+          e.stopPropagation();
+
+          const resolvedTarget =
+            libDropTargetRef.current ?? resolveDropTargetFromPoint(e.clientX, e.clientY);
+
+          const parentId = resolvedTarget?.parentId ?? null;
+          const idx = resolvedTarget?.idx ?? plan.length;
+
+          handleSeqDrop(e, parentId, idx);
+          libDropTargetRef.current = null;
+          setDropTarget(null);
+        }}
       >
         {!hasPlan ? (
           <div className="flex flex-col items-center justify-center h-full gap-5 p-8">
@@ -338,6 +527,7 @@ export function SequenceEditor({
               if (dragLibItem) {
                 e.preventDefault();
                 e.stopPropagation();
+                e.dataTransfer.dropEffect = "copy";
               }
             }}
             onDrop={(e) => {
@@ -358,6 +548,14 @@ export function SequenceEditor({
           </div>
         ) : (
           <div>
+            {showRootDropHint && (
+              <div className="sticky top-0 z-10 border-b border-primary/20 bg-primary/5 px-4 py-2">
+                <div className="flex items-center justify-center gap-2 border border-dashed border-primary/30 bg-card/80 px-3 py-2 text-[11px] font-mono text-primary">
+                  <Plus size={12} />
+                  Drop here to add as a normal step
+                </div>
+              </div>
+            )}
             {plan.map((step, index) => (
               <SequenceStep
                 key={step.id}
@@ -365,9 +563,14 @@ export function SequenceEditor({
                 step={step}
                 parentId={null}
                 idx={index}
+                orderPath={String(index + 1)}
                 draggedStepId={draggedStepId}
                 dropTarget={dropTarget}
                 onStepDragStart={startStepDrag}
+                onLibraryDragOverStep={setLibraryDropTargetForRow}
+                onLibraryDropOnStep={handleLibraryDropOnRow}
+                onLibraryDragOverChildLane={setLibraryDropTargetForChild}
+                onLibraryDropOnChildLane={handleLibraryDropOnChild}
               />
             ))}
             <button
