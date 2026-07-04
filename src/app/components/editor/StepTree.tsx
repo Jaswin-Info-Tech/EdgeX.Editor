@@ -8,8 +8,10 @@ interface StepTreeProps {
   depth?: number;
   isLast?: boolean;
   ancestorHasNext?: boolean[];
+  ancestorIds?: string[];
   orderPath?: string;
   selectedId: string | null;
+  selectedPathIds: Set<string>;
   expanded: Set<string>;
   renaming: string | null;
   renameRef: React.RefObject<HTMLInputElement>;
@@ -28,8 +30,10 @@ export function StepTree(props: StepTreeProps) {
     depth = 0,
     isLast = true,
     ancestorHasNext = [],
+    ancestorIds = [],
     orderPath = "1",
     selectedId,
+    selectedPathIds,
     expanded,
     renaming,
     renameRef,
@@ -46,24 +50,27 @@ export function StepTree(props: StepTreeProps) {
   const isExp = expanded.has(step.id);
   const hasKids = !!step.children?.length;
   const stripe = TYPE_STRIPE[step.type] || "#64748b";
-  const branchColumn = 18;
+  const isOnSelectedPath = selectedPathIds.has(step.id);
+  const branchColumn = 16;
   const indent = 14 + depth * branchColumn;
   const currentBranchX = 10 + (depth - 1) * branchColumn;
+  const childBranchX = 10 + depth * branchColumn;
 
   const branchGuides = depth > 0 ? (
     <>
       {ancestorHasNext.map((hasNext, index) => {
         if (!hasNext) return null;
+        const isAncestorActive = selectedPathIds.has(ancestorIds[index]);
         return (
           <div
             key={`ancestor-${index}`}
-            className="pointer-events-none absolute bottom-0 top-0 w-px bg-border/80"
+            className={`pointer-events-none absolute bottom-0 top-0 ${isAncestorActive ? "w-[2px] bg-primary/85" : "w-px bg-border/75"}`}
             style={{ left: 10 + index * branchColumn }}
           />
         );
       })}
       <div
-        className="pointer-events-none absolute w-px bg-border/80"
+        className={`pointer-events-none absolute ${isOnSelectedPath ? "w-[2px] bg-primary/90" : "w-px bg-border/80"}`}
         style={{
           left: currentBranchX,
           top: 0,
@@ -71,8 +78,12 @@ export function StepTree(props: StepTreeProps) {
         }}
       />
       <div
-        className="pointer-events-none absolute h-px bg-border/80"
+        className={`pointer-events-none absolute ${isOnSelectedPath ? "h-[2px] bg-primary/90" : "h-px bg-border/80"}`}
         style={{ left: currentBranchX, top: "50%", width: 12 }}
+      />
+      <div
+        className={`pointer-events-none absolute h-2 w-2 -translate-x-1/2 -translate-y-1/2 border ${step.type === "sequence" ? `${isOnSelectedPath ? "rotate-45 rounded-[1px] border-primary bg-primary/30" : "rotate-45 rounded-[1px] border-primary/60 bg-primary/10"}` : `${isOnSelectedPath ? "border-primary bg-primary/25" : "border-border/90 bg-background"} rounded-full`}`}
+        style={{ left: currentBranchX + 12, top: "50%" }}
       />
     </>
   ) : null;
@@ -108,6 +119,12 @@ export function StepTree(props: StepTreeProps) {
           style={{ paddingLeft: indent, paddingRight: 8 }}
         >
           {branchGuides}
+          {hasKids && !isExp && (
+            <div
+              className={`pointer-events-none absolute h-3 border-l border-dashed ${isOnSelectedPath ? "border-primary/70" : "border-border/70"}`}
+              style={{ left: childBranchX, top: "58%" }}
+            />
+          )}
           <button
             onClick={e => {
               e.stopPropagation();
@@ -139,6 +156,7 @@ export function StepTree(props: StepTreeProps) {
               depth={depth + 1}
               isLast={index === step.children!.length - 1}
               ancestorHasNext={[...ancestorHasNext, !isLast]}
+              ancestorIds={[...ancestorIds, step.id]}
               orderPath={`${orderPath}.${index + 1}`}
             />
           ))}

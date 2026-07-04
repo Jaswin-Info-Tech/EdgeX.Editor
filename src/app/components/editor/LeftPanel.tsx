@@ -124,6 +124,28 @@ export function LeftPanel({
     "#06b6d4",
   ];
 
+  const selectedPathIds = React.useMemo(() => {
+    if (!selectedId) return new Set<string>();
+
+    const path = new Set<string>();
+    const walk = (steps: any[]): boolean => {
+      for (const s of steps) {
+        if (s.id === selectedId) {
+          path.add(s.id);
+          return true;
+        }
+        if (s.children?.length && walk(s.children)) {
+          path.add(s.id);
+          return true;
+        }
+      }
+      return false;
+    };
+
+    walk(plan);
+    return path;
+  }, [plan, selectedId]);
+
   return (
     <>
       <div className="flex border-b border-border shrink-0">
@@ -201,6 +223,7 @@ export function LeftPanel({
                       step={step}
                       orderPath={String(index + 1)}
                       selectedId={selectedId}
+                      selectedPathIds={selectedPathIds}
                       expanded={expanded}
                       renaming={renaming}
                       renameRef={renameRef}
