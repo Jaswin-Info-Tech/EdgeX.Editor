@@ -54,10 +54,13 @@ const mapDotNetTypeToEditorType = (type: string, hasEnum: boolean): string => {
 
 const toEditorProp = (property: ResourceSchemaProperty) => {
   const hasEnum = (property.enumValues?.length ?? 0) > 0;
+  const resolvedEditorType =
+    String(property.editorType ?? "").trim() ||
+    mapDotNetTypeToEditorType(property.type, hasEnum);
   return {
     name: property.name,
     displayName: property.displayName || property.name,
-    editorType: mapDotNetTypeToEditorType(property.type, hasEnum),
+    editorType: resolvedEditorType,
     enumValues: property.enumValues ?? [],
   };
 };
@@ -499,6 +502,14 @@ function GenericResourcePanel({
   };
 
   const editableProperties = schemaProperties.filter((p) => p.isEditable);
+  const normalizedResourceName = resourceName.trim().toLowerCase();
+  const hasDuplicateResourceName = useMemo(() => {
+    if (!normalizedResourceName) return false;
+    return matchingResources.some((resource) => {
+      if (resource.id === selectedResourceId) return false;
+      return String(resource.name ?? "").trim().toLowerCase() === normalizedResourceName;
+    });
+  }, [matchingResources, normalizedResourceName, selectedResourceId]);
 
   useEffect(() => {
     if (activeBlade !== "editor") return;
@@ -514,6 +525,10 @@ function GenericResourcePanel({
     ).trim();
 
     if (!pluginTypeName || !trimmedResourceName) return;
+    if (hasDuplicateResourceName) {
+      setSaveResourceError(`A ${config.itemLabelSingular} with this name already exists.`);
+      return;
+    }
 
     setSaveResourceLoading(true);
     setSaveResourceError("");
@@ -1121,6 +1136,12 @@ function GenericResourcePanel({
                       </div>
                     )}
 
+                    {hasDuplicateResourceName && !saveResourceError && (
+                      <div className="border border-destructive/30 bg-destructive/10 px-3 py-2 text-[12px] font-mono text-destructive">
+                        A {config.itemLabelSingular} with this name already exists. Use a unique name.
+                      </div>
+                    )}
+
                     {deleteResourceError && (
                       <div className="border border-destructive/30 bg-destructive/10 px-3 py-2 text-[13px] font-mono text-destructive">
                         {deleteResourceError}
@@ -1139,6 +1160,7 @@ function GenericResourcePanel({
                       onClick={handleSave}
                       disabled={
                         !resourceName.trim() ||
+                        hasDuplicateResourceName ||
                         schemaLoading ||
                         schemaError ||
                         saveResourceLoading ||

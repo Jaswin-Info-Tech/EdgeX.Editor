@@ -1,4 +1,4 @@
-import { Sliders, Plug } from "lucide-react";
+import { AlertTriangle, Plug, Sliders } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useAppDispatch, useAppSelector } from "../../store/hooks";
 import { TYPE_STRIPE } from "../../constants/editor";
@@ -312,25 +312,23 @@ useEffect(() => {
     const hasDisplayedProperties = groups.length > 0;
     const hasSchemaProperties = schemaProperties.length > 0;
     const showSchemaSection = hasSchemaProperties || Boolean(schemaError);
+    const canSaveSchema = hasSchemaProperties && !schemaError;
 
     const stripe = TYPE_STRIPE[selectedStep.type] || "#64748b";
 
     return (
-      <div className="overflow-y-auto h-full">
-        <div
-          className="border-b border-border"
-          style={{ borderLeft: `3px solid ${stripe}` }}
-        >
-          <div className="px-3 py-3">
-            <div className="flex items-center gap-2 mb-1.5">
+      <div className="h-full overflow-y-auto bg-card">
+        <div className="border-b border-border bg-gradient-to-r from-muted/30 via-muted/10 to-card" style={{ borderLeft: `3px solid ${stripe}` }}>
+          <div className="px-3 py-3.5">
+            <div className="mb-1.5 flex items-center gap-2">
               <TypeIcon type={selectedStep.type} size={14} />
               <span className="text-[13px] font-semibold text-foreground font-mono leading-tight">
                 {selectedStep.name}
               </span>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <StatusPill status={selectedStep.status} />
-              <span className="text-[11px] font-mono text-muted-foreground">
+              <span className="border border-border bg-background px-1.5 py-0.5 text-[10px] font-mono text-muted-foreground">
                 {(selectedStep.type || "unknown").toUpperCase()}
               </span>
               {selectedStep.description && (
@@ -342,10 +340,9 @@ useEffect(() => {
           </div>
         </div>
 
-        <div className="border-b border-border">
-
-          <div className="flex items-center justify-between px-3 py-2">
-            <span className="text-[11px] font-mono text-muted-foreground uppercase tracking-wider">
+        <div className="border-b border-border bg-muted/10">
+          <div className="flex items-center justify-between px-3 py-2.5">
+            <span className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider">
               Breakpoint
             </span>
             <Toggle
@@ -364,7 +361,7 @@ useEffect(() => {
 
         {groups.map((group) => (
           <div key={group}>
-            <div className="flex items-center gap-2 px-3 py-2 bg-muted/30 border-b border-border">
+            <div className="flex items-center gap-2 border-b border-border bg-muted/35 px-3 py-2">
               <div className="w-[3px] h-3" style={{ background: stripe }} />
               <span className="text-[10px] font-mono font-bold text-muted-foreground uppercase tracking-widest">
                 {group}
@@ -377,7 +374,7 @@ useEffect(() => {
                 return (
                   <div
                     key={prop.key}
-                    className="px-3 py-2.5 border-b border-border/40"
+                    className="border-b border-border/40 px-3 py-2.5"
                   >
                     <div className="flex items-center gap-2 mb-1.5">
                       <label className="block text-[11px] font-mono text-muted-foreground uppercase tracking-wide">
@@ -474,14 +471,20 @@ useEffect(() => {
           </div>
         ))}
 
-        {!hasDisplayedProperties && (
+        {showSchemaSection && (
           <>
-            <div className="flex items-center gap-2 px-3 py-2 bg-muted/30 border-b border-border">
+            <div className="flex items-center justify-between gap-2 border-b border-border bg-muted/35 px-3 py-2">
+              <div className="flex items-center gap-2">
               <div className="w-[3px] h-3" style={{ background: stripe }} />
               <span className="text-[10px] font-mono font-bold text-muted-foreground uppercase tracking-widest">
-                {hasDisplayedProperties ? "Schema Properties" : "Properties"}
+                  Schema Properties
+              </span>
+              </div>
+              <span className="text-[10px] font-mono text-muted-foreground">
+                {hasSchemaProperties ? `${schemaProperties.length} fields` : "No fields"}
               </span>
             </div>
+
             {hasSchemaProperties ? (
               schemaProperties.map((prop: any) =>
                 renderEditor(
@@ -492,24 +495,42 @@ useEffect(() => {
                 ),
               )
             ) : (
-              <div className="px-3 py-4 text-[12px] text-muted-foreground font-mono">
-                {schemaError
-                  ? `Unable to load schema: ${schemaError}`
-                  : "No configurable properties."}
+              <div className="border-b border-border px-3 py-4 text-[12px] text-muted-foreground font-mono">
+                {schemaError ? (
+                  <span className="flex items-start gap-2 text-destructive">
+                    <AlertTriangle size={14} className="mt-0.5 shrink-0" />
+                    <span>{`Unable to load schema: ${schemaError}`}</span>
+                  </span>
+                ) : (
+                  "No configurable schema properties."
+                )}
               </div>
             )}
 
           </>
         )}
+
+        {!hasDisplayedProperties && !showSchemaSection && (
+          <div className="px-3 py-5 text-center text-[12px] font-mono text-muted-foreground">
+            No editable properties for this step.
+          </div>
+        )}
+
         {selectedStep && (
-          <div className="px-3 py-3 border-t border-border mt-1">
+          <div className="mt-1 border-t border-border bg-card px-3 py-3">
             <button
               onClick={commitSchemaProperties}
-              className="w-full h-8 text-[12px] font-mono bg-info hover:bg-secondary/80 text-foreground flex items-center justify-center gap-1.5 border border-border transition-colors"
+              disabled={!canSaveSchema}
+              className="flex h-9 w-full items-center justify-center gap-1.5 border border-border bg-primary text-[12px] font-mono font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
             >
               <Plug size={11} />
               Save Properties
             </button>
+            {!canSaveSchema && (
+              <div className="mt-1.5 text-[10px] font-mono text-muted-foreground">
+                Schema must be loaded to save schema properties.
+              </div>
+            )}
           </div>
         )}
 
