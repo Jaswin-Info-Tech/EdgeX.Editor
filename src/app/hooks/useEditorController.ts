@@ -59,6 +59,7 @@ export function useEditorController() {
   const [addStepIdx, setAddStepIdx] = useState<number | undefined>(undefined);
   const [isDark, setIsDark] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
+  const [savedPlanSignature, setSavedPlanSignature] = useState<string | null>(null);
   const [draggedStepId, setDraggedStepId] = useState<string | null>(null);
 
   const [leftOpen, setLeftOpen] = useState(true);
@@ -85,10 +86,54 @@ export function useEditorController() {
   const runTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
   const renameRef = useRef<HTMLInputElement>(null);
 
+  const formatStepForSave = useCallback((step: TestStep): any => {
+    const props = (step.properties || []).reduce((acc: Record<string, any>, prop: any) => {
+      acc[prop.label] = prop.value;
+      return acc;
+    }, {});
+
+    const stepTypeName = step.stepTypeName
+      ?? step.typeName
+      ?? step.fullName
+      ?? step.className
+      ?? step.name;
+
+    const formattedStep: any = {
+      stepTypeName,
+      ...(step.name && { name: step.name }),
+      properties: props,
+    };
+
+    if (step.children?.length) {
+      formattedStep.children = step.children.map(formatStepForSave);
+    }
+
+    return formattedStep;
+  }, []);
+
+  const buildSaveSignature = useCallback((steps: TestStep[], meta: PlanMeta) => {
+    return JSON.stringify({
+      outputPath: `D:\\plans\\${meta.name}.TapPlan`,
+      overwrite: true,
+      steps: steps.map(formatStepForSave),
+    });
+  }, [formatStepForSave]);
+
+  const currentSaveSignature = useMemo(
+    () => buildSaveSignature(plan, planMeta),
+    [buildSaveSignature, plan, planMeta],
+  );
+
   useEffect(() => { document.documentElement.classList.toggle("dark", isDark); }, [isDark]);
   useEffect(() => { logEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [logs]);
   useEffect(() => { renameRef.current?.focus(); }, [renaming]);
-  useEffect(() => { setIsSaved(false); }, [plan]);
+  useEffect(() => {
+    if (!hasPlan || !savedPlanSignature) {
+      setIsSaved(false);
+      return;
+    }
+    setIsSaved(currentSaveSignature === savedPlanSignature);
+  }, [currentSaveSignature, hasPlan, savedPlanSignature]);
   useEffect(() => {
     const asBool = (value: unknown, fallback = false) => {
       if (typeof value === "boolean") return value;
@@ -181,6 +226,222 @@ export function useEditorController() {
     setLogs(prev => [...prev, { id: logId.current++, timestamp: nowTs(), level, source, message }]);
   }, []);
 
+  const logApiErrorDetails = useCallback((
+    source: string,
+    error: unknown,
+    defaults?: { method?: string; url?: string },
+  ) => {
+    const asRecord = (value: unknown): Record<string, unknown> | null => {
+      if (value && typeof value === "object") return value as Record<string, unknown>;
+      return null;
+    };
+
+    const stringify = (value: unknown) => {
+      if (value == null) return "";
+      if (typeof value === "string") return value;
+      if (typeof value === "number" || typeof value === "boolean") return String(value);
+      try {
+        return JSON.stringify(value);
+      } catch {
+        return String(value);
+      }
+    };
+
+    const cleanServerErrorText = (raw: string) => {
+      const normalized = raw.replace(/\r/g, "\n");
+
+      const exceptionMatch = normalized.match(/([A-Za-z0-9_.]+Exception)\s*:\s*([^\n]+)/);
+      if (exceptionMatch) {
+        return `${exceptionMatch[1]}: ${exceptionMatch[2].trim()}`;
+      }
+
+      const filteredLine = normalized
+        .split("\n")
+        .map((line) => line.trim())
+        .filter(Boolean)
+        .find((line) => {
+          if (/^l:\s*/i.test(line)) return false;
+          if (/Microsoft\.AspNetCore\.Diagnostics\.ExceptionHandlerMiddleware/i.test(line)) return false;
+          if (/An unhandled exception has occurred while executing the request\.?/i.test(line)) return false;
+          return true;
+        });
+
+      if (filteredLine) {
+        return filteredLine;
+      }
+
+      return normalized.replace(/\s+/g, " ").trim();
+    };
+
+    const lines: string[] = [];
+    const errorObj = asRecord(error);
+    const responseObj = asRecord(errorObj?.response);
+    const requestConfig = asRecord(errorObj?.config);
+    const responseData = responseObj?.data;
+    const responseHeaders = asRecord(responseObj?.headers);
+
+    const method = String(requestConfig?.method ?? defaults?.method ?? "GET").toUpperCase();
+    const url = String(requestConfig?.url ?? defaults?.url ?? "unknown-endpoint");
+    const status = responseObj?.status;
+    const statusText = responseObj?.statusText;
+
+    lines.push(`Request: ${method} ${url}`);
+    if (typeof status === "number") {
+      lines.push(`HTTP: ${status}${statusText ? ` ${String(statusText)}` : ""}`);
+    }
+
+    if (typeof errorObj?.message === "string" && errorObj.message.trim()) {
+      lines.push(`Message: ${errorObj.message}`);
+    }
+
+    const dataRecord = asRecord(responseData);
+    if (dataRecord) {
+      const directMessage =
+        stringify(dataRecord.message) ||
+        stringify(dataRecord.error) ||
+        stringify(dataRecord.title) ||
+        stringify(dataRecord.detail);
+      if (directMessage) {
+        lines.push(`API: ${cleanServerErrorText(directMessage)}`);
+      }
+
+      const errorsBag = dataRecord.errors;
+      const errorsRecord = asRecord(errorsBag);
+      if (errorsRecord) {
+        Object.entries(errorsRecord).forEach(([field, value]) => {
+          if (Array.isArray(value)) {
+            value.forEach((item) => {
+              lines.push(`Validation: ${field} -> ${cleanServerErrorText(stringify(item))}`);
+            });
+          } else {
+            lines.push(`Validation: ${field} -> ${cleanServerErrorText(stringify(value))}`);
+          }
+        });
+      }
+
+      if (lines.length <= 4) {
+        lines.push(`Payload: ${stringify(responseData)}`);
+      }
+    } else if (responseData != null) {
+      const rawPayload = stringify(responseData);
+      lines.push(`API: ${cleanServerErrorText(rawPayload)}`);
+      lines.push(`Payload: ${rawPayload}`);
+    }
+
+    if (responseHeaders?.["x-correlation-id"]) {
+      lines.push(`CorrelationId: ${String(responseHeaders["x-correlation-id"])}`);
+    }
+
+    lines.forEach((line) => addLog("ERROR", source, line));
+  }, [addLog]);
+
+  const logApiSuccessDetails = useCallback((source: string, action: string, response: unknown) => {
+    const asRecord = (value: unknown): Record<string, unknown> | null => {
+      if (value && typeof value === "object") return value as Record<string, unknown>;
+      return null;
+    };
+
+    const stringify = (value: unknown) => {
+      if (value == null) return "";
+      if (typeof value === "string") return value;
+      if (typeof value === "number" || typeof value === "boolean") return String(value);
+      try {
+        return JSON.stringify(value);
+      } catch {
+        return String(value);
+      }
+    };
+
+    const responseObj = asRecord(response);
+    const payload = asRecord(responseObj?.data) ?? responseObj;
+
+    addLog("INFO", source, `${action} API response received.`);
+
+    if (!payload) {
+      const raw = stringify(response);
+      if (raw) addLog("INFO", source, `Response: ${raw}`);
+      return;
+    }
+
+    const preferredFields = action === "Run"
+      ? [
+        "runId",
+        "planName",
+        "path",
+        "verdict",
+        "duration",
+        "failedToStart",
+      ]
+      : [
+        "status",
+        "success",
+        "message",
+        "runId",
+        "id",
+        "path",
+        "state",
+        "result",
+        "timestampUtc",
+        "startedAt",
+        "durationMs",
+      ];
+
+    const summaryPairs: string[] = [];
+    preferredFields.forEach((key) => {
+      const value = payload[key];
+      if (value == null) return;
+      if (typeof value === "object") return;
+      summaryPairs.push(`${key}=${stringify(value)}`);
+    });
+
+    if (summaryPairs.length > 0) {
+      for (let index = 0; index < summaryPairs.length; index += 4) {
+        addLog("INFO", source, `Response: ${summaryPairs.slice(index, index + 4).join(" | ")}`);
+      }
+    }
+
+    const normalizedEntries = Object.entries(payload)
+      .filter(([key, value]) => !preferredFields.includes(key) && value != null && typeof value !== "object")
+      .slice(0, 8);
+
+    if (normalizedEntries.length > 0) {
+      const extras = normalizedEntries.map(([key, value]) => `${key}=${stringify(value)}`);
+      for (let index = 0; index < extras.length; index += 4) {
+        addLog("INFO", source, `Response extra: ${extras.slice(index, index + 4).join(" | ")}`);
+      }
+    }
+
+    const parameters = Array.isArray(payload?.parameters) ? payload.parameters : [];
+    if (parameters.length > 0) {
+      const grouped: Record<string, string[]> = {};
+      parameters.forEach((entry: any) => {
+        const name = stringify(entry?.name || "Parameter").trim() || "Parameter";
+        const value = stringify(entry?.value);
+        grouped[name] = grouped[name] ?? [];
+        grouped[name].push(value);
+      });
+
+      addLog("INFO", source, `Parameters (${parameters.length})`);
+      const orderedKeys = Object.keys(grouped).sort((a, b) => a.localeCompare(b));
+      const normalizedParams = orderedKeys.map((key) => {
+        const values = grouped[key];
+        const merged = values.length > 1 ? values.join(", ") : values[0];
+        return `${key}=${merged}`;
+      });
+
+      for (let index = 0; index < normalizedParams.length; index += 3) {
+        addLog("INFO", source, `Param: ${normalizedParams.slice(index, index + 3).join(" | ")}`);
+      }
+    }
+
+    if (normalizedEntries.length === 0 && preferredFields.every((key) => payload[key] == null)) {
+      const raw = stringify(payload);
+      if (raw) {
+        addLog("INFO", source, `Response: ${raw.slice(0, 1200)}`);
+      }
+    }
+  }, [addLog]);
+
   const { data } = usePlugins();
 
   const library: LibraryItem[] = useMemo(() => {
@@ -227,6 +488,7 @@ export function useEditorController() {
     setRunState("idle");
     setLogs([]);
     setHasPlan(true);
+    setSavedPlanSignature(null);
     setIsSaved(false);
     setShowNewPlan(false);
     setLeftTab("library");
@@ -315,51 +577,73 @@ export function useEditorController() {
     setPlan(resetAll);
     setLogs([]);
     setRunState("running");
+    setShowConsole(true);
+
+    const runPath = "D:\\plans\\SamplePlan.TapPlan";
+    addLog("INFO", "EdgeX", `=== Run started - "${planMeta.name}" ===`);
+    addLog("INFO", "TestPlans", `Run request: ${runPath}`);
 
     try {
-      await runTestPlan({
-        path: "D:\\plans\\SamplePlan.TapPlan",
+      const runResponse = await runTestPlan({
+        path: runPath,
         cacheXml: true,
       });
-      addLog("INFO", "TestPlans", `Run started: D:\\plans\\SamplePlan.TapPlan`);
+      logApiSuccessDetails("TestPlans", "Run", runResponse);
+
+      const asRecord = (value: unknown): Record<string, unknown> | null => {
+        if (value && typeof value === "object") return value as Record<string, unknown>;
+        return null;
+      };
+      const stringify = (value: unknown) => {
+        if (value == null) return "";
+        if (typeof value === "string") return value;
+        if (typeof value === "number" || typeof value === "boolean") return String(value);
+        try {
+          return JSON.stringify(value);
+        } catch {
+          return String(value);
+        }
+      };
+      const payload = asRecord(runResponse);
+      const parameters = Array.isArray(payload?.parameters) ? payload.parameters : [];
+      const findParam = (name: string) => {
+        const match = parameters.find(
+          (entry: any) => String(entry?.name ?? "").toLowerCase() === name.toLowerCase(),
+        );
+        return match ? stringify(match.value) : "";
+      };
+
+      const verdictRaw = payload?.verdict;
+      const verdictFromParam = findParam("Verdict");
+      const verdictMap: Record<string, string> = {
+        "0": "NotSet",
+        "1": "Pass",
+        "2": "Fail",
+        "3": "Inconclusive",
+        "4": "Aborted",
+        "5": "Error",
+      };
+      const verdict = verdictFromParam || verdictMap[String(verdictRaw)] || stringify(verdictRaw) || "Unknown";
+      const duration = stringify(payload?.duration) || findParam("Duration") || "-";
+      const runId = stringify(payload?.runId) || "-";
+      const failedToStart = String(payload?.failedToStart ?? "false").toLowerCase() === "true";
+
+      addLog("INFO", "EdgeX", `Run summary: id=${runId} | verdict=${verdict} | duration=${duration}`);
+
+      if (failedToStart) {
+        addLog("ERROR", "EdgeX", "=== Run complete - Failed to start ===");
+        setRunState("idle");
+      } else {
+        addLog("INFO", "EdgeX", "=== Run complete ===");
+        setRunState("completed");
+      }
     } catch (error) {
       console.error("Failed to run test plan:", error);
+      setShowConsole(true);
       addLog("ERROR", "TestPlans", "Failed to start test plan run.");
+      logApiErrorDetails("TestPlans", error, { method: "POST", url: "testplans/run" });
       setRunState("idle");
-      return;
     }
-
-    // ✅ Step 3: Animate UI steps after both API calls succeed
-    const leaves = flatAll(plan).filter(step => !step.children && step.enabled);
-    addLog("INFO", "EdgeX", `=== Run started - "${planMeta.name}" ===`);
-    addLog("INFO", "EdgeX", `${leaves.length} enabled steps`);
-    let offset = 0;
-
-    leaves.forEach(step => {
-      const start = offset + 200 + Math.random() * 150;
-      const duration = 500 + Math.random() * 1500;
-      offset = start + duration;
-      const stepType = (step.type ?? step.stepTypeName ?? "STEP").toUpperCase();
-
-      runTimers.current.push(setTimeout(() => {
-        setPlan(prev => setStatusIn(prev, step.id, "running"));
-        addLog("INFO", stepType, `-> ${step.name}`);
-      }, start));
-
-      const verdict: StepStatus = Math.random() > 0.1 ? "passed" : "failed";
-      runTimers.current.push(setTimeout(() => {
-        setPlan(prev => setStatusIn(prev, step.id, verdict));
-        addLog(verdict === "passed" ? "PASS" : "FAIL", stepType, `  ${step.name}: ${verdict.toUpperCase()} (${duration.toFixed(0)}ms)`);
-        if (verdict === "failed") addLog("ERROR", stepType, "  Out-of-limits condition detected");
-      }, start + duration));
-    });
-
-    const finishTimer = setTimeout(() => {
-      setRunState("completed");
-      addLog("INFO", "EdgeX", `=== Run complete - ${(offset / 1000).toFixed(2)}s ===`);
-    }, offset + 300);
-
-    runTimers.current.push(finishTimer);
   };
 
   const handleStop = () => {
@@ -416,12 +700,14 @@ export function useEditorController() {
       toast.success(`${pluginName} ${action} successfully`, { id: toastId });
       refreshPluginData();
       setTimeout(refreshPluginData, 1500); // safety net in case backend hasn't registered the install yet
-    } catch {
+    } catch (error) {
       setPlugins(prev => prev.map(item => item.id === id
         ? { ...item, state: item.isInstalled ? "installed" : "available" }
         : item
       ));
+      setShowConsole(true);
       addLog("ERROR", "Plugins", `Unable to ${action === "updated" ? "update" : "install"}: ${pluginName}`);
+      logApiErrorDetails("Plugins", error, { method: "POST", url: "package/install" });
       toast.error(`Failed to ${action === "updated" ? "update" : "install"} ${pluginName}`, { id: toastId });
     }
   };
@@ -457,7 +743,9 @@ export function useEditorController() {
       }, 1500);
     } catch (err) {
       console.error("Uninstall API error:", err);
+      setShowConsole(true);
       addLog("ERROR", "Plugins", `Unable to uninstall: ${pluginName}`);
+      logApiErrorDetails("Plugins", err, { method: "POST", url: "plugins/remove" });
       toast.error(`Failed to remove ${pluginName}`, { id: toastId });
     }
   };
@@ -483,9 +771,11 @@ export function useEditorController() {
       toast.success(`${pluginName} uninstalled successfully`, { id: toastId });
       refreshPluginData();
       setTimeout(refreshPluginData, 1500);
-    } catch {
+    } catch (error) {
       setPlugins(prev => prev.map(item => item.id === id ? { ...item, state: "installed", isInstalled: true } : item));
+      setShowConsole(true);
       addLog("ERROR", "Plugins", `Unable to uninstall: ${pluginName}`);
+      logApiErrorDetails("Plugins", error, { method: "POST", url: "package/uninstall" });
       toast.error(`Failed to uninstall ${pluginName}`, { id: toastId });
     }
   };
@@ -498,8 +788,10 @@ export function useEditorController() {
       toast.success(`${file.name} uploaded and installed successfully`, { id: toastId });
       refreshPluginData();
       setTimeout(refreshPluginData, 1500);
-    } catch {
+    } catch (error) {
+      setShowConsole(true);
       addLog("ERROR", "Plugins", `Unable to install: ${file.name}`);
+      logApiErrorDetails("Plugins", error, { method: "POST", url: "plugins/upload" });
       toast.error(`Failed to upload ${file.name}`, { id: toastId });
     }
 
@@ -508,30 +800,7 @@ export function useEditorController() {
 
 
 
-  const formatStepForCompose = (step: TestStep): any => {
-    const props = (step.properties || []).reduce((acc: Record<string, any>, prop: any) => {
-      acc[prop.label] = prop.value;
-      return acc;
-    }, {});
-
-    const stepTypeName = step.stepTypeName
-      ?? step.typeName
-      ?? step.fullName
-      ?? step.className
-      ?? step.name;
-
-    const formattedStep: any = {
-      stepTypeName,
-      ...(step.name && { name: step.name }),
-      properties: props,
-    };
-
-    if (step.children?.length) {
-      formattedStep.children = step.children.map(formatStepForCompose);
-    }
-
-    return formattedStep;
-  };
+  const formatStepForCompose = (step: TestStep): any => formatStepForSave(step);
 
   const handleSave = async () => {
     const jsonData = {
@@ -540,15 +809,18 @@ export function useEditorController() {
       steps: plan.map(formatStepForCompose),
     };
     console.log(JSON.stringify(jsonData, null, 2));
+
     try {
       const response = await composeTestPlan(jsonData);``
       addLog("INFO", "TestPlans", `Saved: ${jsonData.outputPath}`);
+      setSavedPlanSignature(currentSaveSignature);
       setIsSaved(true);
       return response;
     } catch (error) {
       console.error("Failed to compose test plan:", error);
+      setShowConsole(true);
       addLog("ERROR", "TestPlans", "Failed to save test plan.");
-      setIsSaved(false);
+      logApiErrorDetails("TestPlans", error, { method: "POST", url: "plugins/compose" });
     }
   };
 
@@ -671,6 +943,8 @@ export function useEditorController() {
     }
 
     setHasPlan(true);
+    setSavedPlanSignature(null);
+    setIsSaved(false);
     addLog("INFO", "TestPlans", "Plan imported successfully.");
   };
   const handleImportPlan = () => {

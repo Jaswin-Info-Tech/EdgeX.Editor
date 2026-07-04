@@ -332,9 +332,11 @@ export function LeftPanel({
                 No steps match your search or filter.
               </div>
             )}
-            {filteredLib.map((item, index) => (
+            {filteredLib.map((item, index) => {
+              const rowKey = `${item.id || item.name || "step"}-${item.baseType || ""}-${item.assembly || ""}-${index}`;
+              return (
               <div
-                key={item.id}
+                key={rowKey}
                 draggable
                 onDragStart={() => setDragLibItem(item)}
                 onDragEnd={() => {
@@ -390,7 +392,8 @@ export function LeftPanel({
                   </div>
                 </div>
               </div>
-            ))}
+            );
+            })}
           </div>
           <div className="px-3 h-7 border-t border-border flex items-center shrink-0">
             <span className="text-[10px] font-mono text-muted-foreground">

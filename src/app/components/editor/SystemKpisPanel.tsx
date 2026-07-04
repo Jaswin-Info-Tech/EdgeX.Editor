@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   Activity,
+  ArrowLeft,
   ChartNoAxesCombined,
   Cpu,
   HardDrive,
@@ -31,6 +32,7 @@ type HistoryPoint = {
 
 interface SystemKpisPanelProps {
   isVisible: boolean;
+  onClose: () => void;
 }
 
 const HISTORY_LIMIT = 24;
@@ -77,7 +79,7 @@ const KpiTile = ({
   </div>
 );
 
-export function SystemKpisPanel({ isVisible }: SystemKpisPanelProps) {
+export function SystemKpisPanel({ isVisible, onClose }: SystemKpisPanelProps) {
   const { data, isLoading, isFetching, isError, error, refetch } = useSystemKpis(isVisible);
   const [history, setHistory] = useState<HistoryPoint[]>([]);
 
@@ -143,6 +145,12 @@ export function SystemKpisPanel({ isVisible }: SystemKpisPanelProps) {
                 Last sample: {formatTimestamp(data.timestampUtc)} {isFetching ? "(refreshing...)" : ""}
               </div>
             </div>
+            <button
+              onClick={onClose}
+              className="inline-flex items-center gap-2 border border-border px-3 py-1.5 text-[12px] font-mono font-semibold text-foreground hover:bg-secondary"
+            >
+              <ArrowLeft size={12} /> Back To Editor
+            </button>
           </div>
         </div>
 

@@ -995,7 +995,10 @@ export function EditorShell(props: EditorShellProps) {
       />
 
       {showSystemKpis ? (
-        <SystemKpisPanel isVisible={showSystemKpis} />
+        <SystemKpisPanel
+          isVisible={showSystemKpis}
+          onClose={() => setShowSystemKpis(false)}
+        />
       ) : (
       <div className="flex flex-1 overflow-hidden relative">
         {isTablet && leftOpen && (
