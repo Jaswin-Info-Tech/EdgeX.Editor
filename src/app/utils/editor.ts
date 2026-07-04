@@ -68,6 +68,16 @@ export function resetAll(steps: TestStep[]): TestStep[] {
 }
 
 export function makeStep(lib: LibraryItem): TestStep {
+  const libRecord = lib as any;
+  const canonicalStepTypeName =
+    lib.fullName ??
+    lib.typeName ??
+    lib.className ??
+    lib.stepTypeName ??
+    libRecord.path ??
+    libRecord.typePath ??
+    lib.name;
+
   return {
     id: uid(),
     name: lib.name,
@@ -76,10 +86,10 @@ export function makeStep(lib: LibraryItem): TestStep {
     enabled: true,
     description: lib.description,
     properties: (lib.defaultProps || []).map(p => ({ ...p })),
-    stepTypeName: lib.stepTypeName ?? lib.typeName ?? lib.fullName ?? lib.className ?? lib.name,
-    typeName: lib.typeName,
-    fullName: lib.fullName,
-    className: lib.className,
+    stepTypeName: canonicalStepTypeName,
+    typeName: lib.typeName ?? canonicalStepTypeName,
+    fullName: lib.fullName ?? canonicalStepTypeName,
+    className: lib.className ?? canonicalStepTypeName,
   };
 }
 

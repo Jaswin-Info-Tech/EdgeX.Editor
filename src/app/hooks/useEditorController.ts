@@ -23,6 +23,7 @@ import { moveStepToPosition } from "../utils/editor";
 import {
   cancelRun,
   composeTestPlan,
+  getStepSchema,
   getRunLogs,
   getRunLogsStreamUrl,
   getRunStatus,
@@ -122,6 +123,87 @@ export function useEditorController() {
   const runLogsPollingErrorNotifiedRef = useRef(false);
   const runLogsStreamErrorNotifiedRef = useRef(false);
   const runLogsClosedNotifiedRef = useRef(false);
+  const canonicalTypeNameCacheRef = useRef<Map<string, string>>(new Map());
+
+  const resolveCanonicalStepTypeName = (stepLike: any): string => {
+    const candidates = [
+      stepLike?.fullName,
+      stepLike?.typeName,
+      stepLike?.className,
+      stepLike?.stepTypeName,
+      stepLike?.type,
+      stepLike?.name,
+    ];
+
+    const resolved = candidates
+      .map((value) => String(value ?? "").trim())
+      .find(Boolean);
+
+    return resolved || "unknown";
+  };
+
+  const getSchemaRecords = (response: any) => {
+    if (Array.isArray(response?.schemas)) return response.schemas;
+    if (Array.isArray(response)) return response;
+    if (response?.properties) return [response];
+    return [];
+  };
+
+  const resolveCanonicalTypeFromSchema = async (stepTypeName: string): Promise<string> => {
+    const requested = String(stepTypeName ?? "").trim();
+    if (!requested) return requested;
+
+    const cached = canonicalTypeNameCacheRef.current.get(requested);
+    if (cached) return cached;
+
+    try {
+      const schema = await getStepSchema(requested);
+      const records = getSchemaRecords(schema);
+      const fullName = String(records?.[0]?.fullName ?? "").trim();
+      const resolved = fullName || requested;
+      canonicalTypeNameCacheRef.current.set(requested, resolved);
+      canonicalTypeNameCacheRef.current.set(resolved, resolved);
+      return resolved;
+    } catch {
+      canonicalTypeNameCacheRef.current.set(requested, requested);
+      return requested;
+    }
+  };
+
+  const normalizeFormattedStepTypeNames = async (step: any): Promise<any> => {
+    const requestedTypeName = String(step?.stepTypeName ?? "").trim();
+    const resolvedTypeName = requestedTypeName
+      ? await resolveCanonicalTypeFromSchema(requestedTypeName)
+      : requestedTypeName;
+
+    const normalizedChildren = Array.isArray(step?.children) && step.children.length > 0
+      ? await Promise.all(step.children.map((child: any) => normalizeFormattedStepTypeNames(child)))
+      : undefined;
+
+    return {
+      ...step,
+      stepTypeName: resolvedTypeName,
+      ...(normalizedChildren ? { children: normalizedChildren } : {}),
+    };
+  };
+
+  const hydrateAddedStepTypeName = async (stepId: string, initialTypeName: string) => {
+    const requested = String(initialTypeName ?? "").trim();
+    if (!requested || requested === "unknown") return;
+
+    const resolved = await resolveCanonicalTypeFromSchema(requested);
+    if (!resolved) return;
+
+    setPlan((prev) =>
+      updateIn(prev, stepId, (step) => ({
+        ...step,
+        stepTypeName: resolved,
+        typeName: resolved,
+        fullName: resolved,
+        className: resolved,
+      })),
+    );
+  };
 
   const formatStepForSave = useCallback((step: TestStep): any => {
     const props = (step.properties || []).reduce((acc: Record<string, any>, prop: any) => {
@@ -129,11 +211,7 @@ export function useEditorController() {
       return acc;
     }, {});
 
-    const stepTypeName = step.stepTypeName
-      ?? step.typeName
-      ?? step.fullName
-      ?? step.className
-      ?? step.name;
+    const stepTypeName = resolveCanonicalStepTypeName(step);
 
     const formattedStep: any = {
       stepTypeName,
@@ -997,6 +1075,9 @@ export function useEditorController() {
     setSelectedId(step.id);
     if (switchTab) setLeftTab("plan");
     addLog("INFO", "Plan", `Added: "${step.name}"`);
+
+    const initialTypeName = resolveCanonicalStepTypeName(step);
+    void hydrateAddedStepTypeName(step.id, initialTypeName);
   };
 
   const handleContextAction = (action: string, stepId: string) => {
@@ -1387,10 +1468,15 @@ export function useEditorController() {
   const formatStepForCompose = (step: TestStep): any => formatStepForSave(step);
 
   const handleSave = async () => {
+    const formattedSteps = plan.map(formatStepForCompose);
+    const normalizedSteps = await Promise.all(
+      formattedSteps.map((step) => normalizeFormattedStepTypeNames(step)),
+    );
+
     const jsonData = {
       outputPath: `D:\\plans\\${planMeta.name}.TapPlan`,
       overwrite: true,
-      steps: plan.map(formatStepForCompose),
+      steps: normalizedSteps,
     };
     console.log(JSON.stringify(jsonData, null, 2));
 
@@ -1454,6 +1540,8 @@ export function useEditorController() {
   };
 
   const convertImportedStep = (step: any): TestStep => {
+    const stepTypeName = resolveCanonicalStepTypeName(step);
+
     return {
       id: crypto.randomUUID(),
 
@@ -1463,15 +1551,15 @@ export function useEditorController() {
 
       status: "pending",
 
-      type: step.stepTypeName,
+      type: stepTypeName,
 
-      stepTypeName: step.stepTypeName,
+      stepTypeName,
 
-      typeName: step.stepTypeName,
+      typeName: String(step.typeName ?? stepTypeName),
 
-      fullName: step.stepTypeName,
+      fullName: String(step.fullName ?? stepTypeName),
 
-      className: step.stepTypeName,
+      className: String(step.className ?? stepTypeName),
 
       properties: Object.entries(step.properties || {}).map(([key, value]) => {
         let propertyValue: string | number | boolean;

@@ -915,7 +915,16 @@ export function EditorShell(props: EditorShellProps) {
     };
 
     const visualType = libraryMappedType ?? inferVisualType();
-    const stepTypeName = rawType || rawName || "unknown";
+    const stepTypeName = [
+      step.fullName,
+      step.typeName,
+      step.className,
+      step.stepTypeName,
+      rawType,
+      rawName,
+    ]
+      .map((value) => String(value ?? "").trim())
+      .find(Boolean) || "unknown";
 
     return {
       id: String(step.stepId ?? step.path ?? crypto.randomUUID()),
@@ -929,9 +938,9 @@ export function EditorShell(props: EditorShellProps) {
         : [],
       children: children.length > 0 ? children : undefined,
       stepTypeName,
-      typeName: stepTypeName,
-      fullName: stepTypeName,
-      className: stepTypeName,
+      typeName: String(step.typeName ?? stepTypeName),
+      fullName: String(step.fullName ?? stepTypeName),
+      className: String(step.className ?? stepTypeName),
     };
   };
 

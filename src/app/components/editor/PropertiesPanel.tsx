@@ -375,7 +375,9 @@ useEffect(() => {
       return {
         ...step,
         properties: [...keepProps, ...newProps],
-        stepTypeName: meta?.fullName ?? step.stepTypeName,
+        // Preserve the original stepTypeName chosen for this step.
+        // Saving schema properties should not change the step identity in payloads.
+        stepTypeName: step.stepTypeName,
         assembly: meta?.assembly ?? step.assembly,
         baseType: meta?.baseType ?? step.baseType,
         fullName: meta?.fullName ?? step.fullName,
