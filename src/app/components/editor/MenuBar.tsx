@@ -1,4 +1,4 @@
-import { Moon, PanelLeftOpen, PanelRightOpen, Sun, Check } from "lucide-react";
+import { Moon, PanelLeftOpen, PanelRightOpen, Sun, Check, Settings } from "lucide-react";
 
 const MENU_ITEMS: Record<string, string[]> = {
   File: ["Import Plan","Export Plan"],
@@ -28,6 +28,9 @@ interface MenuBarProps {
   setShowConnectionsPanel: (value: boolean) => void;
   setShowResultListenersPanel: (value: boolean) => void;
   setShowTraceListenersPanel: (value: boolean) => void;
+  activeServerName: string;
+  activeServerHealth: "healthy" | "error" | "stale" | "untested";
+  onOpenServerSettings: () => void;
   handleSave: () => void;
   handleExportPlan: () => void;
   handleImportPlan: () => void;
@@ -59,6 +62,9 @@ export function MenuBar({
   setShowConnectionsPanel,
   setShowResultListenersPanel,
   setShowTraceListenersPanel,
+  activeServerName,
+  activeServerHealth,
+  onOpenServerSettings,
   handleSave,
   handleExportPlan,
   handleImportPlan,
@@ -71,6 +77,24 @@ export function MenuBar({
     : runState === "paused" ? "text-orange-500 border-orange-500/40 bg-orange-500/10"
       : runState === "completed" ? "text-emerald-500 border-emerald-500/40 bg-emerald-500/10"
         : "text-muted-foreground border-border";
+
+  const serverHealthStyles =
+    activeServerHealth === "healthy"
+      ? "bg-emerald-500"
+      : activeServerHealth === "error"
+        ? "bg-red-500"
+        : activeServerHealth === "stale"
+          ? "bg-amber-500"
+          : "bg-muted-foreground/60";
+
+  const serverHealthLabel =
+    activeServerHealth === "healthy"
+      ? "Healthy"
+      : activeServerHealth === "error"
+        ? "Failed"
+        : activeServerHealth === "stale"
+          ? "Stale"
+          : "Not Tested";
 
   const runMenuAction = (item: string) => {
     setActiveMenu(null);
@@ -154,6 +178,13 @@ export function MenuBar({
             <span className="text-[11px] font-mono text-muted-foreground hidden md:block">{planMeta.name}</span>
           </div>
         )}
+        <span
+          className="hidden max-w-[260px] truncate border border-border px-2 py-0.5 text-[11px] font-mono text-muted-foreground lg:inline-flex lg:items-center lg:gap-1.5"
+          title={`Server: ${activeServerName || "Not configured"} | Health: ${serverHealthLabel}`}
+        >
+          <span className={`h-2 w-2 shrink-0 rounded-full ${serverHealthStyles}`} />
+          <span>Server: {activeServerName || "Not configured"}</span>
+        </span>
         <span className={`text-[11px] font-mono px-2 py-0.5 border font-semibold ${runStatusStyle}`}>{runState.toUpperCase()}</span>
         {isTablet && (
           <>
@@ -165,6 +196,13 @@ export function MenuBar({
             </button>
           </>
         )}
+        <button
+          onClick={onOpenServerSettings}
+          title="API server settings"
+          className="p-1.5 border border-border text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+        >
+          <Settings size={13} />
+        </button>
         <button
           onClick={() => setIsDark((value: boolean) => !value)}
           title={isDark ? "Light mode" : "Dark mode"}

@@ -12,6 +12,9 @@ export const usePackages = () => {
 export function useAvailablePackages(search: string = "") {
   return useQuery({
     queryKey: ["available-packages", search],
-    queryFn: () => getAvailablePackages(search),
+    queryFn: async () => {
+      const data = await getAvailablePackages(search);
+      return Array.isArray(data) ? data : [];
+    },
   });
 }

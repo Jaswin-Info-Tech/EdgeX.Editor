@@ -19,9 +19,14 @@ import { PropertiesDock } from "../components/editor/PropertiesDock";
 import { PropertiesPanel } from "../components/editor/PropertiesPanel";
 import { ResourcesPanel } from "../components/editor/ResourcesPanel";
 import { SequenceEditor } from "../components/editor/SequenceEditor";
+import { ServerSettingsModal } from "../components/editor/ServerSettingsModal";
 import { SystemKpisPanel } from "../components/editor/SystemKpisPanel";
 import { Splitter } from "../components/editor/resizable";
 import { TestPlansPanel } from "../components/editor/TestPlansPanel";
+import {
+  getActiveServerProfile,
+  hasConfiguredServer,
+} from "../config/serverSettings";
 import { useTestPlans } from "../hooks/usePlugin";
 import type { Property, TestStep } from "../types/editor";
 import { flatAll } from "../utils/editor";
@@ -148,6 +153,7 @@ interface EditorShellProps {
 }
 
 export function EditorShell(props: EditorShellProps) {
+  const STALE_SERVER_HEALTH_MS = 24 * 60 * 60 * 1000;
   const {
     selectedId,
     leftTab,
@@ -299,7 +305,56 @@ export function EditorShell(props: EditorShellProps) {
   const [pendingTestPlan, setPendingTestPlan] = useState<any | null>(null);
   const [showUnsavedPlanWarning, setShowUnsavedPlanWarning] = useState(false);
   const [showTestPlansPanel, setShowTestPlansPanel] = useState(false);
-  const displayLibrary = data?.length ? data : library;
+  const [showServerSettings, setShowServerSettings] = useState(false);
+  const [isInitialServerSetup, setIsInitialServerSetup] = useState(false);
+  const [activeServerLabel, setActiveServerLabel] = useState("");
+  const [activeServerHealth, setActiveServerHealth] = useState<"healthy" | "error" | "stale" | "untested">("untested");
+  const displayLibrary = useMemo(() => {
+    if (Array.isArray(data) && data.length > 0) return data;
+    if (Array.isArray(library)) return library;
+    return [];
+  }, [data, library]);
+
+  const resolveActiveServerMeta = () => {
+    const active = getActiveServerProfile();
+    const label = active?.name?.trim() || active?.baseUrl || "Not configured";
+    setActiveServerLabel(label);
+
+    if (!active?.lastTestedAt || !active?.lastTestStatus) {
+      setActiveServerHealth("untested");
+      return;
+    }
+
+    const testedAt = new Date(active.lastTestedAt).getTime();
+    if (!Number.isFinite(testedAt)) {
+      setActiveServerHealth("untested");
+      return;
+    }
+
+    if (Date.now() - testedAt > STALE_SERVER_HEALTH_MS) {
+      setActiveServerHealth("stale");
+      return;
+    }
+
+    setActiveServerHealth(active.lastTestStatus === "success" ? "healthy" : "error");
+  };
+
+  useEffect(() => {
+    resolveActiveServerMeta();
+
+    if (!hasConfiguredServer()) {
+      setIsInitialServerSetup(true);
+      setShowServerSettings(true);
+    }
+
+    const interval = window.setInterval(() => {
+      resolveActiveServerMeta();
+    }, 15000);
+
+    return () => {
+      window.clearInterval(interval);
+    };
+  }, []);
 
   const libraryVisualTypeLookup = useMemo(() => {
     const map = new Map<string, string>();
@@ -1056,6 +1111,9 @@ export function EditorShell(props: EditorShellProps) {
         setShowConnectionsPanel={setShowConnectionsPanel}
         setShowResultListenersPanel={setShowResultListenersPanel}
         setShowTraceListenersPanel={setShowTraceListenersPanel}
+        activeServerName={activeServerLabel}
+        activeServerHealth={activeServerHealth}
+        onOpenServerSettings={() => setShowServerSettings(true)}
         handleSave={handleSaveAndMarkClean}
         handleRun={handleRun}
         handleStop={handleStop}
@@ -1351,6 +1409,29 @@ export function EditorShell(props: EditorShellProps) {
         contextMenu={contextMenu}
         setContextMenu={setContextMenu}
         handleContextAction={handleContextAction}
+      />
+
+      <ServerSettingsModal
+        isOpen={showServerSettings}
+        forceSetup={isInitialServerSetup}
+        onClose={() => setShowServerSettings(false)}
+        onSaved={(active) => {
+          const label = active?.name?.trim() || active?.baseUrl || "Not configured";
+          setActiveServerLabel(label);
+          if (!active?.lastTestedAt || !active?.lastTestStatus) {
+            setActiveServerHealth("untested");
+          } else {
+            const testedAt = new Date(active.lastTestedAt).getTime();
+            if (!Number.isFinite(testedAt)) {
+              setActiveServerHealth("untested");
+            } else if (Date.now() - testedAt > STALE_SERVER_HEALTH_MS) {
+              setActiveServerHealth("stale");
+            } else {
+              setActiveServerHealth(active.lastTestStatus === "success" ? "healthy" : "error");
+            }
+          }
+          setIsInitialServerSetup(false);
+        }}
       />
     </div>
   );

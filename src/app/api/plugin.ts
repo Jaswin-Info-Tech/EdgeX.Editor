@@ -1,6 +1,7 @@
 // api/users.js
 
 import axiosClient from "./client";
+import { getActiveServerProfile } from "../config/serverSettings";
 
 export const getInstalledPlugins = async (search?: string) => {
   const { data } = await axiosClient.get("/plugins", {
@@ -73,7 +74,8 @@ export const getRunLogs = async (runId: string) => {
 };
 
 export const getRunLogsStreamUrl = (runId: string) => {
-  const base = String(axiosClient.defaults.baseURL ?? "").replace(/\/$/, "");
+  const active = getActiveServerProfile();
+  const base = String(active?.baseUrl ?? axiosClient.defaults.baseURL ?? "").replace(/\/$/, "");
   return `${base}/runs/${runId}/logs/stream`;
 };
 
