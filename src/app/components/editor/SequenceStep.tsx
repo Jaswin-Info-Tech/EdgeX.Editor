@@ -225,7 +225,7 @@ export function SequenceStep(props: SequenceStepProps) {
             }}
           />
 
-          <div className="flex-1 flex items-center gap-2.5 px-3 py-2.5 min-w-0">
+          <div className="flex-1 flex items-center gap-2.5 px-3 py-2 min-w-0">
             {hasKids && (
               <button
                 onClick={(e) => {
@@ -276,19 +276,21 @@ export function SequenceStep(props: SequenceStepProps) {
                 className="flex-1 bg-primary/10 border border-primary px-1.5 py-0 text-[13px] font-mono text-foreground outline-none"
               />
             ) : (
-              <div className="flex-1 min-w-0">
+              <div
+                className="flex min-w-0 flex-1 items-center gap-2"
+                onDoubleClick={(e) => {
+                  e.stopPropagation();
+                  setRenaming(step.id);
+                  setRenameVal(step.name);
+                }}
+              >
                 <div
-                  className={`text-[13px] font-mono truncate ${isSel ? "text-foreground font-medium" : "text-foreground/80 group-hover:text-foreground"}`}
-                  onDoubleClick={(e) => {
-                    e.stopPropagation();
-                    setRenaming(step.id);
-                    setRenameVal(step.name);
-                  }}
+                  className={`min-w-0 flex-1 truncate text-[13px] font-mono ${isSel ? "text-foreground font-medium" : "text-foreground/80 group-hover:text-foreground"}`}
                 >
                   {step.name}
                 </div>
                 {summary && (
-                  <div className="text-[11px] text-muted-foreground font-mono mt-0.5">
+                  <div className="shrink-0 truncate border border-border/60 bg-muted/20 px-1.5 py-0 text-[10px] font-mono text-muted-foreground">
                     {summary}
                   </div>
                 )}

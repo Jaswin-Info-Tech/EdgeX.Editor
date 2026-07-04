@@ -31,6 +31,18 @@ import {
   runTestPlan,
 } from "../api/plugin";
 
+const PLAN_SNAPSHOT_STORAGE_KEY = "edgex.editor.planSnapshot.v1";
+
+type PersistedPlanSnapshot = {
+  hasPlan: boolean;
+  plan: TestStep[];
+  planMeta: PlanMeta;
+  selectedId: string | null;
+  expandedIds: string[];
+  leftTab: "plan" | "library" | "plugins" | "instruments";
+  savedPlanSignature: string | null;
+};
+
 
 
 
@@ -153,12 +165,90 @@ export function useEditorController() {
   useEffect(() => { logEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [logs]);
   useEffect(() => { renameRef.current?.focus(); }, [renaming]);
   useEffect(() => {
+    try {
+      const rawSnapshot = localStorage.getItem(PLAN_SNAPSHOT_STORAGE_KEY);
+      if (!rawSnapshot) return;
+
+      const parsed = JSON.parse(rawSnapshot) as Partial<PersistedPlanSnapshot>;
+      if (!parsed || parsed.hasPlan !== true || !Array.isArray(parsed.plan)) return;
+
+      const restoredPlan = parsed.plan;
+      const restoredMeta = parsed.planMeta;
+      if (!restoredMeta || typeof restoredMeta !== "object") return;
+
+      setPlan(restoredPlan);
+      setPlanMeta({
+        name: String(restoredMeta.name ?? "Untitled Test Plan"),
+        description: String(restoredMeta.description ?? ""),
+        author: String(restoredMeta.author ?? ""),
+        version: String(restoredMeta.version ?? "1.0.0"),
+        dutName: String(restoredMeta.dutName ?? ""),
+        dutSerial: String(restoredMeta.dutSerial ?? ""),
+        dutModel: String(restoredMeta.dutModel ?? ""),
+        dutFirmware: String(restoredMeta.dutFirmware ?? ""),
+      });
+      setHasPlan(true);
+
+      const validIds = new Set(flatAll(restoredPlan).map((step) => step.id));
+      const restoredSelectedId = String(parsed.selectedId ?? "");
+      setSelectedId(restoredSelectedId && validIds.has(restoredSelectedId) ? restoredSelectedId : null);
+
+      const expandedIds = Array.isArray(parsed.expandedIds)
+        ? parsed.expandedIds.filter((id): id is string => typeof id === "string" && validIds.has(id))
+        : [];
+      setExpanded(new Set(expandedIds));
+
+      const restoredLeftTab = parsed.leftTab;
+      if (restoredLeftTab === "plan" || restoredLeftTab === "library" || restoredLeftTab === "plugins" || restoredLeftTab === "instruments") {
+        setLeftTab(restoredLeftTab);
+      }
+
+      setSavedPlanSignature(typeof parsed.savedPlanSignature === "string" ? parsed.savedPlanSignature : null);
+      setRunState("idle");
+      setActiveRunId(null);
+      setLogs((prev) => [
+        ...prev,
+        {
+          id: logId.current++,
+          timestamp: nowTs(),
+          level: "INFO",
+          source: "TestPlans",
+          message: "Restored previous plan from browser session.",
+        },
+      ]);
+    } catch {
+      // Ignore restore failures and fall back to default empty state.
+    }
+  }, []);
+  useEffect(() => {
     if (!hasPlan || !savedPlanSignature) {
       setIsSaved(false);
       return;
     }
     setIsSaved(currentSaveSignature === savedPlanSignature);
   }, [currentSaveSignature, hasPlan, savedPlanSignature]);
+  useEffect(() => {
+    try {
+      if (!hasPlan) {
+        localStorage.removeItem(PLAN_SNAPSHOT_STORAGE_KEY);
+        return;
+      }
+
+      const snapshot: PersistedPlanSnapshot = {
+        hasPlan,
+        plan,
+        planMeta,
+        selectedId,
+        expandedIds: Array.from(expanded),
+        leftTab,
+        savedPlanSignature,
+      };
+
+      localStorage.setItem(PLAN_SNAPSHOT_STORAGE_KEY, JSON.stringify(snapshot));
+    } catch {
+      // Ignore persistence errors (e.g., private mode quota issues).
+    }
+  }, [expanded, hasPlan, leftTab, plan, planMeta, savedPlanSignature, selectedId]);
   useEffect(() => {
     const asBool = (value: unknown, fallback = false) => {
       if (typeof value === "boolean") return value;
