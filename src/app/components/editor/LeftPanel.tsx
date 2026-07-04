@@ -12,8 +12,47 @@ import {
 } from "lucide-react";
 import type { InstrumentItem, LibraryItem } from "../../types/editor";
 import { flatAll } from "../../utils/editor";
+import { TYPE_STRIPE } from "../../constants/editor";
 import { TypeIcon } from "./atoms";
 import { StepTree } from "./StepTree";
+
+function inferLibraryIconType(item: any): string {
+  const explicitType = String(item?.type ?? "").toLowerCase().trim();
+  const rawName = String(item?.name ?? "").toLowerCase().trim();
+  const haystack = [
+    item?.name,
+    item?.category,
+    item?.baseType,
+    item?.description,
+    item?.assembly,
+    explicitType,
+  ]
+    .map((value) => String(value ?? "").toLowerCase().trim())
+    .filter(Boolean)
+    .join(" ");
+
+  // Class-style names from external step libraries get dedicated icons.
+  if (/\ballclass\b/.test(rawName)) return "all";
+  if (/\bbank\d+class\b/.test(rawName)) return "bank";
+  if (/\battenuationclass\b/.test(rawName)) return "attenuation";
+  if (/\bclearclass\b/.test(rawName)) return "clear";
+  if (/\bcloseclass\b/.test(rawName)) return "close";
+  if (/\bcommon[a-z0-9_]*class\b/.test(rawName)) return "common";
+
+  if (/\b(sequence|group|container)\b/.test(haystack)) return "sequence";
+  if (/\b(command|cmd|scpi\s*command|write|query|reset|clear|close|open)\b/.test(haystack)) return "command";
+  if (/\b(if|else|branch|switch|condition|when)\b/.test(haystack)) return "condition";
+  if (/\b(loop|repeat|foreach|while|until|iterate)\b/.test(haystack)) return "loop";
+  if (/\b(install|uninstall|package|plugin)\b/.test(haystack)) return "package";
+  if (/\b(rf|spectrum|signal|network analyzer|vna)\b/.test(haystack)) return "rf";
+  if (/\b(measure|measurement|read|verify|assert|result|check)\b/.test(haystack)) return "measure";
+  if (/\b(network|socket|tcp|udp|http|ethernet)\b/.test(haystack)) return "network";
+  if (/\b(instrument|scpi|scope|generator|dmm|supply)\b/.test(haystack)) return "instrument";
+  if (/\b(dut|device under test)\b/.test(haystack)) return "dut";
+  if (/\b(hw|hardware)\b/.test(haystack)) return "hw";
+
+  return explicitType || "flow";
+}
 
 function instrumentToLibraryItem(instrument: InstrumentItem): LibraryItem {
   return {
@@ -359,7 +398,7 @@ export function LeftPanel({
             )}
             {filteredLib.map((item, index) => {
               const rowKey = `${item.id || item.name || "step"}-${item.baseType || ""}-${item.assembly || ""}-${index}`;
-              const type = String(item.type ?? "flow");
+              const iconType = inferLibraryIconType(item);
               const hoverInfo = [
                 `Category: ${item.category || "-"}`,
                 `Base Type: ${item.baseType || "-"}`,
@@ -398,8 +437,15 @@ export function LeftPanel({
                 className="group cursor-grab border-b border-l-2 border-l-transparent border-border/40 px-3 py-2 transition-colors hover:border-l-primary/60 hover:bg-secondary/40"
               >
                 <div className="flex items-center gap-2.5">
-                  <div className="shrink-0">
-                    <TypeIcon type={type} size={14} />
+                  <div
+                    className="flex h-5 w-5 shrink-0 items-center justify-center rounded-sm border"
+                    style={{
+                      color: TYPE_STRIPE[iconType] || "#64748b",
+                      borderColor: `${TYPE_STRIPE[iconType] || "#64748b"}66`,
+                      background: `${TYPE_STRIPE[iconType] || "#64748b"}1a`,
+                    }}
+                  >
+                    <TypeIcon type={iconType} size={12} />
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex min-w-0 items-center gap-1.5">
@@ -426,11 +472,11 @@ export function LeftPanel({
             );
             })}
           </div>
-          <div className="px-3 h-7 border-t border-border flex items-center shrink-0">
-            <span className="text-[10px] font-mono text-muted-foreground">
+          <div className="px-3 h-7 border-t border-border flex items-center gap-2 shrink-0 overflow-hidden">
+            <span className="min-w-0 truncate whitespace-nowrap text-[10px] font-mono text-muted-foreground">
               {filteredLib.length} steps
             </span>
-            <span className="ml-auto text-[10px] font-mono text-muted-foreground/80">
+            <span className="ml-auto min-w-0 truncate whitespace-nowrap text-[10px] font-mono text-muted-foreground/80">
               drag or double-click to add
             </span>
           </div>

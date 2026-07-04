@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Activity, AlertTriangle, BarChart2, CheckCircle2, Clock, Cpu, Layers, Minus, Radio, Wifi, XCircle, Zap } from "lucide-react";
+import { Activity, AlertTriangle, BarChart2, CheckCircle2, Clock, Cpu, Database, Layers, Minus, Package, Plug, Radio, RotateCcw, SlidersHorizontal, Terminal, Wifi, XCircle, Zap } from "lucide-react";
 import type { StepStatus } from "../../types/editor";
 import { STATUS_COLOR, TYPE_STRIPE } from "../../constants/editor";
 
@@ -14,15 +14,29 @@ export function StatusIcon({ status, size = 13 }: { status: StepStatus; size?: n
 }
 
 export function TypeIcon({ type, size = 13 }: { type: string; size?: number }) {
-  const col = TYPE_STRIPE[type] || "#64748b";
+  const normalized = String(type ?? "").toLowerCase().trim();
+  const col = TYPE_STRIPE[normalized] || "#64748b";
   const p = { size, style: { color: col } };
-  if (type === "sequence") return <Layers {...p} />;
-  if (type === "rf") return <Radio {...p} />;
-  if (type === "measure") return <BarChart2 {...p} />;
-  if (type === "network") return <Wifi {...p} />;
-  if (type === "dut") return <Cpu {...p} />;
-  if (type === "hw") return <Cpu {...p} />;
-  if (type === "instrument") return <Zap {...p} />;
+
+  if (normalized === "sequence") return <Layers {...p} />;
+  if (normalized === "rf") return <Radio {...p} />;
+  if (normalized === "measure") return <BarChart2 {...p} />;
+  if (normalized === "network") return <Wifi {...p} />;
+  if (normalized === "dut") return <Cpu {...p} />;
+  if (normalized === "hw") return <Cpu {...p} />;
+  if (normalized === "instrument") return <Zap {...p} />;
+  if (normalized === "command") return <Terminal {...p} />;
+  if (normalized === "all") return <Layers {...p} />;
+  if (normalized === "bank") return <Database {...p} />;
+  if (normalized === "attenuation") return <SlidersHorizontal {...p} />;
+  if (normalized === "clear") return <XCircle {...p} />;
+  if (normalized === "close") return <Minus {...p} />;
+  if (normalized === "common") return <Cpu {...p} />;
+  if (normalized === "condition") return <AlertTriangle {...p} />;
+  if (normalized === "loop") return <RotateCcw {...p} />;
+  if (normalized === "package") return <Package {...p} />;
+  if (normalized === "plugin") return <Plug {...p} />;
+
   return <Clock {...p} />;
 }
 

@@ -3,11 +3,15 @@ import type { StepStatus } from "../types/editor";
 export const TYPE_STRIPE: Record<string, string> = {
   sequence: "#3b82f6", rf: "#a855f7", measure: "#10b981",
   network: "#06b6d4", hw: "#f97316", instrument: "#eab308", dut: "#22c55e", flow: "#64748b",
+  command: "#0f766e", condition: "#f59e0b", loop: "#0ea5e9", package: "#6366f1", plugin: "#8b5cf6",
+  all: "#3b82f6", bank: "#0ea5e9", attenuation: "#f59e0b", clear: "#ef4444", close: "#64748b", common: "#14b8a6",
 };
 
 export const TYPE_LABEL: Record<string, string> = {
   sequence: "SEQ", rf: "RF", measure: "MSR", network: "NET",
   hw: "HW", instrument: "INST", dut: "DUT", flow: "FLOW",
+  command: "CMD", condition: "COND", loop: "LOOP", package: "PKG", plugin: "PLG",
+  all: "ALL", bank: "BANK", attenuation: "ATT", clear: "CLR", close: "CLS", common: "COM",
 };
 
 export const STATUS_COLOR: Record<StepStatus, string> = {
