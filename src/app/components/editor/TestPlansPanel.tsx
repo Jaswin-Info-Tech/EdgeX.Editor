@@ -113,14 +113,14 @@ export function TestPlansPanel({
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-[2px]"
       onClick={onClose}
     >
-      <div className="flex h-[680px] max-h-[90vh] w-[980px] max-w-[96vw] flex-col overflow-hidden border border-border/80 bg-card shadow-[0_28px_64px_rgba(0,0,0,0.45)]" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between border-b border-border px-5 py-3.5 bg-gradient-to-r from-muted/70 via-muted/30 to-card">
+      <div className="flex h-[640px] max-h-[90vh] w-[980px] max-w-[96vw] flex-col overflow-hidden border border-border/80 bg-card shadow-[0_28px_64px_rgba(0,0,0,0.45)]" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between border-b border-border px-4 py-2.5 bg-gradient-to-r from-muted/70 via-muted/30 to-card">
           <div className="flex min-w-0 items-center gap-3">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center border border-primary/35 bg-primary/10 text-primary shadow-sm">
-              <ClipboardList size={16} />
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center border border-primary/35 bg-primary/10 text-primary shadow-sm">
+              <ClipboardList size={14} />
             </div>
             <div className="min-w-0">
-              <div className="truncate text-[15px] font-semibold text-foreground">Test Plans</div>
+              <div className="truncate text-[14px] font-semibold text-foreground">Test Plans</div>
               <div className="truncate text-[12px] font-mono text-muted-foreground">Browse and open plans from local disk paths</div>
             </div>
           </div>
@@ -138,7 +138,7 @@ export function TestPlansPanel({
           </div>
         </div>
 
-        <div className="shrink-0 border-b border-border bg-muted/20 px-4 py-3">
+        <div className="shrink-0 border-b border-border bg-muted/20 px-4 py-2">
           <div className="flex w-full items-center gap-2">
             <div className="flex h-[38px] flex-1 items-center gap-2 border border-border bg-background px-3 focus-within:border-primary/70 focus-within:ring-2 focus-within:ring-primary/15">
               <Search size={13} className="shrink-0 text-muted-foreground" />
@@ -173,7 +173,7 @@ export function TestPlansPanel({
             <span>Tip: Press Enter to search quickly</span>
           </div>
           {recentPathChips.length > 0 && (
-            <div className="mt-2.5 flex items-center justify-between gap-3">
+            <div className="mt-2 flex items-center justify-between gap-3">
               <div className="flex min-w-0 items-center gap-2 overflow-hidden">
                 <div className="flex items-center gap-1 text-[11px] font-mono text-muted-foreground shrink-0">
                   <Clock3 size={11} /> Recent:
@@ -203,7 +203,7 @@ export function TestPlansPanel({
         </div>
 
         {showUnsavedWarning && (
-          <div className="mx-4 mt-3 border border-yellow-500/35 bg-yellow-500/10 shadow-sm">
+          <div className="mx-4 mt-2 border border-yellow-500/35 bg-yellow-500/10 shadow-sm">
             <div className="flex items-start gap-3 px-3 py-2">
               <AlertTriangle
                 size={16}
@@ -247,94 +247,77 @@ export function TestPlansPanel({
             </div>
           )}
           {isLoading ? (
-            <div className="px-5 py-10 text-center text-[12px] font-mono text-muted-foreground">
+            <div className="px-5 py-8 text-center text-[12px] font-mono text-muted-foreground">
               Searching test plans on disk...
             </div>
           ) : isError ? (
-            <div className="px-5 py-10 text-center text-[12px] font-mono text-destructive">
+            <div className="px-5 py-8 text-center text-[12px] font-mono text-destructive">
               Unable to load test plans.
             </div>
           ) : !hasSearched ? (
-            <div className="px-5 py-8">
-              <div className="mx-auto max-w-[760px] border border-border bg-muted/20 p-5">
-                <div className="text-[14px] font-semibold text-foreground">Load Test Plans</div>
-                <div className="mt-1 text-[12px] text-muted-foreground">
-                  Enter a folder path in the search box, then click Search to discover available test plans.
-                </div>
-
-                <div className="mt-4 grid gap-3 md:grid-cols-2">
-                  <div className="border border-border bg-background p-3">
-                    <div className="text-[12px] font-semibold text-foreground">Quick Start</div>
-                    <ol className="mt-2 list-decimal space-y-1 pl-4 text-[12px] text-muted-foreground">
-                      <li>Type a directory path like D:\\plans</li>
-                      <li>Press Enter or click Search</li>
-                      <li>Select a test plan row to open it</li>
-                    </ol>
-                  </div>
-                  <div className="border border-border bg-background p-3">
-                    <div className="text-[12px] font-semibold text-foreground">Search Tips</div>
-                    <ul className="mt-2 list-disc space-y-1 pl-4 text-[12px] text-muted-foreground">
-                      <li>Use full folder paths for better results</li>
-                      <li>Subfolders are included by the backend search</li>
-                      <li>Use Enter for faster keyboard flow</li>
-                    </ul>
+            <div className="px-4 py-4">
+              <div className="mx-auto max-w-[860px] border border-border bg-muted/15">
+                <div className="border-b border-border px-4 py-2.5">
+                  <div className="text-[13px] font-semibold text-foreground">Load Test Plans</div>
+                  <div className="mt-0.5 text-[11px] text-muted-foreground">
+                    Enter a folder path and run search.
                   </div>
                 </div>
 
-                {recentPathChips.length > 0 && (
-                  <div className="mt-4 border border-border bg-background p-3">
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-2 text-[12px] font-semibold text-foreground">
-                        <Clock3 size={13} className="text-muted-foreground" />
-                        Recent Paths
-                      </div>
-                      <button
-                        onClick={clearRecentPaths}
-                        className="h-6 border border-border px-2 text-[10px] font-mono uppercase tracking-wider text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
-                      >
-                        Clear
-                      </button>
+                <div className="px-4 py-3">
+                  <div className="grid gap-2 text-[11px] text-muted-foreground md:grid-cols-[1fr_auto] md:items-center">
+                    <div className="min-w-0 truncate">
+                      Steps: 1) Type path (example: <span className="font-mono">D:\\plans</span>) 2) Press Enter/Search 3) Open a plan row.
                     </div>
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      {recentPathChips.map((path) => (
+                    <button
+                      onClick={handleSearch}
+                      className="flex h-8 items-center justify-center gap-2 bg-primary px-3 text-[12px] font-mono font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
+                    >
+                      <Search size={12} /> Search Now
+                    </button>
+                  </div>
+
+                  {recentPathChips.length > 0 && (
+                    <div className="mt-3 border border-border bg-background px-3 py-2.5">
+                      <div className="mb-2 flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-1.5 text-[11px] font-mono text-muted-foreground">
+                          <Clock3 size={12} /> Recent Paths
+                        </div>
                         <button
-                          key={`guide:${path}`}
-                          onClick={() => applyRecentPath(path)}
-                          className="h-7 border border-border bg-background px-2.5 text-[11px] font-mono text-muted-foreground transition-colors hover:border-primary/50 hover:text-foreground"
-                          title={`Search ${path}`}
+                          onClick={clearRecentPaths}
+                          className="h-6 border border-border px-2 text-[10px] font-mono uppercase tracking-wider text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
                         >
-                          {path}
+                          Clear
                         </button>
-                      ))}
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {recentPathChips.map((path) => (
+                          <button
+                            key={`guide:${path}`}
+                            onClick={() => applyRecentPath(path)}
+                            className="h-6 border border-border bg-background px-2 text-[11px] font-mono text-muted-foreground transition-colors hover:border-primary/50 hover:text-foreground"
+                            title={`Search ${path}`}
+                          >
+                            {path}
+                          </button>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )}
 
-                <div className="mt-4 border border-dashed border-border bg-background/70 p-3 text-[12px] text-muted-foreground">
-                  <span className="font-semibold text-foreground">Example:</span>
-                  <span className="ml-2 font-mono">D:\\plans</span>
-                </div>
-
-                <div className="mt-4 flex items-center justify-between gap-3">
-                  <div className="text-[11px] text-muted-foreground">
+                  <div className="mt-3 border border-dashed border-border bg-background/70 px-3 py-2 text-[11px] text-muted-foreground">
                     {trimmedQuery ? `Ready to search in: ${trimmedQuery}` : "Enter a path above to begin."}
                   </div>
-                  <button
-                    onClick={handleSearch}
-                    className="flex h-8 items-center gap-2 bg-primary px-3 text-[12px] font-mono font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
-                  >
-                    <Search size={12} /> Search Now
-                  </button>
                 </div>
               </div>
             </div>
           ) : hasSearched && testPlans.length === 0 ? (
-            <div className="px-5 py-10 text-center text-[12px] font-mono text-muted-foreground">
+            <div className="px-5 py-8 text-center text-[12px] font-mono text-muted-foreground">
               No test plans found for your search.
             </div>
           ) : (
             <>
-              <div className="sticky top-0 z-10 grid grid-cols-[minmax(0,1fr)_88px_180px_26px] items-center gap-2 border-b border-border bg-muted/45 px-5 py-2 text-[10px] font-mono uppercase tracking-[0.12em] text-muted-foreground">
+              <div className="sticky top-0 z-10 grid grid-cols-[minmax(0,1fr)_88px_180px_26px] items-center gap-2 border-b border-border bg-muted/45 px-4 py-1.5 text-[10px] font-mono uppercase tracking-[0.12em] text-muted-foreground">
                 <span>Name / Path</span>
                 <span className="text-right">Steps</span>
                 <span>Last Modified</span>
@@ -348,13 +331,13 @@ export function TestPlansPanel({
                     onClick={() => onOpen(plan)}
                     disabled={!!openingPath}
                     title={String(plan.path ?? "").replace(/\\/g, "\\\\")}
-                    className="group relative grid w-full grid-cols-[minmax(0,1fr)_88px_180px_26px] items-center gap-2 border-b border-border border-l-2 border-l-transparent px-5 py-3 text-left transition-colors hover:border-l-primary/60 hover:bg-secondary/40 focus:bg-primary/10 focus:outline-none disabled:cursor-wait disabled:opacity-60"
+                    className="group relative grid w-full grid-cols-[minmax(0,1fr)_88px_180px_26px] items-center gap-2 border-b border-border border-l-2 border-l-transparent px-4 py-2 text-left transition-colors hover:border-l-primary/60 hover:bg-secondary/40 focus:bg-primary/10 focus:outline-none disabled:cursor-wait disabled:opacity-60"
                   >
                     <div className="min-w-0">
-                      <div className="truncate text-[14px] font-semibold text-foreground transition-colors group-hover:text-primary">
+                      <div className="truncate text-[13px] font-semibold text-foreground transition-colors group-hover:text-primary">
                         {plan.name}
                       </div>
-                      <div className="mt-0.5 truncate text-[12px] text-muted-foreground transition-colors group-hover:text-foreground/75">
+                      <div className="truncate text-[11px] text-muted-foreground transition-colors group-hover:text-foreground/75">
                         {String(plan.path ?? "").replace(/\\/g, "\\\\")}
                       </div>
                     </div>
