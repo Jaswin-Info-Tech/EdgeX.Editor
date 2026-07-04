@@ -104,7 +104,12 @@ const getResourceDisplayName = (resource: Resource) =>
   resource.properties?.name ||
   String((resource as any).dutName ?? (resource as any).model ?? resource.type ?? "");
 
-type ResourceKind = "instrument" | "duts" | "connections";
+type ResourceKind =
+  | "instrument"
+  | "duts"
+  | "connections"
+  | "result-listeners"
+  | "trace-listeners";
 
 interface KindConfig {
   resourceKind: ResourceKind;
@@ -203,6 +208,56 @@ const CONFIGS: Record<ResourceKind, KindConfig> = {
     noInstancesMessage: "No existing instances of this connection.",
     footerAddedMessage: "Will be added to the Connections panel",
     footerUpdatedMessage: "Will update the selected connection resource",
+    deleteIcon: (p) => <Trash2 {...p} />,
+    resolveTypeName: (item) => String(item?.name ?? "").trim(),
+    matchesResource: (resource, item) => {
+      const selectedType = extractTypeName(String(item?.name ?? "")).toLowerCase();
+      const resourceType = extractTypeName(String(resource.type ?? "")).toLowerCase();
+      return resourceType === selectedType;
+    },
+    getDisplayName: (resource) => resource.name,
+    coerceEnums: true,
+    useNameInputRef: false,
+  },
+  "result-listeners": {
+    resourceKind: "result-listeners",
+    icon: (p) => <FileText {...p} />,
+    panelTitle: "Add Result Listener",
+    itemLabelSingular: "result listener",
+    itemLabelCapitalized: "Result Listener",
+    itemsEmptyMessage: "No result listeners available.",
+    itemsEmptyMessageFiltered: "No matching result listeners.",
+    loadingItemsMessage: "Loading result listeners...",
+    errorItemsMessage: "Unable to load result listeners.",
+    baseTypeFallback: "Result output plugin",
+    noInstancesMessage: "No existing instances of this result listener.",
+    footerAddedMessage: "Will be added to the Result Listeners panel",
+    footerUpdatedMessage: "Will update the selected result listener resource",
+    deleteIcon: (p) => <Trash2 {...p} />,
+    resolveTypeName: (item) => String(item?.name ?? "").trim(),
+    matchesResource: (resource, item) => {
+      const selectedType = extractTypeName(String(item?.name ?? "")).toLowerCase();
+      const resourceType = extractTypeName(String(resource.type ?? "")).toLowerCase();
+      return resourceType === selectedType;
+    },
+    getDisplayName: (resource) => resource.name,
+    coerceEnums: true,
+    useNameInputRef: false,
+  },
+  "trace-listeners": {
+    resourceKind: "trace-listeners",
+    icon: (p) => <Zap {...p} />,
+    panelTitle: "Add Trace Listener",
+    itemLabelSingular: "trace listener",
+    itemLabelCapitalized: "Trace Listener",
+    itemsEmptyMessage: "No trace listeners available.",
+    itemsEmptyMessageFiltered: "No matching trace listeners.",
+    loadingItemsMessage: "Loading trace listeners...",
+    errorItemsMessage: "Unable to load trace listeners.",
+    baseTypeFallback: "Trace output plugin",
+    noInstancesMessage: "No existing instances of this trace listener.",
+    footerAddedMessage: "Will be added to the Trace Listeners panel",
+    footerUpdatedMessage: "Will update the selected trace listener resource",
     deleteIcon: (p) => <Trash2 {...p} />,
     resolveTypeName: (item) => String(item?.name ?? "").trim(),
     matchesResource: (resource, item) => {
@@ -1273,6 +1328,66 @@ export function ConnectionsPanel({
     <GenericResourcePanel
       config={CONFIGS.connections}
       items={connections}
+      search={search}
+      setSearch={setSearch}
+      isLoading={isLoading}
+      isError={isError}
+      onClose={onClose}
+    />
+  );
+}
+
+interface ResultListenersPanelProps {
+  resultListeners: any[];
+  search: string;
+  setSearch: (value: string) => void;
+  isLoading: boolean;
+  isError: boolean;
+  onClose: () => void;
+}
+
+export function ResultListenersPanel({
+  resultListeners,
+  search,
+  setSearch,
+  isLoading,
+  isError,
+  onClose,
+}: ResultListenersPanelProps) {
+  return (
+    <GenericResourcePanel
+      config={CONFIGS["result-listeners"]}
+      items={resultListeners}
+      search={search}
+      setSearch={setSearch}
+      isLoading={isLoading}
+      isError={isError}
+      onClose={onClose}
+    />
+  );
+}
+
+interface TraceListenersPanelProps {
+  traceListeners: any[];
+  search: string;
+  setSearch: (value: string) => void;
+  isLoading: boolean;
+  isError: boolean;
+  onClose: () => void;
+}
+
+export function TraceListenersPanel({
+  traceListeners,
+  search,
+  setSearch,
+  isLoading,
+  isError,
+  onClose,
+}: TraceListenersPanelProps) {
+  return (
+    <GenericResourcePanel
+      config={CONFIGS["trace-listeners"]}
+      items={traceListeners}
       search={search}
       setSearch={setSearch}
       isLoading={isLoading}

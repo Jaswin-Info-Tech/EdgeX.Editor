@@ -1,4 +1,4 @@
-import { ActivitySquare, Database, FilePlus, FolderOpen, FolderPlus, Package, Pause, Play, Plus, RotateCcw, Save, Square } from "lucide-react";
+import { ActivitySquare, FilePlus, FolderOpen, FolderPlus, Package, Pause, Play, RotateCcw, Save, Square } from "lucide-react";
 import { ToolBtn } from "./atoms";
 
 interface EditorToolbarProps {

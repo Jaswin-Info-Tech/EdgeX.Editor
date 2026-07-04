@@ -3,7 +3,7 @@ import { Moon, PanelLeftOpen, PanelRightOpen, Sun, Check } from "lucide-react";
 const MENU_ITEMS: Record<string, string[]> = {
   File: ["Import Plan","Export Plan"],
   View: ["Step Library", "Properties", "Console", "-", "Reset Layout"],
-  Bench: ["Instruments", "DUTs", "Connections"],
+  Bench: ["Instruments", "DUTs", "Connections", "Result Listeners", "Trace Listeners"],
 };
 
 interface MenuBarProps {
@@ -26,6 +26,8 @@ interface MenuBarProps {
   setShowInstrumentsPanel: (value: boolean) => void;
   setShowDutsPanel: (value: boolean) => void;
   setShowConnectionsPanel: (value: boolean) => void;
+  setShowResultListenersPanel: (value: boolean) => void;
+  setShowTraceListenersPanel: (value: boolean) => void;
   handleSave: () => void;
   handleExportPlan: () => void;
   handleImportPlan: () => void;
@@ -55,6 +57,8 @@ export function MenuBar({
   setShowInstrumentsPanel,
   setShowDutsPanel,
   setShowConnectionsPanel,
+  setShowResultListenersPanel,
+  setShowTraceListenersPanel,
   handleSave,
   handleExportPlan,
   handleImportPlan,
@@ -76,6 +80,8 @@ export function MenuBar({
     if (item === "Instruments") setShowInstrumentsPanel(true);
     if (item === "DUTs") setShowDutsPanel(true);
     if (item === "Connections") setShowConnectionsPanel(true);
+    if (item === "Result Listeners") setShowResultListenersPanel(true);
+    if (item === "Trace Listeners") setShowTraceListenersPanel(true);
     if (item === "Run All") handleRun();
     if (item === "Stop") handleStop();
     if (item === "Pause") handlePause();

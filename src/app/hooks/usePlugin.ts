@@ -1,6 +1,14 @@
 // hooks/useUsers.js
 import { useQuery } from "@tanstack/react-query";
-import { getInstalledPlugins, getInstruments, getDuts, getSteps, getConnections } from "../api/plugin";
+import {
+  getInstalledPlugins,
+  getInstruments,
+  getDuts,
+  getSteps,
+  getConnections,
+  getResultListeners,
+  getTraceListeners,
+} from "../api/plugin";
 import { getTestPlans } from "../api/testplans";
 import type { ConnectionItem, DutItem, InstrumentItem, LibraryItem, TestPlanItem } from "../types/editor";
 
@@ -95,6 +103,44 @@ export const useConnections = () => {
     queryKey: ["connections"],
     queryFn: async () => {
       const data = await getConnections();
+      if (Array.isArray(data)) {
+        return data.map((item: any) => ({
+          name: String(item.name ?? ""),
+          assembly: String(item.assembly ?? ""),
+          baseType: String(item.baseType ?? ""),
+          canCreateInstance: Boolean(item.canCreateInstance),
+          isBrowsable: Boolean(item.isBrowsable),
+        }));
+      }
+      return [];
+    },
+  });
+};
+
+export const useResultListeners = () => {
+  return useQuery<InstrumentItem[]>({
+    queryKey: ["result-listeners"],
+    queryFn: async () => {
+      const data = await getResultListeners();
+      if (Array.isArray(data)) {
+        return data.map((item: any) => ({
+          name: String(item.name ?? ""),
+          assembly: String(item.assembly ?? ""),
+          baseType: String(item.baseType ?? ""),
+          canCreateInstance: Boolean(item.canCreateInstance),
+          isBrowsable: Boolean(item.isBrowsable),
+        }));
+      }
+      return [];
+    },
+  });
+};
+
+export const useTraceListeners = () => {
+  return useQuery<InstrumentItem[]>({
+    queryKey: ["trace-listeners"],
+    queryFn: async () => {
+      const data = await getTraceListeners();
       if (Array.isArray(data)) {
         return data.map((item: any) => ({
           name: String(item.name ?? ""),

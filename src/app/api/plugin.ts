@@ -73,3 +73,13 @@ export const getConnections = async () => {
   const { data } = await axiosClient.get("/plugins/connections");
   return data;
 };
+
+export const getResultListeners = async () => {
+  const { data } = await axiosClient.get("/plugins/result-listeners");
+  return data;
+};
+
+export const getTraceListeners = async () => {
+  const { data } = await axiosClient.get("/plugins/trace-listeners");
+  return data;
+};

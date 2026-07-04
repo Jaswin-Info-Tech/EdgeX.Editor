@@ -8,7 +8,15 @@ import { addToParent, deleteIn, flatAll, makeSequence, makeStep, moveIn, nowTs, 
 import { removePlugin, uploadPlugin } from "../api/plugin";
 import { installPackage, uninstallPackage } from "../api/package";
 import { useAvailablePackages } from "./usePackage";
-import { useInstalledPlugins, useDuts, usePlugins, useInstruments,useConnections } from "./usePlugin";
+import {
+  useInstalledPlugins,
+  useDuts,
+  usePlugins,
+  useInstruments,
+  useConnections,
+  useResultListeners,
+  useTraceListeners,
+} from "./usePlugin";
 import { useWindowWidth } from "./useWindowWidth";
 import { useDebounce } from "./useDebounce";
 import { moveStepToPosition } from "../utils/editor";
@@ -462,6 +470,16 @@ export function useEditorController() {
   const { data: instruments, isLoading: isInstrumentsLoading, isError: isInstrumentsError } = useInstruments();
   const { data: duts, isLoading: isDutsLoading, isError: isDutsError } = useDuts();
   const { data: connections, isLoading: isConnectionsLoading, isError: isConnectionsError } = useConnections();
+  const {
+    data: resultListeners,
+    isLoading: isResultListenersLoading,
+    isError: isResultListenersError,
+  } = useResultListeners();
+  const {
+    data: traceListeners,
+    isLoading: isTraceListenersLoading,
+    isError: isTraceListenersError,
+  } = useTraceListeners();
 
   const selectedStep = selectedId ? flatAll(plan).find(step => step.id === selectedId) : null;
   const toggleExpand = (id: string) => setExpanded(prev => {
@@ -1035,8 +1053,16 @@ export function useEditorController() {
     isInstrumentsError,
     duts: duts ?? [],
     connections: connections ?? [],
+    resultListeners: resultListeners ?? [],
+    traceListeners: traceListeners ?? [],
     isDutsLoading,
     isDutsError,
+    isConnectionsLoading,
+    isConnectionsError,
+    isResultListenersLoading,
+    isResultListenersError,
+    isTraceListenersLoading,
+    isTraceListenersError,
     plan,
     planMeta,
     stats,

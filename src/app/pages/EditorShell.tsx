@@ -4,7 +4,13 @@ import { getResources, getResourceSchema } from "../api/resources";
 import { Toggle } from "../components/editor/atoms";
 import { ConsolePanel } from "../components/editor/ConsolePanel";
 import { EditorToolbar } from "../components/editor/EditorToolbar";
-import { DutsPanel, InstrumentsPanel, ConnectionsPanel } from "../components/editor/benchModals";
+import {
+  DutsPanel,
+  InstrumentsPanel,
+  ConnectionsPanel,
+  ResultListenersPanel,
+  TraceListenersPanel,
+} from "../components/editor/benchModals";
 import { LeftPanel } from "../components/editor/LeftPanel";
 import { MenuBar } from "../components/editor/MenuBar";
 import { ModalsHost } from "../components/editor/ModalsHost";
@@ -85,6 +91,12 @@ interface EditorShellProps {
   connections: any[];
   isConnectionsLoading: boolean;
   isConnectionsError: boolean;
+  resultListeners: any[];
+  isResultListenersLoading: boolean;
+  isResultListenersError: boolean;
+  traceListeners: any[];
+  isTraceListenersLoading: boolean;
+  isTraceListenersError: boolean;
   plan: any;
   planMeta: any;
   stats: any;
@@ -201,6 +213,12 @@ export function EditorShell(props: EditorShellProps) {
     connections,
     isConnectionsLoading,
     isConnectionsError,
+    resultListeners,
+    isResultListenersLoading,
+    isResultListenersError,
+    traceListeners,
+    isTraceListenersLoading,
+    isTraceListenersError,
     plan,
     planMeta,
     stats,
@@ -252,6 +270,10 @@ export function EditorShell(props: EditorShellProps) {
   const [connectionSearch, setConnectionSearch] = useState("");
   const [showDutsPanel, setShowDutsPanel] = useState(false);
   const [showConnectionsPanel, setShowConnectionsPanel] = useState(false);
+  const [resultListenerSearch, setResultListenerSearch] = useState("");
+  const [traceListenerSearch, setTraceListenerSearch] = useState("");
+  const [showResultListenersPanel, setShowResultListenersPanel] = useState(false);
+  const [showTraceListenersPanel, setShowTraceListenersPanel] = useState(false);
   const [resourceSearch, setResourceSearch] = useState("");
   const [showResourcesPanel, setShowResourcesPanel] = useState(false);
   const [showCreateResource, setShowCreateResource] = useState(false);
@@ -350,6 +372,34 @@ export function EditorShell(props: EditorShellProps) {
         );
       }),
     [connections, connectionSearch],
+  );
+
+  const filteredResultListeners = useMemo(
+    () =>
+      resultListeners.filter((listener: any) => {
+        const search = resultListenerSearch.trim().toLowerCase();
+        if (!search) return true;
+        return [listener.name, listener.baseType, listener.assembly].some((value) =>
+          String(value ?? "")
+            .toLowerCase()
+            .includes(search),
+        );
+      }),
+    [resultListeners, resultListenerSearch],
+  );
+
+  const filteredTraceListeners = useMemo(
+    () =>
+      traceListeners.filter((listener: any) => {
+        const search = traceListenerSearch.trim().toLowerCase();
+        if (!search) return true;
+        return [listener.name, listener.baseType, listener.assembly].some((value) =>
+          String(value ?? "")
+            .toLowerCase()
+            .includes(search),
+        );
+      }),
+    [traceListeners, traceListenerSearch],
   );
 
 
@@ -961,6 +1011,8 @@ export function EditorShell(props: EditorShellProps) {
         setShowInstrumentsPanel={setShowInstrumentsPanel}
         setShowDutsPanel={setShowDutsPanel}
         setShowConnectionsPanel={setShowConnectionsPanel}
+        setShowResultListenersPanel={setShowResultListenersPanel}
+        setShowTraceListenersPanel={setShowTraceListenersPanel}
         handleSave={handleSaveAndMarkClean}
         handleRun={handleRun}
         handleStop={handleStop}
@@ -1095,6 +1147,28 @@ export function EditorShell(props: EditorShellProps) {
           isLoading={isConnectionsLoading}
           isError={isConnectionsError}
           onClose={() => setShowConnectionsPanel(false)}
+        />
+      )}
+
+      {showResultListenersPanel && (
+        <ResultListenersPanel
+          resultListeners={filteredResultListeners}
+          search={resultListenerSearch}
+          setSearch={setResultListenerSearch}
+          isLoading={isResultListenersLoading}
+          isError={isResultListenersError}
+          onClose={() => setShowResultListenersPanel(false)}
+        />
+      )}
+
+      {showTraceListenersPanel && (
+        <TraceListenersPanel
+          traceListeners={filteredTraceListeners}
+          search={traceListenerSearch}
+          setSearch={setTraceListenerSearch}
+          isLoading={isTraceListenersLoading}
+          isError={isTraceListenersError}
+          onClose={() => setShowTraceListenersPanel(false)}
         />
       )}
 

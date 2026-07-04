@@ -36,20 +36,24 @@ export const getResources = async (): Promise<Resource[]> => {
 
     const combined: Resource[] = [];
 
-    // Instruments
-    if (data.instruments && Array.isArray(data.instruments)) {
-      const mappedInstruments = data.instruments.map((instrument: any, index: number) => {
-        const propsMap = propsArrayToMap(instrument.properties);
+    const mapResourceGroup = (items: any[], prefix: string) => {
+      return items.map((resource: any, index: number) => {
+        const propsMap = propsArrayToMap(resource.properties);
         return {
-          id: instrument.name || `instrument-${index}`,
-          name: instrument.name || "Unnamed",
-          instrument: extractTypeName(instrument.type),
-          status: propsMap.Error ? "Error" : "Active",
+          id: resource.id || resource.name || `${prefix}-${index}`,
+          name: resource.name || "Unnamed",
+          instrument: resource.instrument || extractTypeName(resource.type),
+          status: resource.status || (propsMap.Error ? "Error" : "Active"),
           error: propsMap.Error || "",
-          type: instrument.type,
+          type: resource.type,
           properties: propsMap,
         };
       });
+    };
+
+    // Instruments
+    if (data.instruments && Array.isArray(data.instruments)) {
+      const mappedInstruments = mapResourceGroup(data.instruments, "instrument");
       combined.push(...mappedInstruments);
     }
 
@@ -57,19 +61,28 @@ export const getResources = async (): Promise<Resource[]> => {
     const connections = data.connections ?? data.conections;
 
     if (Array.isArray(connections)) {
-      const mappedConnections = connections.map((connection: any, index: number) => {
-        const propsMap = propsArrayToMap(connection.properties);
-        return {
-          id: connection.name || `connection-${index}`,
-          name: connection.name || "Unnamed",
-          instrument: extractTypeName(connection.type),
-          status: propsMap.Error ? "Error" : "Active",
-          error: propsMap.Error || "",
-          type: connection.type,
-          properties: propsMap,
-        };
-      });
+      const mappedConnections = mapResourceGroup(connections, "connection");
       combined.push(...mappedConnections);
+    }
+
+    // Result listeners
+    const resultListeners =
+      data.resultListeners ??
+      data.resultlisteners ??
+      data.result_listeners;
+
+    if (Array.isArray(resultListeners)) {
+      combined.push(...mapResourceGroup(resultListeners, "result-listener"));
+    }
+
+    // Trace listeners
+    const traceListeners =
+      data.traceListeners ??
+      data.tracelisteners ??
+      data.trace_listeners;
+
+    if (Array.isArray(traceListeners)) {
+      combined.push(...mapResourceGroup(traceListeners, "trace-listener"));
     }
 
     // DUTs
