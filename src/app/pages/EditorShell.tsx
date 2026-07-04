@@ -23,6 +23,7 @@ import { ServerSettingsModal } from "../components/editor/ServerSettingsModal";
 import { SystemKpisPanel } from "../components/editor/SystemKpisPanel";
 import { Splitter } from "../components/editor/resizable";
 import { TestPlansPanel } from "../components/editor/TestPlansPanel";
+import { queryClient } from "../api/queryClient";
 import {
   getActiveServerProfile,
   hasConfiguredServer,
@@ -30,6 +31,7 @@ import {
 import { useTestPlans } from "../hooks/usePlugin";
 import type { Property, TestStep } from "../types/editor";
 import { flatAll } from "../utils/editor";
+import { toast } from "sonner";
 
 interface EditorShellProps {
   selectedId: any;
@@ -337,6 +339,13 @@ export function EditorShell(props: EditorShellProps) {
     }
 
     setActiveServerHealth(active.lastTestStatus === "success" ? "healthy" : "error");
+  };
+
+  const refreshForServerChange = () => {
+    toast.success("Server settings saved. Refreshing application...");
+    void queryClient.invalidateQueries().finally(() => {
+      window.location.reload();
+    });
   };
 
   useEffect(() => {
@@ -1431,6 +1440,7 @@ export function EditorShell(props: EditorShellProps) {
             }
           }
           setIsInitialServerSetup(false);
+          refreshForServerChange();
         }}
       />
     </div>

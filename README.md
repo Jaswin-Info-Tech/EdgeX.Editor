@@ -9,3 +9,10 @@
 
   Run `npm run dev` to start the development server.
   
+
+  docker build --build-arg VITE_API_BASE_URL=http://your-backend-url -t rajasekhar0790/edgex-editor:latest .
+Push image:
+docker push rajasekhar0790/edgex-editor:latest
+How to run pushed image directly:
+
+docker run -d -p 8088:80 --name edgex-editor rajasekhar0790/edgex-editor:latest

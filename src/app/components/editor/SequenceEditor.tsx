@@ -182,6 +182,11 @@ export function SequenceEditor({
 }: SequenceEditorProps) {
   const targetParentId = null;
   const targetIdx = plan.length;
+  const planFileName = useMemo(() => {
+    const rawName = String(planMeta?.name ?? "").trim();
+    if (!rawName) return "Untitled.TapPlan";
+    return /\.tapplan$/i.test(rawName) ? rawName : `${rawName}.TapPlan`;
+  }, [planMeta?.name]);
 
   const expanded: Set<string> = sequenceStepProps.expanded;
   const setDraggedStepId: (id: string | null) => void =
@@ -445,7 +450,7 @@ export function SequenceEditor({
               -
             </span>
             <span className="text-[12px] text-muted-foreground font-mono truncate">
-              {planMeta.name}
+              {planFileName}
             </span>
           </>
         )}

@@ -10,9 +10,9 @@ import {
   X,
   ChevronUp,
 } from "lucide-react";
-import { TYPE_STRIPE } from "../../constants/editor";
 import type { InstrumentItem, LibraryItem } from "../../types/editor";
 import { flatAll } from "../../utils/editor";
+import { TypeIcon } from "./atoms";
 import { StepTree } from "./StepTree";
 
 function instrumentToLibraryItem(instrument: InstrumentItem): LibraryItem {
@@ -115,15 +115,6 @@ export function LeftPanel({
   setContextMenu,
   toggleExpand,
 }: LeftPanelProps) {
-  const rowAccentColors = [
-    "#3b82f6",
-    "#10b981",
-    "#f59e0b",
-    "#a855f7",
-    "#ef4444",
-    "#06b6d4",
-  ];
-
   const selectedPathIds = React.useMemo(() => {
     if (!selectedId) return new Set<string>();
 
@@ -151,7 +142,7 @@ export function LeftPanel({
       <div className="flex border-b border-border shrink-0">
         {(
           [
-            ["plan", "Plan", <List size={12} />],
+            ["plan", "MyPlan", <List size={12} />],
             ["library", "Steps", <Database size={12} />],
           ] as const
         ).map(([tab, label, icon]) => (
@@ -358,8 +349,7 @@ export function LeftPanel({
           <div className="flex-1 overflow-y-auto">
             <div className="sticky top-0 z-10 border-b border-border bg-card/95 px-3 py-1.5 backdrop-blur">
               <div className="flex items-center gap-2 text-[10px] font-mono uppercase tracking-wider text-muted-foreground">
-                <span className="min-w-0 flex-1">Step</span>
-                <span className="shrink-0">Details</span>
+                <span className="min-w-0 flex-1">Step Library</span>
               </div>
             </div>
             {filteredLib.length === 0 && (
@@ -369,6 +359,15 @@ export function LeftPanel({
             )}
             {filteredLib.map((item, index) => {
               const rowKey = `${item.id || item.name || "step"}-${item.baseType || ""}-${item.assembly || ""}-${index}`;
+              const type = String(item.type ?? "flow");
+              const hoverInfo = [
+                `Category: ${item.category || "-"}`,
+                `Base Type: ${item.baseType || "-"}`,
+                `Assembly: ${item.assembly || "-"}`,
+                item.pluginId ? `Plugin: ${item.pluginId}` : "",
+              ]
+                .filter(Boolean)
+                .join("\n");
               return (
               <div
                 key={rowKey}
@@ -395,41 +394,31 @@ export function LeftPanel({
                     selectedStep?.type === "sequence" ? selectedId : null,
                   );
                 }}
-                className="group cursor-grab border-b border-l-2 border-l-transparent border-border/40 px-3 py-2.5 transition-colors hover:border-l-primary/60 hover:bg-secondary/40"
+                title={hoverInfo}
+                className="group cursor-grab border-b border-l-2 border-l-transparent border-border/40 px-3 py-2 transition-colors hover:border-l-primary/60 hover:bg-secondary/40"
               >
-                <div className="flex items-start gap-2.5">
-                  <div
-                    className="mt-0.5 h-4 w-[3px] shrink-0"
-                    style={{
-                      background:
-                        rowAccentColors[index % rowAccentColors.length] ||
-                        TYPE_STRIPE[item.type] ||
-                        "#64748b",
-                    }}
-                  />
+                <div className="flex items-center gap-2.5">
+                  <div className="shrink-0">
+                    <TypeIcon type={type} size={14} />
+                  </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex min-w-0 items-center gap-1.5">
                       <span className="truncate text-[12px] font-semibold text-foreground transition-colors group-hover:text-primary">
                         {item.name}
                       </span>
+                      <ChevronRight size={12} className="ml-auto shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
+                    </div>
+                    <div className="mt-1 hidden min-w-0 items-center gap-1 text-[10px] font-mono text-muted-foreground group-hover:flex">
+                      <span className="shrink-0 uppercase tracking-wide text-muted-foreground/80">Base</span>
+                      <span className="truncate">{item.baseType || "-"}</span>
+                      <span className="shrink-0 text-muted-foreground/50">|</span>
+                      <span className="shrink-0 uppercase tracking-wide text-muted-foreground/80">Asm</span>
+                      <span className="min-w-0 truncate">{item.assembly || "-"}</span>
                       {item.pluginId && (
-                        <span className="shrink-0 border border-primary/30 bg-primary/10 px-1 text-[9px] font-mono text-primary">
+                        <span className="ml-1 shrink-0 border border-primary/30 bg-primary/10 px-1 text-[9px] font-mono text-primary">
                           plugin
                         </span>
                       )}
-                      <ChevronRight size={12} className="ml-auto shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
-                    </div>
-                    <div className="mt-1 flex min-w-0 items-center gap-1 text-[10px] font-mono text-muted-foreground">
-                      <span className="shrink-0 uppercase tracking-wide text-muted-foreground/80">Base</span>
-                      <span className="truncate" title={item.baseType || "-"}>{item.baseType || "-"}</span>
-                      <span className="shrink-0 text-muted-foreground/50">|</span>
-                      <span className="shrink-0 uppercase tracking-wide text-muted-foreground/80">Asm</span>
-                      <span
-                        className="min-w-0 truncate"
-                        title={item.assembly || "-"}
-                      >
-                        {item.assembly || "-"}
-                      </span>
                     </div>
                   </div>
                 </div>
