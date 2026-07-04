@@ -1,5 +1,5 @@
-import { AlertTriangle, Plug, Sliders } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { AlertTriangle, ChevronDown, ChevronRight, Plug, Search, Sliders } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAppDispatch, useAppSelector } from "../../store/hooks";
 import { TYPE_STRIPE } from "../../constants/editor";
 import { flatAll, formatFreq, updateIn } from "../../utils/editor";
@@ -41,6 +41,9 @@ export function PropertiesPanel({
 }: PropertiesPanelProps) {
   const dispatch = useAppDispatch();
   const [schemaPropertyValues, setSchemaPropertyValues] = useState<Record<string, any>>({});
+  const [schemaCollapsed, setSchemaCollapsed] = useState(false);
+  const [schemaSearch, setSchemaSearch] = useState("");
+  const [schemaSavedSnapshot, setSchemaSavedSnapshot] = useState("{}");
   // console.log("PropertiesPanel selectedStep:", selectedStep);
   // console.log("PropertiesPanel resources:", resources);
   // Reads from the `properties` slice
@@ -146,8 +149,43 @@ const editorContext = useMemo<EditorContext>(() => {
   const schemaResponse = stepTypeName ? schemaCache[stepTypeName] : null;
   const schemaError = stepTypeName ? errorsByTypeName[stepTypeName] : null;
 
+  const makeSchemaSnapshot = useCallback((values: Record<string, any>, props: any[]) => {
+    const payload = props
+      .map((prop: any) => ({
+        name: String(prop?.name ?? ""),
+        value: values[prop?.name],
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+    try {
+      return JSON.stringify(payload);
+    } catch {
+      return "[]";
+    }
+  }, []);
+
   const schemaRecords = useMemo(() => getSchemaRecords(schemaResponse), [schemaResponse]);
   const schemaProperties = useMemo(() => schemaRecords[0]?.properties ?? [], [schemaRecords]);
+  const filteredSchemaProperties = useMemo(() => {
+    const query = schemaSearch.trim().toLowerCase();
+    if (!query) return schemaProperties;
+    return schemaProperties.filter((prop: any) => {
+      const name = String(prop.name ?? "").toLowerCase();
+      const displayName = String(prop.displayName ?? "").toLowerCase();
+      const editorType = String(prop.editorType ?? "").toLowerCase();
+      const typeName = String(prop.propertyType ?? prop.fullTypeName ?? "").toLowerCase();
+      return (
+        name.includes(query) ||
+        displayName.includes(query) ||
+        editorType.includes(query) ||
+        typeName.includes(query)
+      );
+    });
+  }, [schemaProperties, schemaSearch]);
+
+  useEffect(() => {
+    setSchemaCollapsed(false);
+    setSchemaSearch("");
+  }, [selectedStep?.id]);
 
 useEffect(() => {
   if (!selectedStep) {
@@ -192,7 +230,14 @@ useEffect(() => {
     }
   });
   setSchemaPropertyValues(values);
+  setSchemaSavedSnapshot(makeSchemaSnapshot(values, schemaProperties));
 }, [selectedStep, schemaProperties]);
+
+  const hasUnsavedSchemaChanges = useMemo(() => {
+    if (!schemaProperties.length) return false;
+    const current = makeSchemaSnapshot(schemaPropertyValues, schemaProperties);
+    return current !== schemaSavedSnapshot;
+  }, [makeSchemaSnapshot, schemaProperties, schemaPropertyValues, schemaSavedSnapshot]);
 
 
   const getTypedValue = (prop: any, value: any) => {
@@ -291,6 +336,8 @@ useEffect(() => {
         fullName: meta?.fullName ?? step.fullName,
       };
     }));
+
+    setSchemaSavedSnapshot(makeSchemaSnapshot(schemaPropertyValues, schemaProperties));
   };
 
   const renderProperties = () => {
@@ -317,7 +364,8 @@ useEffect(() => {
     const stripe = TYPE_STRIPE[selectedStep.type] || "#64748b";
 
     return (
-      <div className="h-full overflow-y-auto bg-card">
+      <div className="flex h-full flex-col bg-card">
+        <div className="min-h-0 flex-1 overflow-y-auto">
         <div className="border-b border-border bg-gradient-to-r from-muted/30 via-muted/10 to-card" style={{ borderLeft: `3px solid ${stripe}` }}>
           <div className="px-3 py-3.5">
             <div className="mb-1.5 flex items-center gap-2">
@@ -480,19 +528,55 @@ useEffect(() => {
                   Schema Properties
               </span>
               </div>
-              <span className="text-[10px] font-mono text-muted-foreground">
-                {hasSchemaProperties ? `${schemaProperties.length} fields` : "No fields"}
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-mono text-muted-foreground">
+                  {hasSchemaProperties
+                    ? `${filteredSchemaProperties.length}/${schemaProperties.length} fields`
+                    : "No fields"}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setSchemaCollapsed((prev) => !prev)}
+                  className="flex h-6 w-6 items-center justify-center border border-border text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+                  title={schemaCollapsed ? "Expand schema fields" : "Collapse schema fields"}
+                >
+                  {schemaCollapsed ? <ChevronRight size={12} /> : <ChevronDown size={12} />}
+                </button>
+              </div>
             </div>
 
-            {hasSchemaProperties ? (
-              schemaProperties.map((prop: any) =>
-                renderEditor(
-                  prop,
-                  schemaPropertyValues,
-                  setSchemaPropertyValues,
-                  editorContext,
-                ),
+            {!schemaCollapsed && hasSchemaProperties && (
+              <div className="border-b border-border px-3 py-2 bg-muted/10">
+                <div className="flex h-8 items-center gap-2 border border-border bg-background px-2.5 focus-within:border-primary/70 focus-within:ring-2 focus-within:ring-primary/15">
+                  <Search size={12} className="shrink-0 text-muted-foreground" />
+                  <input
+                    value={schemaSearch}
+                    onChange={(e) => setSchemaSearch(e.target.value)}
+                    placeholder="Filter schema fields..."
+                    className="min-w-0 flex-1 bg-transparent text-[12px] font-mono text-foreground placeholder:text-muted-foreground outline-none"
+                  />
+                </div>
+              </div>
+            )}
+
+            {schemaCollapsed ? (
+              <div className="border-b border-border px-3 py-3 text-[11px] font-mono text-muted-foreground">
+                Schema fields are collapsed.
+              </div>
+            ) : hasSchemaProperties ? (
+              filteredSchemaProperties.length > 0 ? (
+                filteredSchemaProperties.map((prop: any) =>
+                  renderEditor(
+                    prop,
+                    schemaPropertyValues,
+                    setSchemaPropertyValues,
+                    editorContext,
+                  ),
+                )
+              ) : (
+                <div className="border-b border-border px-3 py-3 text-[11px] font-mono text-muted-foreground">
+                  No schema fields match your filter.
+                </div>
               )
             ) : (
               <div className="border-b border-border px-3 py-4 text-[12px] text-muted-foreground font-mono">
@@ -516,11 +600,19 @@ useEffect(() => {
           </div>
         )}
 
+        </div>
+
         {selectedStep && (
-          <div className="mt-1 border-t border-border bg-card px-3 py-3">
+          <div className="sticky bottom-0 z-10 border-t border-border bg-card/95 px-3 py-3 backdrop-blur-[1px]">
+            <div className="mb-2 flex items-center justify-between">
+              <span className={`text-[10px] font-mono ${hasUnsavedSchemaChanges ? "text-amber-600 dark:text-amber-400" : "text-muted-foreground"}`}>
+                {hasUnsavedSchemaChanges ? "Unsaved changes" : "All changes saved"}
+              </span>
+            </div>
+
             <button
               onClick={commitSchemaProperties}
-              disabled={!canSaveSchema}
+              disabled={!canSaveSchema || !hasUnsavedSchemaChanges}
               className="flex h-9 w-full items-center justify-center gap-1.5 border border-border bg-primary text-[12px] font-mono font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
             >
               <Plug size={11} />
