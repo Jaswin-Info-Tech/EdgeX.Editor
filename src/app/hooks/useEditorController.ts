@@ -20,7 +20,16 @@ import {
 import { useWindowWidth } from "./useWindowWidth";
 import { useDebounce } from "./useDebounce";
 import { moveStepToPosition } from "../utils/editor";
-import { composeTestPlan, runTestPlan } from "../api/plugin";
+import {
+  cancelRun,
+  composeTestPlan,
+  getRunLogs,
+  getRunLogsStreamUrl,
+  getRunStatus,
+  pauseRun,
+  resumeRun,
+  runTestPlan,
+} from "../api/plugin";
 
 
 
@@ -68,6 +77,7 @@ export function useEditorController() {
   const [isDark, setIsDark] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
   const [savedPlanSignature, setSavedPlanSignature] = useState<string | null>(null);
+  const [activeRunId, setActiveRunId] = useState<string | null>(null);
   const [draggedStepId, setDraggedStepId] = useState<string | null>(null);
 
   const [leftOpen, setLeftOpen] = useState(true);
@@ -93,6 +103,13 @@ export function useEditorController() {
   const logEndRef = useRef<HTMLDivElement>(null);
   const runTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
   const renameRef = useRef<HTMLInputElement>(null);
+  const lastPolledRunPhaseRef = useRef<"running" | "paused" | "completed" | null>(null);
+  const runStatusPollingDisabledRef = useRef(false);
+  const seenRunLogKeysRef = useRef<Set<string>>(new Set());
+  const runLogsPollingDisabledRef = useRef(false);
+  const runLogsPollingErrorNotifiedRef = useRef(false);
+  const runLogsStreamErrorNotifiedRef = useRef(false);
+  const runLogsClosedNotifiedRef = useRef(false);
 
   const formatStepForSave = useCallback((step: TestStep): any => {
     const props = (step.properties || []).reduce((acc: Record<string, any>, prop: any) => {
@@ -290,10 +307,16 @@ export function useEditorController() {
 
     const method = String(requestConfig?.method ?? defaults?.method ?? "GET").toUpperCase();
     const url = String(requestConfig?.url ?? defaults?.url ?? "unknown-endpoint");
+    const baseURL = String(requestConfig?.baseURL ?? "");
+    const resolvedUrl = /^https?:\/\//i.test(url)
+      ? url
+      : baseURL
+        ? `${baseURL.replace(/\/$/, "")}/${url.replace(/^\//, "")}`
+        : url;
     const status = responseObj?.status;
     const statusText = responseObj?.statusText;
 
-    lines.push(`Request: ${method} ${url}`);
+    lines.push(`Request: ${method} ${resolvedUrl}`);
     if (typeof status === "number") {
       lines.push(`HTTP: ${status}${statusText ? ` ${String(statusText)}` : ""}`);
     }
@@ -450,6 +473,355 @@ export function useEditorController() {
     }
   }, [addLog]);
 
+  useEffect(() => {
+    if (!activeRunId) {
+      seenRunLogKeysRef.current.clear();
+      runLogsPollingErrorNotifiedRef.current = false;
+      runLogsStreamErrorNotifiedRef.current = false;
+      runLogsClosedNotifiedRef.current = false;
+      return;
+    }
+
+    if (runState !== "running" && runState !== "paused") return;
+
+    let cancelled = false;
+    let pollIntervalId: ReturnType<typeof setInterval> | null = null;
+    let eventSource: EventSource | null = null;
+    let usingPolling = false;
+
+    const asRecord = (value: unknown): Record<string, unknown> | null => {
+      if (value && typeof value === "object") return value as Record<string, unknown>;
+      return null;
+    };
+
+    const stringify = (value: unknown) => {
+      if (value == null) return "";
+      if (typeof value === "string") return value;
+      if (typeof value === "number" || typeof value === "boolean") return String(value);
+      try {
+        return JSON.stringify(value);
+      } catch {
+        return String(value);
+      }
+    };
+
+    const mapLogLevel = (value: unknown): LogEntry["level"] => {
+      const text = String(value ?? "").trim().toUpperCase();
+      if (text === "PASS") return "PASS";
+      if (text === "FAIL") return "FAIL";
+      if (text === "WARN" || text === "WARNING") return "WARN";
+      if (text === "ERROR" || text === "ERR" || text === "FATAL") return "ERROR";
+      if (text === "DEBUG" || text === "TRACE") return "DEBUG";
+      return "INFO";
+    };
+
+    const extractLogEntries = (payload: unknown): any[] => {
+      if (Array.isArray(payload)) return payload;
+      const rec = asRecord(payload);
+      if (!rec) return [];
+
+      if (Array.isArray(rec.logs)) return rec.logs as any[];
+      if (Array.isArray(rec.entries)) return rec.entries as any[];
+      if (Array.isArray(rec.items)) return rec.items as any[];
+      if (Array.isArray(rec.data)) return rec.data as any[];
+
+      return [rec];
+    };
+
+    const appendEntries = (payload: unknown) => {
+      const entries = extractLogEntries(payload);
+      if (entries.length === 0) return;
+
+      const nextLogs: LogEntry[] = [];
+
+      entries.forEach((entry: any) => {
+        const rec = asRecord(entry);
+        const message = rec
+          ? stringify(rec.message ?? rec.text ?? rec.line ?? rec.log)
+          : stringify(entry);
+        if (!message) return;
+
+        const source = rec
+          ? stringify(rec.source ?? rec.logger ?? rec.category ?? rec.component)
+          : "Run";
+        const level = rec
+          ? mapLogLevel(rec.level ?? rec.severity ?? rec.type)
+          : "INFO";
+        const externalId = rec
+          ? stringify(rec.id ?? rec.sequence ?? rec.index)
+          : "";
+        const key = externalId || `${source}|${level}|${message}`;
+
+        if (seenRunLogKeysRef.current.has(key)) return;
+        seenRunLogKeysRef.current.add(key);
+
+        nextLogs.push({
+          id: logId.current++,
+          timestamp: nowTs(),
+          level,
+          source: source || "Run",
+          message,
+        });
+      });
+
+      if (nextLogs.length > 0) {
+        setLogs((prev) => [...prev, ...nextLogs]);
+        runLogsPollingErrorNotifiedRef.current = false;
+      }
+    };
+
+    const markRunLogsClosed = (reason: string) => {
+      setRunState("completed");
+      setActiveRunId(null);
+      if (!runLogsClosedNotifiedRef.current) {
+        addLog("INFO", "EdgeX", `Run ${activeRunId} completed or expired [${reason}].`);
+        runLogsClosedNotifiedRef.current = true;
+      }
+    };
+
+    const ingestLogs = async () => {
+      try {
+        const payload = await getRunLogs(activeRunId);
+        if (cancelled) return;
+        appendEntries(payload);
+      } catch (error) {
+        if (cancelled) return;
+
+        const responseObj = asRecord(asRecord(error)?.response);
+        const statusCode = Number(responseObj?.status ?? 0);
+        const body = asRecord(responseObj?.data);
+        const message = String(body?.message ?? "").toLowerCase();
+
+        if (statusCode === 404 && message.includes("run not found")) {
+          markRunLogsClosed("log sync");
+          return;
+        }
+
+        if (statusCode === 404 || statusCode === 405) {
+          runLogsPollingDisabledRef.current = true;
+          if (!runLogsPollingErrorNotifiedRef.current) {
+            addLog("WARN", "EdgeX", "Run logs polling disabled (logs endpoint unavailable).");
+            runLogsPollingErrorNotifiedRef.current = true;
+          }
+          return;
+        }
+
+        if (!runLogsPollingErrorNotifiedRef.current) {
+          addLog("WARN", "EdgeX", "Unable to fetch live run logs; retrying...");
+          runLogsPollingErrorNotifiedRef.current = true;
+        }
+      }
+    };
+
+    const startPolling = () => {
+      if (usingPolling || runLogsPollingDisabledRef.current) return;
+      usingPolling = true;
+      ingestLogs();
+      pollIntervalId = setInterval(ingestLogs, 1500);
+    };
+
+    const startStream = () => {
+      const streamUrl = getRunLogsStreamUrl(activeRunId);
+      eventSource = new EventSource(streamUrl);
+
+      eventSource.onmessage = (event) => {
+        if (cancelled) return;
+        if (!event.data) return;
+        try {
+          appendEntries(JSON.parse(event.data));
+        } catch {
+          appendEntries({ message: event.data, source: "RunStream", level: "INFO" });
+        }
+      };
+
+      eventSource.onerror = async () => {
+        if (cancelled) return;
+        if (eventSource) {
+          eventSource.close();
+          eventSource = null;
+        }
+
+        try {
+          const statusPayload = await getRunStatus(activeRunId);
+          if (cancelled) return;
+
+          const statusRecord = asRecord(statusPayload) ?? {};
+          const statusText = String(statusRecord.status ?? statusRecord.state ?? statusRecord.runState ?? "").toLowerCase();
+          const verdictText = String(statusRecord.verdict ?? "").toLowerCase();
+          const completedFlag =
+            statusRecord.completed === true ||
+            statusRecord.isCompleted === true ||
+            statusRecord.finished === true ||
+            statusRecord.ended === true ||
+            statusRecord.succeeded === true;
+
+          if (
+            completedFlag ||
+            statusText.includes("completed") ||
+            statusText.includes("finished") ||
+            statusText.includes("stopped") ||
+            statusText.includes("cancel") ||
+            statusText.includes("aborted") ||
+            statusText.includes("failed") ||
+            statusText.includes("error") ||
+            (verdictText && verdictText !== "0" && verdictText !== "notset")
+          ) {
+            markRunLogsClosed("stream status sync");
+            return;
+          }
+        } catch (statusError) {
+          if (cancelled) return;
+          const statusResponse = asRecord(asRecord(statusError)?.response);
+          const statusCode = Number(statusResponse?.status ?? 0);
+          const statusBody = asRecord(statusResponse?.data);
+          const statusMessage = String(statusBody?.message ?? "").toLowerCase();
+          if (statusCode === 404 && statusMessage.includes("run not found")) {
+            markRunLogsClosed("stream status sync");
+            return;
+          }
+        }
+
+        if (!runLogsStreamErrorNotifiedRef.current) {
+          addLog("WARN", "EdgeX", "Run logs stream unavailable. Falling back to polling.");
+          runLogsStreamErrorNotifiedRef.current = true;
+        }
+        startPolling();
+      };
+    };
+
+    startStream();
+
+    return () => {
+      cancelled = true;
+      if (eventSource) {
+        eventSource.close();
+      }
+      if (pollIntervalId) {
+        clearInterval(pollIntervalId);
+      }
+    };
+  }, [activeRunId, addLog, runState]);
+
+  useEffect(() => {
+    if ((runState === "completed" || runState === "idle") && activeRunId) {
+      setActiveRunId(null);
+    }
+    if (runState === "completed" || runState === "idle") {
+      lastPolledRunPhaseRef.current = null;
+    }
+  }, [runState, activeRunId]);
+
+  useEffect(() => {
+    if (!activeRunId) return;
+    if (runStatusPollingDisabledRef.current) return;
+    if (runState !== "running" && runState !== "paused") return;
+
+    let cancelled = false;
+
+    const asRecord = (value: unknown): Record<string, unknown> | null => {
+      if (value && typeof value === "object") return value as Record<string, unknown>;
+      return null;
+    };
+
+    const stringify = (value: unknown) => {
+      if (value == null) return "";
+      if (typeof value === "string") return value;
+      if (typeof value === "number" || typeof value === "boolean") return String(value);
+      try {
+        return JSON.stringify(value);
+      } catch {
+        return String(value);
+      }
+    };
+
+    const getPhase = (payload: Record<string, unknown>) => {
+      const statusText = String(payload.status ?? payload.state ?? payload.runState ?? "").toLowerCase();
+      const verdictText = String(payload.verdict ?? "").toLowerCase();
+      const completedFlag =
+        payload.completed === true ||
+        payload.isCompleted === true ||
+        payload.finished === true ||
+        payload.ended === true ||
+        payload.succeeded === true;
+
+      if (completedFlag) return "completed" as const;
+      if (statusText.includes("paused")) return "paused" as const;
+      if (
+        statusText.includes("completed") ||
+        statusText.includes("finished") ||
+        statusText.includes("stopped") ||
+        statusText.includes("cancel") ||
+        statusText.includes("aborted") ||
+        statusText.includes("failed") ||
+        statusText.includes("error")
+      ) {
+        return "completed" as const;
+      }
+
+      if (verdictText && verdictText !== "0" && verdictText !== "notset") {
+        return "completed" as const;
+      }
+
+      return "running" as const;
+    };
+
+    const pollStatus = async () => {
+      if (cancelled) return;
+      if (runState !== "running" && runState !== "paused") return;
+      try {
+        const response = await getRunStatus(activeRunId);
+        if (cancelled) return;
+
+        const payload = asRecord(response) ?? {};
+        const phase = getPhase(payload);
+        const previous = lastPolledRunPhaseRef.current;
+        if (phase !== previous) {
+          lastPolledRunPhaseRef.current = phase;
+          if (phase === "paused") {
+            setRunState("paused");
+            addLog("WARN", "EdgeX", `Run paused (${activeRunId}) [status sync].`);
+          } else if (phase === "running") {
+            setRunState("running");
+          } else {
+            const duration = stringify(payload.duration ?? payload.durationMs ?? "-");
+            const verdict = stringify(payload.verdict ?? payload.result ?? payload.status ?? "completed");
+            setRunState("completed");
+            setActiveRunId(null);
+            addLog("INFO", "EdgeX", `Run completed [status sync]: verdict=${verdict} | duration=${duration}`);
+          }
+        }
+      } catch (error) {
+        if (cancelled) return;
+
+        const responseObj = asRecord(asRecord(error)?.response);
+        const statusCode = Number(responseObj?.status ?? 0);
+        const payload = asRecord(responseObj?.data);
+        const message = String(payload?.message ?? "").toLowerCase();
+
+        if (statusCode === 404 && message.includes("run not found")) {
+          setRunState("completed");
+          setActiveRunId(null);
+          addLog("INFO", "EdgeX", `Run ${activeRunId} completed or expired [status sync].`);
+          return;
+        }
+
+        if (statusCode === 404 || statusCode === 405) {
+          runStatusPollingDisabledRef.current = true;
+          addLog("WARN", "EdgeX", "Run status polling disabled (status endpoint unavailable).");
+          return;
+        }
+      }
+    };
+
+    pollStatus();
+    const intervalId = setInterval(pollStatus, 3000);
+
+    return () => {
+      cancelled = true;
+      clearInterval(intervalId);
+    };
+  }, [activeRunId, addLog, runState]);
+
   const { data } = usePlugins();
 
   const library: LibraryItem[] = useMemo(() => {
@@ -504,6 +876,7 @@ export function useEditorController() {
     setSelectedId(null);
     setExpanded(new Set());
     setRunState("idle");
+    setActiveRunId(null);
     setLogs([]);
     setHasPlan(true);
     setSavedPlanSignature(null);
@@ -595,6 +968,7 @@ export function useEditorController() {
     setPlan(resetAll);
     setLogs([]);
     setRunState("running");
+    setActiveRunId(null);
     setShowConsole(true);
 
     const runPath = "D:\\plans\\SamplePlan.TapPlan";
@@ -645,15 +1019,26 @@ export function useEditorController() {
       const duration = stringify(payload?.duration) || findParam("Duration") || "-";
       const runId = stringify(payload?.runId) || "-";
       const failedToStart = String(payload?.failedToStart ?? "false").toLowerCase() === "true";
+      const hasRunId = runId !== "-" && runId.trim() !== "";
+      const isRunningVerdict = verdict.toLowerCase() === "notset";
+
+      if (hasRunId) {
+        setActiveRunId(runId);
+      }
 
       addLog("INFO", "EdgeX", `Run summary: id=${runId} | verdict=${verdict} | duration=${duration}`);
 
       if (failedToStart) {
         addLog("ERROR", "EdgeX", "=== Run complete - Failed to start ===");
         setRunState("idle");
+        setActiveRunId(null);
+      } else if (isRunningVerdict) {
+        addLog("INFO", "EdgeX", "Run is active. Use Pause/Resume/Stop controls.");
+        setRunState("running");
       } else {
         addLog("INFO", "EdgeX", "=== Run complete ===");
         setRunState("completed");
+        setActiveRunId(null);
       }
     } catch (error) {
       console.error("Failed to run test plan:", error);
@@ -661,28 +1046,119 @@ export function useEditorController() {
       addLog("ERROR", "TestPlans", "Failed to start test plan run.");
       logApiErrorDetails("TestPlans", error, { method: "POST", url: "testplans/run" });
       setRunState("idle");
+      setActiveRunId(null);
     }
   };
 
-  const handleStop = () => {
+  const handleStop = async () => {
     runTimers.current.forEach(clearTimeout);
-    setRunState("idle");
-    addLog("WARN", "EdgeX", "Run aborted by user.");
+    if (!activeRunId || (runState !== "running" && runState !== "paused")) {
+      setRunState("idle");
+      setActiveRunId(null);
+      addLog("WARN", "EdgeX", "Run aborted by user.");
+      return;
+    }
+
+    try {
+      const response = await cancelRun(activeRunId);
+      setShowConsole(true);
+      addLog("WARN", "EdgeX", `Cancelling run ${activeRunId}...`);
+      logApiSuccessDetails("TestPlans", "Cancel", response);
+      setRunState("idle");
+      setActiveRunId(null);
+      addLog("WARN", "EdgeX", "Run cancelled.");
+    } catch (error) {
+      setShowConsole(true);
+      const asRecord = (value: unknown): Record<string, unknown> | null => {
+        if (value && typeof value === "object") return value as Record<string, unknown>;
+        return null;
+      };
+      const responseObj = asRecord(asRecord(error)?.response);
+      const status = responseObj?.status;
+      const payload = asRecord(responseObj?.data);
+      const message = String(payload?.message ?? "").toLowerCase();
+
+      if (status === 404 && message.includes("run not found")) {
+        addLog("WARN", "EdgeX", `Run ${activeRunId} is no longer active (already completed/expired).`);
+        setRunState("completed");
+        setActiveRunId(null);
+        return;
+      }
+
+      addLog("ERROR", "EdgeX", `Unable to cancel run ${activeRunId}.`);
+      logApiErrorDetails("TestPlans", error, { method: "POST", url: `runs/${activeRunId}/cancel` });
+    }
   };
 
-  const handlePause = () => {
+  const handlePause = async () => {
+    if (!activeRunId) {
+      addLog("WARN", "EdgeX", "No active run to pause or resume.");
+      return;
+    }
+
     if (runState === "running") {
-      setRunState("paused");
-      addLog("WARN", "EdgeX", "Run paused.");
+      try {
+        const response = await pauseRun(activeRunId);
+        setShowConsole(true);
+        logApiSuccessDetails("TestPlans", "Pause", response);
+        setRunState("paused");
+        addLog("WARN", "EdgeX", `Run paused (${activeRunId}).`);
+      } catch (error) {
+        setShowConsole(true);
+        const asRecord = (value: unknown): Record<string, unknown> | null => {
+          if (value && typeof value === "object") return value as Record<string, unknown>;
+          return null;
+        };
+        const responseObj = asRecord(asRecord(error)?.response);
+        const status = responseObj?.status;
+        const payload = asRecord(responseObj?.data);
+        const message = String(payload?.message ?? "").toLowerCase();
+
+        if (status === 404 && message.includes("run not found")) {
+          addLog("WARN", "EdgeX", `Run ${activeRunId} is no longer active (already completed/expired).`);
+          setRunState("completed");
+          setActiveRunId(null);
+          return;
+        }
+
+        addLog("ERROR", "EdgeX", `Unable to pause run ${activeRunId}.`);
+        logApiErrorDetails("TestPlans", error, { method: "POST", url: `runs/${activeRunId}/pause` });
+      }
     } else if (runState === "paused") {
-      setRunState("running");
-      addLog("INFO", "EdgeX", "Run resumed.");
+      try {
+        const response = await resumeRun(activeRunId);
+        setShowConsole(true);
+        logApiSuccessDetails("TestPlans", "Resume", response);
+        setRunState("running");
+        addLog("INFO", "EdgeX", `Run resumed (${activeRunId}).`);
+      } catch (error) {
+        setShowConsole(true);
+        const asRecord = (value: unknown): Record<string, unknown> | null => {
+          if (value && typeof value === "object") return value as Record<string, unknown>;
+          return null;
+        };
+        const responseObj = asRecord(asRecord(error)?.response);
+        const status = responseObj?.status;
+        const payload = asRecord(responseObj?.data);
+        const message = String(payload?.message ?? "").toLowerCase();
+
+        if (status === 404 && message.includes("run not found")) {
+          addLog("WARN", "EdgeX", `Run ${activeRunId} is no longer active (already completed/expired).`);
+          setRunState("completed");
+          setActiveRunId(null);
+          return;
+        }
+
+        addLog("ERROR", "EdgeX", `Unable to resume run ${activeRunId}.`);
+        logApiErrorDetails("TestPlans", error, { method: "POST", url: `runs/${activeRunId}/resume` });
+      }
     }
   };
 
   const handleReset = () => {
     runTimers.current.forEach(clearTimeout);
     setRunState("idle");
+    setActiveRunId(null);
     setPlan(resetAll);
     setLogs([{ id: logId.current++, timestamp: nowTs(), level: "INFO", source: "EdgeX", message: "Plan reset. Ready." }]);
   };
@@ -961,6 +1437,8 @@ export function useEditorController() {
     }
 
     setHasPlan(true);
+    setRunState("idle");
+    setActiveRunId(null);
     setSavedPlanSignature(null);
     setIsSaved(false);
     addLog("INFO", "TestPlans", "Plan imported successfully.");

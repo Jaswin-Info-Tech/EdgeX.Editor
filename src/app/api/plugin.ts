@@ -62,6 +62,36 @@ export const runTestPlan = async (payload: any) => {
   return data;
 };
 
+export const getRunStatus = async (runId: string) => {
+  const { data } = await axiosClient.get(`/runs/${runId}`);
+  return data;
+};
+
+export const getRunLogs = async (runId: string) => {
+  const { data } = await axiosClient.get(`/runs/${runId}/logs`);
+  return data;
+};
+
+export const getRunLogsStreamUrl = (runId: string) => {
+  const base = String(axiosClient.defaults.baseURL ?? "").replace(/\/$/, "");
+  return `${base}/runs/${runId}/logs/stream`;
+};
+
+export const cancelRun = async (runId: string) => {
+  const { data } = await axiosClient.post(`/runs/${runId}/cancel`);
+  return data;
+};
+
+export const pauseRun = async (runId: string) => {
+  const { data } = await axiosClient.post(`/runs/${runId}/pause`);
+  return data;
+};
+
+export const resumeRun = async (runId: string) => {
+  const { data } = await axiosClient.post(`/runs/${runId}/resume`);
+  return data;
+};
+
 
 export const getDuts = async () => {
   const { data } = await axiosClient.get("/plugins/duts");
