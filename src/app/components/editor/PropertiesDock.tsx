@@ -43,7 +43,20 @@ export function PropertiesDock({
 
   return (
     <>
-      <Splitter dir="h" onMouseDown={dragRight} />
+      <Splitter
+        dir="h"
+        onMouseDown={dragRight}
+        actionButton={(
+          <button
+            type="button"
+            onClick={() => setRightOpen(false)}
+            className="flex h-6 w-6 items-center justify-center border border-border bg-card text-muted-foreground transition-colors hover:border-primary/40 hover:bg-secondary hover:text-foreground"
+            title="Collapse properties panel"
+          >
+            <ChevronRight size={11} />
+          </button>
+        )}
+      />
       <div className="shrink-0 flex flex-col border-l border-border bg-card overflow-hidden" style={{ width: rightW }}>
         <PanelHeader icon={<SlidersHorizontal size={13} />} label="Properties">
           {selectedStep && (

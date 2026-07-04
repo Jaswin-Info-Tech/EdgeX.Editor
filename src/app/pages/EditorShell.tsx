@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { PanelRightOpen } from "lucide-react";
+import { ChevronLeft, PanelLeftOpen, PanelRightOpen } from "lucide-react";
 import { getTestPlanEditorModel } from "../api/testplans";
 import { getResources, getResourceSchema } from "../api/resources";
 import { Toggle } from "../components/editor/atoms";
@@ -300,6 +300,23 @@ export function EditorShell(props: EditorShellProps) {
   const [showUnsavedPlanWarning, setShowUnsavedPlanWarning] = useState(false);
   const [showTestPlansPanel, setShowTestPlansPanel] = useState(false);
   const displayLibrary = data?.length ? data : library;
+
+  const libraryVisualTypeLookup = useMemo(() => {
+    const map = new Map<string, string>();
+    (displayLibrary || []).forEach((item: any) => {
+      const visualType = String(item?.type ?? "").toLowerCase().trim();
+      if (!visualType) return;
+      [item?.name, item?.stepTypeName, item?.typeName, item?.fullName, item?.className]
+        .map((value) => String(value ?? "").toLowerCase().trim())
+        .filter(Boolean)
+        .forEach((key) => {
+          if (!map.has(key)) {
+            map.set(key, visualType);
+          }
+        });
+    });
+    return map;
+  }, [displayLibrary]);
 
   const libCats = useMemo<string[]>(
     () => [
@@ -809,12 +826,37 @@ export function EditorShell(props: EditorShellProps) {
     const children = Array.isArray(step.children)
       ? step.children.map(toEditorStep)
       : [];
-    const stepType = String(step.type ?? "unknown");
+
+    const rawType = String(step.type ?? "").trim();
+    const rawName = String(step.name ?? "").trim();
+    const rawPath = String(step.path ?? "").trim();
+
+    const lookupCandidates = [rawType, rawName, rawPath]
+      .map((value) => value.toLowerCase())
+      .filter(Boolean);
+
+    const libraryMappedType = lookupCandidates
+      .map((candidate) => libraryVisualTypeLookup.get(candidate))
+      .find(Boolean);
+
+    const inferVisualType = () => {
+      const haystack = `${rawType} ${rawName} ${rawPath}`.toLowerCase();
+      if (children.length > 0 || /\bsequence\b/.test(haystack)) return "sequence";
+      if (/\b(rf|spectrum|signal|network analyzer|vna)\b/.test(haystack)) return "rf";
+      if (/\b(scpi|instrument|scope|supply|generator|dmm)\b/.test(haystack)) return "instrument";
+      if (/\b(dut|device under test)\b/.test(haystack)) return "dut";
+      if (/\b(if|condition|parallel|dialog|loop|lock|flow|delay|log|package|install|uninstall)\b/.test(haystack)) return "flow";
+      if (/\b(measure|measurement|read|verify|assert|result)\b/.test(haystack)) return "measure";
+      return "measure";
+    };
+
+    const visualType = libraryMappedType ?? inferVisualType();
+    const stepTypeName = rawType || rawName || "unknown";
 
     return {
       id: String(step.stepId ?? step.path ?? crypto.randomUUID()),
       name: String(step.name ?? "Unnamed Step"),
-      type: stepType,
+      type: visualType,
       status: "pending",
       enabled: Boolean(step.enabled ?? true),
       description: String(step.path ?? ""),
@@ -822,10 +864,10 @@ export function EditorShell(props: EditorShellProps) {
         ? step.properties.map(toEditorProperty)
         : [],
       children: children.length > 0 ? children : undefined,
-      stepTypeName: stepType,
-      typeName: stepType,
-      fullName: stepType,
-      className: stepType,
+      stepTypeName,
+      typeName: stepTypeName,
+      fullName: stepTypeName,
+      className: stepTypeName,
     };
   };
 
@@ -1076,8 +1118,36 @@ export function EditorShell(props: EditorShellProps) {
             >
               {leftPanel}
             </div>
-            <Splitter dir="h" onMouseDown={dragLeft} />
+            <Splitter
+              dir="h"
+              onMouseDown={dragLeft}
+              actionButton={(
+                <button
+                  type="button"
+                  onClick={() => setLeftOpen(false)}
+                  className="flex h-6 w-6 items-center justify-center border border-border bg-card text-muted-foreground transition-colors hover:border-primary/40 hover:bg-secondary hover:text-foreground"
+                  title="Collapse left panel"
+                >
+                  <ChevronLeft size={11} />
+                </button>
+              )}
+            />
           </>
+        )}
+
+        {!isTablet && !leftOpen && (
+          <div className="shrink-0 w-9 border-r border-border bg-gradient-to-b from-card to-muted/20 flex items-start justify-center pt-2">
+            <button
+              onClick={() => setLeftOpen(true)}
+              title="Open left panel"
+              className="group flex h-40 w-7 flex-col items-center justify-start gap-2 border border-border/60 bg-card/70 py-2 text-muted-foreground transition-colors hover:border-primary/40 hover:bg-secondary/70 hover:text-foreground"
+            >
+              <PanelLeftOpen size={13} className="shrink-0" />
+              <span className="text-[9px] font-mono font-semibold uppercase tracking-[0.2em] [writing-mode:vertical-rl] [text-orientation:mixed]">
+                Steps
+              </span>
+            </button>
+          </div>
         )}
 
         <SequenceEditor

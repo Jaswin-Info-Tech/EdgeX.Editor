@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { MouseEvent as ReactMouseEvent } from "react";
+import type { ReactNode } from "react";
 
 export function useDragResize(
   dir: "h" | "v",
@@ -34,9 +35,10 @@ export function useDragResize(
 interface SplitterProps {
   onMouseDown: (e: ReactMouseEvent) => void;
   dir: "h" | "v";
+  actionButton?: ReactNode;
 }
 
-export function Splitter({ onMouseDown, dir }: SplitterProps) {
+export function Splitter({ onMouseDown, dir, actionButton }: SplitterProps) {
   const [hot, setHot] = useState(false);
 
   const down = (e: ReactMouseEvent) => {
@@ -59,7 +61,7 @@ export function Splitter({ onMouseDown, dir }: SplitterProps) {
   return (
     <div
       onMouseDown={down}
-      className={`shrink-0 z-10 transition-colors flex items-center justify-center
+      className={`group relative shrink-0 z-10 transition-colors flex items-center justify-center
         ${
           dir === "h"
             ? "w-[4px] cursor-col-resize flex-col gap-1"
@@ -67,6 +69,18 @@ export function Splitter({ onMouseDown, dir }: SplitterProps) {
         }
         ${hot ? "bg-primary/60" : "bg-border hover:bg-primary/40"}`}
     >
+      {actionButton && (
+        <div
+          className={(dir === "h"
+            ? "absolute -right-3 top-2 z-20"
+            : "absolute right-2 -top-3 z-20") +
+            " opacity-0 pointer-events-none transition-opacity group-hover:opacity-100 group-hover:pointer-events-auto group-focus-within:opacity-100 group-focus-within:pointer-events-auto"
+          }
+          onMouseDown={(e) => e.stopPropagation()}
+        >
+          {actionButton}
+        </div>
+      )}
       {[0, 1, 2].map((i) => (
         <div
           key={i}
