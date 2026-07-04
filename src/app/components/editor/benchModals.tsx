@@ -564,30 +564,30 @@ function GenericResourcePanel({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-[1px]"
+      className="fixed inset-0 z-50 flex items-stretch justify-end bg-black/40"
       onClick={closePanel}
     >
       <div
-        className="flex h-[620px] max-h-[88vh] w-[980px] max-w-[95vw] flex-col overflow-hidden border border-border bg-card shadow-2xl"
+        className="flex h-full w-[1080px] max-w-[96vw] flex-col overflow-hidden border-l border-border bg-card shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex h-14 items-center justify-between border-b border-border bg-muted/30 px-5">
+        <div className="flex h-12 items-center justify-between border-b border-border bg-card px-4">
           <div className="flex min-w-0 items-center gap-3">
-            <div className="flex h-8 w-8 items-center justify-center border border-primary/30 bg-primary/10 text-primary">
+            <div className="flex h-7 w-7 items-center justify-center border border-primary/30 bg-primary/5 text-primary">
               <DatabaseZap size={16} className="text-primary" />
             </div>
             <div className="min-w-0">
-              <div className="truncate text-[15px] font-semibold text-foreground">
+              <div className="truncate text-[14px] font-semibold text-foreground">
                 {config.panelTitle}
               </div>
-              <div className="truncate text-[12px] font-mono text-muted-foreground">
-                Manage {config.itemLabelSingular} templates and existing instances
+              <div className="truncate text-[11px] font-mono text-muted-foreground">
+                Manage {config.itemLabelSingular} types and instances
               </div>
             </div>
           </div>
           <button
             onClick={closePanel}
-            className="flex h-8 w-8 items-center justify-center border border-transparent text-muted-foreground transition-colors hover:border-border hover:bg-secondary hover:text-foreground"
+            className="flex h-8 w-8 items-center justify-center border border-transparent text-muted-foreground transition-colors hover:border-border hover:bg-secondary/80 hover:text-foreground"
             title="Close"
           >
             <X size={14} />
@@ -596,8 +596,8 @@ function GenericResourcePanel({
 
         <div className="flex min-h-0 flex-1">
           <section className="flex min-w-0 flex-1 flex-col bg-card">
-            <div className="border-b border-border bg-muted/20 px-5 py-2.5">
-              <div className="flex items-center gap-1 text-[12px] font-mono">
+            <div className="border-b border-border bg-muted/10 px-4 py-2">
+              <div className="flex items-center gap-1 text-[11px] font-mono">
                 <button
                   onClick={() => setActiveBlade("types")}
                   className={`transition-colors ${activeBlade === "types" ? "text-foreground" : "text-muted-foreground hover:text-foreground"}`}
@@ -624,20 +624,20 @@ function GenericResourcePanel({
               </div>
             </div>
 
-            <div className="min-h-0 flex flex-1 overflow-hidden bg-muted/5">
+            <div className="min-h-0 flex flex-1 overflow-hidden bg-background">
               {activeBlade === "types" && (
-                <div className="flex h-full w-[290px] shrink-0 flex-col border-r border-border bg-card">
+                <div className="flex h-full w-[310px] shrink-0 flex-col border-r border-border bg-card">
                 <div className="border-b border-border px-3 py-3">
                   <div className="mb-2 text-[11px] font-mono uppercase tracking-wider text-muted-foreground">
                     {config.itemLabelCapitalized} Types
                   </div>
-                  <div className="flex h-9 items-center gap-2 border border-border bg-background px-2.5">
+                  <div className="flex h-8 items-center gap-2 border border-border bg-background px-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]">
                     <Search size={12} className="shrink-0 text-muted-foreground" />
                     <input
                       value={search}
                       onChange={(e) => setSearch(e.target.value)}
                       placeholder={`Search ${config.itemLabelSingular} type...`}
-                      className="min-w-0 flex-1 bg-transparent text-[13px] font-mono text-foreground placeholder:text-muted-foreground outline-none"
+                      className="min-w-0 flex-1 bg-transparent text-[12px] font-mono text-foreground placeholder:text-muted-foreground outline-none"
                     />
                     {search && (
                       <button
@@ -650,10 +650,10 @@ function GenericResourcePanel({
                     )}
                   </div>
                 </div>
-                <div className="border-b border-border px-3 py-2 text-[11px] font-mono text-muted-foreground">
+                <div className="border-b border-border px-3 py-1.5 text-[10px] font-mono text-muted-foreground">
                   {items.length} types
                 </div>
-                <div className="min-h-0 flex-1 overflow-y-auto p-2">
+                <div className="min-h-0 flex-1 overflow-y-auto p-2.5">
                   {isLoading ? (
                     <div className="px-3 py-8 text-center text-[13px] font-mono text-muted-foreground">
                       {config.loadingItemsMessage}
@@ -675,15 +675,15 @@ function GenericResourcePanel({
                           key={key}
                           onClick={() => selectItem(item)}
                           title={item.name}
-                          className={`mb-1 flex w-full items-start gap-2.5 border px-2.5 py-2.5 text-left transition-colors ${isSelected
-                            ? "border-primary/40 bg-primary/10"
-                            : "border-transparent hover:border-border hover:bg-secondary/40"
+                          className={`mb-1 flex w-full items-start gap-2 border px-2 py-2 text-left transition-colors ${isSelected
+                            ? "border-primary/40 bg-primary/8 shadow-[inset_2px_0_0_0_var(--color-primary)]"
+                            : "border-border/60 hover:border-border hover:bg-secondary/30"
                             }`}
                         >
                           <Icon size={15} className="mt-0.5 shrink-0 text-primary" />
                           <div className="min-w-0">
-                            <div className="truncate text-[13px] font-semibold text-foreground">{item.name}</div>
-                            <div className="mt-1 truncate text-[11px] font-mono text-muted-foreground">
+                            <div className="truncate text-[12px] font-semibold text-foreground">{item.name}</div>
+                            <div className="mt-0.5 truncate text-[10px] font-mono text-muted-foreground">
                               {item.assembly || config.baseTypeFallback}
                             </div>
                           </div>
@@ -697,57 +697,60 @@ function GenericResourcePanel({
 
               {activeBlade === "types" && (
                 <div className="blade-enter-soft flex min-w-0 flex-1 flex-col bg-card">
-                  <div className="border-b border-border bg-muted/20 px-6 py-4">
-                    <div className="text-[15px] font-semibold text-foreground">Resource Setup Flow</div>
-                    <div className="mt-1 text-[12px] font-mono text-muted-foreground">
-                      Select a type on the left to open resource instances and configuration.
+                  <div className="border-b border-border bg-muted/10 px-4 py-3">
+                    <div className="text-[14px] font-semibold text-foreground">Resource Setup Workflow</div>
+                    <div className="mt-1 text-[11px] font-mono text-muted-foreground">
+                      Follow the guided flow to select a type, manage instances, and apply configuration safely.
                     </div>
                   </div>
 
-                  <div className="min-h-0 flex-1 overflow-y-auto p-6">
-                    <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-                      <div className="border border-border bg-background p-4">
-                        <div className="flex items-center gap-2 text-[13px] font-semibold text-foreground">
+                  <div className="min-h-0 flex-1 overflow-y-auto p-4">
+                    <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
+                      <div className="border border-border bg-card p-3">
+                        <div className="flex items-center gap-2 text-[12px] font-semibold text-foreground">
                           <MousePointerClick size={15} className="text-primary" />
                           Step 1: Pick Type
                         </div>
-                        <div className="mt-2 text-[12px] font-mono text-muted-foreground">
-                          Choose instrument/DUT/connection type from the left blade.
+                        <div className="mt-2 space-y-1 text-[11px] font-mono text-muted-foreground">
+                          <div>Select the required Instrument, DUT, or Connection type from the left blade.</div>
+                          <div>Use the search box to quickly narrow large catalogs by name or assembly.</div>
                         </div>
                       </div>
 
-                      <div className="border border-border bg-background p-4">
-                        <div className="flex items-center gap-2 text-[13px] font-semibold text-foreground">
+                      <div className="border border-border bg-card p-3">
+                        <div className="flex items-center gap-2 text-[12px] font-semibold text-foreground">
                           <FolderKanban size={15} className="text-primary" />
                           Step 2: Manage Instances
                         </div>
-                        <div className="mt-2 text-[12px] font-mono text-muted-foreground">
-                          View existing instances, search quickly, filter by status, or add new.
+                        <div className="mt-2 space-y-1 text-[11px] font-mono text-muted-foreground">
+                          <div>Review existing instances in a structured grid with type and health status.</div>
+                          <div>Filter by status, search by name, or create a new instance with Add.</div>
                         </div>
                       </div>
 
-                      <div className="border border-border bg-background p-4">
-                        <div className="flex items-center gap-2 text-[13px] font-semibold text-foreground">
+                      <div className="border border-border bg-card p-3">
+                        <div className="flex items-center gap-2 text-[12px] font-semibold text-foreground">
                           <SlidersHorizontal size={15} className="text-primary" />
                           Step 3: Configure
                         </div>
-                        <div className="mt-2 text-[12px] font-mono text-muted-foreground">
-                          Open configuration blade, edit properties, then save.
+                        <div className="mt-2 space-y-1 text-[11px] font-mono text-muted-foreground">
+                          <div>Open the configuration blade to edit resource name and parameters.</div>
+                          <div>Save to persist changes immediately to backend resource configuration.</div>
                         </div>
                       </div>
                     </div>
 
-                    <div className="mt-5 border border-border bg-muted/10 p-4">
-                      <div className="flex items-center gap-2 text-[13px] font-semibold text-foreground">
+                    <div className="mt-4 border border-border bg-card p-3">
+                      <div className="flex items-center gap-2 text-[12px] font-semibold text-foreground">
                         <FileText size={15} className="text-primary" />
-                        What Happens Next
+                        Execution Path
                       </div>
-                      <div className="mt-2 flex items-center gap-2 text-[12px] font-mono text-muted-foreground">
+                      <div className="mt-2 flex items-center gap-2 text-[11px] font-mono text-muted-foreground">
                         <span>Select type</span>
                         <ArrowRight size={12} />
-                        <span>Resource instances blade</span>
+                        <span>Manage instances</span>
                         <ArrowRight size={12} />
-                        <span>Configuration blade</span>
+                        <span>Configure and save</span>
                       </div>
                     </div>
                   </div>
@@ -757,20 +760,20 @@ function GenericResourcePanel({
               {selectedItem && activeBlade === "resources" && (
                 <div className="blade-enter-soft flex h-full min-w-0 flex-1 border-r border-border bg-card">
                   <div className="flex min-w-0 flex-1 flex-col">
-                    <div className="border-b border-border bg-muted/20 px-4 py-3">
+                    <div className="sticky top-0 z-20 border-b border-border bg-card px-4 py-2">
                       <div className="flex flex-wrap items-center justify-between gap-3">
                         <div className="min-w-0">
-                          <div className="truncate text-[12px] font-mono font-semibold uppercase tracking-wider text-muted-foreground">
+                          <div className="truncate text-[11px] font-mono font-semibold uppercase tracking-wider text-muted-foreground">
                             {selectedItem.name} Instances
                           </div>
-                          <div className="mt-1 truncate text-[13px] text-foreground">
+                          <div className="mt-1 truncate text-[12px] text-foreground">
                             {selectedTypeName || config.baseTypeFallback}
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
                           <button
                             onClick={() => setActiveBlade("types")}
-                            className="flex h-8 items-center gap-1.5 border border-border px-2.5 text-[11px] font-mono font-semibold text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+                            className="flex h-8 items-center gap-2 border border-border px-2 text-[10px] font-mono font-semibold text-muted-foreground transition-colors hover:bg-secondary/70 hover:text-foreground"
                             title="Back to instrument types"
                           >
                             <X size={13} />
@@ -778,7 +781,7 @@ function GenericResourcePanel({
                           </button>
                           <button
                             onClick={openAddModal}
-                            className="flex h-8 items-center gap-1.5 border border-primary/30 bg-primary px-3 text-[12px] font-mono font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
+                            className="flex h-8 items-center gap-2 border border-primary/30 bg-primary px-4 text-[11px] font-mono font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
                           >
                             <Plus size={12} />
                             Add
@@ -787,13 +790,13 @@ function GenericResourcePanel({
                       </div>
 
                       <div className="mt-2 flex flex-wrap items-center gap-2">
-                        <div className="flex h-8 min-w-[200px] flex-1 items-center gap-2 border border-border bg-background px-2.5">
+                        <div className="flex h-8 min-w-[200px] flex-1 items-center gap-2 border border-border bg-background px-2">
                           <Search size={12} className="shrink-0 text-muted-foreground" />
                           <input
                             value={instanceSearch}
                             onChange={(e) => setInstanceSearch(e.target.value)}
                             placeholder="Search instances..."
-                            className="min-w-0 flex-1 bg-transparent text-[12px] font-mono text-foreground placeholder:text-muted-foreground outline-none"
+                            className="min-w-0 flex-1 bg-transparent text-[11px] font-mono text-foreground placeholder:text-muted-foreground outline-none"
                           />
                         </div>
                         {[
@@ -804,7 +807,7 @@ function GenericResourcePanel({
                           <button
                             key={filter.id}
                             onClick={() => setStatusFilter(filter.id as "all" | "active" | "error")}
-                            className={`h-8 border px-2.5 text-[11px] font-mono font-semibold transition-colors ${statusFilter === filter.id
+                            className={`h-8 border px-2 text-[10px] font-mono font-semibold transition-colors ${statusFilter === filter.id
                               ? "border-primary/40 bg-primary/10 text-foreground"
                               : "border-border text-muted-foreground hover:bg-secondary hover:text-foreground"
                               }`}
@@ -815,7 +818,7 @@ function GenericResourcePanel({
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-[2fr_1fr_0.7fr_40px] gap-2 border-b border-border bg-muted/10 px-4 py-2 text-[10px] font-mono font-semibold uppercase tracking-wider text-muted-foreground">
+                    <div className="sticky top-10 z-10 grid grid-cols-[2fr_1fr_0.7fr_40px] gap-2 border-b border-border bg-muted/5 px-4 py-1.5 text-[10px] font-mono font-semibold uppercase tracking-wider text-muted-foreground">
                       <span>Name</span>
                       <span>Type</span>
                       <span>Status</span>
@@ -861,20 +864,20 @@ function GenericResourcePanel({
                                     selectResource(resource);
                                   }
                                 }}
-                                className={`grid cursor-pointer grid-cols-[2fr_1fr_0.7fr_40px] items-center gap-2 border-b border-border/70 px-4 py-2 transition-colors ${isSelected
-                                  ? "bg-primary/10"
-                                  : "hover:bg-secondary/40"
+                                className={`grid cursor-pointer grid-cols-[2fr_1fr_0.7fr_40px] items-center gap-2 border-b border-border/70 px-4 py-1.5 transition-colors ${isSelected
+                                  ? "bg-primary/8 shadow-[inset_2px_0_0_0_var(--color-primary)]"
+                                  : "hover:bg-secondary/30"
                                   }`}
                               >
-                                <div className="truncate text-[13px] font-semibold text-foreground">{displayName}</div>
-                                <div className="truncate text-[11px] font-mono text-muted-foreground">
+                                <div className="truncate text-[12px] font-semibold text-foreground">{displayName}</div>
+                                <div className="truncate text-[10px] font-mono text-muted-foreground">
                                   {extractTypeName(String(resource.type ?? "")) || resource.type}
                                 </div>
                                 <div>
                                   <span
-                                    className={`inline-flex border px-2 py-0.5 text-[11px] font-mono ${hasError
-                                      ? "border-destructive/30 bg-destructive/10 text-destructive"
-                                      : "border-emerald-500/30 bg-emerald-500/10 text-emerald-600"
+                                    className={`inline-flex min-w-[64px] justify-center border px-2 py-0.5 text-[10px] font-mono font-semibold ${hasError
+                                      ? "border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-300"
+                                      : "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
                                       }`}
                                   >
                                     {resource.status}
@@ -959,10 +962,10 @@ function GenericResourcePanel({
 
               {activeBlade === "editor" && selectedItem && (
                 <aside className="blade-enter flex h-full min-w-0 flex-1 flex-col bg-card">
-                  <div className="flex h-12 items-center justify-between border-b border-border bg-muted/30 px-4">
+                  <div className="sticky top-0 z-20 flex h-10 items-center justify-between border-b border-border bg-card px-4">
                     <div className="flex items-center gap-2">
                       <Icon size={14} className="text-primary shrink-0" />
-                      <span className="text-[14px] font-semibold text-foreground">
+                      <span className="text-[13px] font-semibold text-foreground">
                         {selectedResource
                           ? `Edit ${selectedResource.name}`
                           : `New ${config.itemLabelCapitalized}`}
@@ -970,7 +973,7 @@ function GenericResourcePanel({
                     </div>
                     <button
                       onClick={closeEditorModal}
-                      className="flex h-8 items-center gap-1.5 border border-border px-2.5 text-[11px] font-mono font-semibold text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+                      className="flex h-8 items-center gap-2 border border-border px-2 text-[10px] font-mono font-semibold text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
                       title="Back to resource instances"
                     >
                       <X size={13} />
@@ -978,12 +981,12 @@ function GenericResourcePanel({
                     </button>
                   </div>
 
-                  <div className="min-h-0 flex-1 overflow-y-auto space-y-3 p-4">
+                  <div className="min-h-0 flex-1 overflow-y-auto space-y-2.5 p-3.5">
                     <section className="border border-border bg-background">
                       <button
                         type="button"
                         onClick={() => setShowBasicsPanel((prev) => !prev)}
-                        className="flex w-full items-center justify-between border-b border-border px-4 py-3 text-left"
+                        className="sticky top-0 z-10 flex w-full items-center justify-between border-b border-border bg-background px-4 py-3 text-left"
                       >
                         <span className="text-[12px] font-mono font-semibold uppercase tracking-wider text-muted-foreground">
                           Basic Details
@@ -1013,7 +1016,7 @@ function GenericResourcePanel({
                       <button
                         type="button"
                         onClick={() => setShowConfigPanel((prev) => !prev)}
-                        className="flex w-full items-center justify-between border-b border-border px-4 py-3 text-left"
+                        className="sticky top-0 z-10 flex w-full items-center justify-between border-b border-border bg-background px-4 py-3 text-left"
                       >
                         <span className="text-[12px] font-mono font-semibold uppercase tracking-wider text-muted-foreground">
                           Configuration
@@ -1070,10 +1073,10 @@ function GenericResourcePanel({
                     )}
                   </div>
 
-                  <div className="flex items-center justify-end gap-2 border-t border-border bg-muted/20 p-3">
+                  <div className="flex h-10 items-center justify-end gap-2 border-t border-border bg-card px-3">
                     <button
                       onClick={closeEditorModal}
-                      className="h-8 border border-border px-4 text-[13px] font-mono font-semibold text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+                      className="h-8 border border-border px-4 text-[12px] font-mono font-semibold text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
                     >
                       Cancel
                     </button>
@@ -1086,7 +1089,7 @@ function GenericResourcePanel({
                         saveResourceLoading ||
                         deleteResourceLoading
                       }
-                      className="flex h-8 items-center gap-2 bg-primary px-4 text-[13px] font-mono font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+                      className="flex h-8 items-center gap-2 bg-primary px-4 text-[12px] font-mono font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       <Zap size={12} />
                       {saveResourceLoading
@@ -1104,7 +1107,7 @@ function GenericResourcePanel({
           </section>
         </div>
 
-        <div className="flex h-12 items-center border-t border-border bg-muted/20 px-4">
+        <div className="flex h-10 items-center border-t border-border bg-card px-4">
           <span className="text-[12px] font-mono text-muted-foreground">
             {activeBlade === "types"
               ? `Choose a ${config.itemLabelSingular} type to continue.`
@@ -1115,7 +1118,7 @@ function GenericResourcePanel({
           <div className="ml-auto flex items-center gap-2">
             <button
               onClick={closePanel}
-              className="h-8 border border-border px-4 text-[13px] font-mono font-semibold text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+              className="h-8 border border-border px-4 text-[12px] font-mono font-semibold text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
             >
               Close
             </button>
