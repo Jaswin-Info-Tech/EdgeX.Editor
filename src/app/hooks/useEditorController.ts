@@ -75,6 +75,7 @@ export function useEditorController() {
   const [showNewPlan, setShowNewPlan] = useState(false);
   const [showAddStep, setShowAddStep] = useState(false);
   const [showPluginMgr, setShowPluginMgr] = useState(false);
+  const [showSystemKpis, setShowSystemKpis] = useState(false);
 
   const [dragLibItem, setDragLibItem] = useState<LibraryItem | null>(null);
   const [dropIdx, setDropIdx] = useState<number | null>(null);
@@ -740,6 +741,8 @@ export function useEditorController() {
     data,
     hasPlan,
     setShowNewPlan,
+    showSystemKpis,
+    setShowSystemKpis,
     handleAddStep,
     plugins,
     installedPlugins,

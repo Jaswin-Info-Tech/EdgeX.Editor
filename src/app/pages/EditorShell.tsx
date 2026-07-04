@@ -12,6 +12,7 @@ import { PropertiesDock } from "../components/editor/PropertiesDock";
 import { PropertiesPanel } from "../components/editor/PropertiesPanel";
 import { ResourcesPanel } from "../components/editor/ResourcesPanel";
 import { SequenceEditor } from "../components/editor/SequenceEditor";
+import { SystemKpisPanel } from "../components/editor/SystemKpisPanel";
 import { Splitter } from "../components/editor/resizable";
 import { TestPlansPanel } from "../components/editor/TestPlansPanel";
 import { useTestPlans } from "../hooks/usePlugin";
@@ -57,6 +58,8 @@ interface EditorShellProps {
   library: any;
   libSearch: any;
   setLibSearch: any;
+  showSystemKpis: boolean;
+  setShowSystemKpis: (value: boolean) => void;
   data: any;
   hasPlan: any;
   setShowNewPlan: any;
@@ -171,6 +174,8 @@ export function EditorShell(props: EditorShellProps) {
     library,
     libSearch,
     setLibSearch,
+    showSystemKpis,
+    setShowSystemKpis,
     data,
     hasPlan,
     setShowNewPlan,
@@ -976,6 +981,8 @@ export function EditorShell(props: EditorShellProps) {
         setShowPluginMgr={setShowPluginMgr}
         setShowResourcesPanel={setShowResourcesPanel}
         setShowTestPlansPanel={setShowTestPlansPanel}
+        showSystemKpis={showSystemKpis}
+        setShowSystemKpis={setShowSystemKpis}
         setAddStepParentId={setAddStepParentId}
         setAddStepIdx={setAddStepIdx}
         setShowAddStep={setShowAddStep}
@@ -987,6 +994,9 @@ export function EditorShell(props: EditorShellProps) {
         handleAddGroup={handleAddGroup}
       />
 
+      {showSystemKpis ? (
+        <SystemKpisPanel isVisible={showSystemKpis} />
+      ) : (
       <div className="flex flex-1 overflow-hidden relative">
         {isTablet && leftOpen && (
           <div
@@ -1050,6 +1060,7 @@ export function EditorShell(props: EditorShellProps) {
           </PropertiesDock>
         )}
       </div>
+      )}
 
       {showInstrumentsPanel && (
         <InstrumentsPanel
@@ -1132,7 +1143,7 @@ export function EditorShell(props: EditorShellProps) {
           onSaveUnsavedChanges={handleSaveAndMarkClean}
         />
       )}
-      {showConsole && (
+      {showConsole && !showSystemKpis && (
         <ConsolePanel
           showConsole={showConsole}
           dragConsole={dragConsole}

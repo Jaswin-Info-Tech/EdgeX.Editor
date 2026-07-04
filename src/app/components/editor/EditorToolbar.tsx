@@ -1,4 +1,4 @@
-import { Database, FilePlus, FolderOpen, FolderPlus, Package, Pause, Play, Plus, RotateCcw, Save, Square } from "lucide-react";
+import { ActivitySquare, Database, FilePlus, FolderOpen, FolderPlus, Package, Pause, Play, Plus, RotateCcw, Save, Square } from "lucide-react";
 import { ToolBtn } from "./atoms";
 
 interface EditorToolbarProps {
@@ -12,6 +12,8 @@ interface EditorToolbarProps {
   setShowPluginMgr: (value: boolean) => void;
   setShowResourcesPanel: (value: boolean) => void;
   setShowTestPlansPanel: (value: boolean) => void;
+  showSystemKpis: boolean;
+  setShowSystemKpis: (value: boolean) => void;
   setAddStepParentId: (value: string | null) => void;
   setAddStepIdx: (value: number | undefined) => void;
   setShowAddStep: (value: boolean) => void;
@@ -34,6 +36,8 @@ export function EditorToolbar({
   setShowPluginMgr,
   setShowResourcesPanel,
   setShowTestPlansPanel,
+  showSystemKpis,
+  setShowSystemKpis,
   setAddStepParentId,
   setAddStepIdx,
   setShowAddStep,
@@ -79,6 +83,9 @@ export function EditorToolbar({
       </ToolBtn>
       <ToolBtn onClick={() => setShowTestPlansPanel(true)} title="Test Plans">
         <FolderPlus size={14} />{!isTablet && "Test Plans"}
+      </ToolBtn>
+      <ToolBtn onClick={() => setShowSystemKpis(!showSystemKpis)} active={showSystemKpis} title="System KPIs">
+        <ActivitySquare size={14} />{!isTablet && "System"}
       </ToolBtn>
       
 
