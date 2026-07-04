@@ -1,4 +1,4 @@
-import { ArrowDown, ArrowUp, SlidersHorizontal, X } from "lucide-react";
+import { ArrowDown, ArrowUp, ChevronRight, SlidersHorizontal, X } from "lucide-react";
 import { moveIn } from "../../utils/editor";
 import { PanelHeader } from "./atoms";
 import { Splitter } from "./resizable";
@@ -52,6 +52,13 @@ export function PropertiesDock({
               <button onClick={() => { if (selectedId) setPlan((prev: any) => moveIn(prev, selectedId, "down")); }} className="p-1 text-muted-foreground hover:text-foreground hover:bg-secondary"><ArrowDown size={11} /></button>
             </>
           )}
+          <button
+            onClick={() => setRightOpen(false)}
+            className="p-1 text-muted-foreground hover:text-foreground hover:bg-secondary"
+            title="Collapse properties"
+          >
+            <ChevronRight size={11} />
+          </button>
         </PanelHeader>
         <div className="flex-1 overflow-hidden">{children}</div>
       </div>

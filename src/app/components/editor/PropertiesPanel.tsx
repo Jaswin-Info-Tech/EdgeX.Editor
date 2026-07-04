@@ -69,6 +69,13 @@ const isConnectionOrDut = (type: string = "") =>
     return "other";
   };
 
+  const getResourceFamily = (resource: any) =>
+    getInstrumentFamily(
+      [resource?.type, resource?.instrument, resource?.name]
+        .filter(Boolean)
+        .join(" "),
+    );
+
   const stepTypeName = useMemo(() => {
     if (!selectedStep) return null;
     const locked = resolvedTypeNames[selectedStep.id];
@@ -181,6 +188,44 @@ const editorContext = useMemo<EditorContext>(() => {
       );
     });
   }, [schemaProperties, schemaSearch]);
+
+  const incompatibleInstrumentSelections = useMemo(() => {
+    if (!stepInstrumentFamily || !selectedStep) return [] as Array<{ propLabel: string; name: string; actualFamily: string }>;
+
+    const instrumentProps = schemaProperties.filter((prop: any) =>
+      normalizeEditorType(prop.editorType) === "instrument-selector",
+    );
+
+    return instrumentProps.flatMap((prop: any) => {
+      const rawValue = schemaPropertyValues[prop.name];
+      const selectedName =
+        rawValue && typeof rawValue === "object"
+          ? String(rawValue.Name ?? "").trim()
+          : String(rawValue ?? "").trim();
+
+      if (!selectedName) return [];
+
+      const matchedResource = (resources ?? []).find(
+        (resource: any) => String(resource?.name ?? "").trim() === selectedName,
+      );
+
+      if (!matchedResource) return [];
+
+      const actualFamily = getResourceFamily(matchedResource);
+      if (actualFamily === stepInstrumentFamily) return [];
+
+      return [{
+        propLabel: String(prop.displayName ?? prop.name ?? "Instrument"),
+        name: selectedName,
+        actualFamily,
+      }];
+    });
+  }, [resources, schemaProperties, schemaPropertyValues, selectedStep, stepInstrumentFamily]);
+
+  const noCompatibleInstrumentOptions =
+    Boolean(stepInstrumentFamily) &&
+    schemaProperties.some((prop: any) => normalizeEditorType(prop.editorType) === "instrument-selector") &&
+    editorContext.instrumentOptions.length === 0;
 
   useEffect(() => {
     setSchemaCollapsed(false);
@@ -379,6 +424,11 @@ useEffect(() => {
               <span className="border border-border bg-background px-1.5 py-0.5 text-[10px] font-mono text-muted-foreground">
                 {(selectedStep.type || "unknown").toUpperCase()}
               </span>
+              {stepInstrumentFamily && (
+                <span className="border border-border bg-background px-1.5 py-0.5 text-[10px] font-mono text-muted-foreground uppercase">
+                  {stepInstrumentFamily} instrument required
+                </span>
+              )}
               {selectedStep.description && (
                 <span className="text-[11px] text-muted-foreground">
                   · {selectedStep.description}
@@ -406,6 +456,30 @@ useEffect(() => {
             />
           </div>
         </div>
+
+        {noCompatibleInstrumentOptions && (
+          <div className="border-b border-amber-500/30 bg-amber-500/10 px-3 py-2.5 text-[11px] font-mono text-amber-700 dark:text-amber-300">
+            No compatible {stepInstrumentFamily?.toUpperCase()} instruments found in resources.
+          </div>
+        )}
+
+        {incompatibleInstrumentSelections.length > 0 && (
+          <div className="border-b border-amber-500/30 bg-amber-500/10 px-3 py-2.5">
+            <div className="flex items-start gap-2 text-[11px] font-mono text-amber-700 dark:text-amber-300">
+              <AlertTriangle size={14} className="mt-0.5 shrink-0" />
+              <div>
+                <div className="font-semibold">
+                  Instrument-family mismatch detected (expected {stepInstrumentFamily?.toUpperCase()}).
+                </div>
+                {incompatibleInstrumentSelections.map((item, index) => (
+                  <div key={`${item.propLabel}-${item.name}-${index}`} className="mt-1">
+                    {item.propLabel}: {item.name} ({item.actualFamily.toUpperCase()})
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
 
         {groups.map((group) => (
           <div key={group}>

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { PanelRightOpen } from "lucide-react";
 import { getTestPlanEditorModel } from "../api/testplans";
 import { getResources, getResourceSchema } from "../api/resources";
 import { Toggle } from "../components/editor/atoms";
@@ -1100,7 +1101,7 @@ export function EditorShell(props: EditorShellProps) {
           handleStepReorder={handleStepReorder}
         />
 
-        {rightOpen && (
+        {rightOpen ? (
           <PropertiesDock
             isTablet={isTablet}
             rightOpen={rightOpen}
@@ -1113,6 +1114,21 @@ export function EditorShell(props: EditorShellProps) {
           >
             {propertiesPanel}
           </PropertiesDock>
+        ) : (
+          !isTablet && (
+            <div className="shrink-0 w-9 border-l border-border bg-gradient-to-b from-card to-muted/20 flex items-start justify-center pt-2">
+              <button
+                onClick={() => setRightOpen(true)}
+                title="Open properties"
+                className="group flex h-40 w-7 flex-col items-center justify-start gap-2 border border-border/60 bg-card/70 py-2 text-muted-foreground transition-colors hover:border-primary/40 hover:bg-secondary/70 hover:text-foreground"
+              >
+                <PanelRightOpen size={13} className="shrink-0" />
+                <span className="text-[9px] font-mono font-semibold uppercase tracking-[0.2em] [writing-mode:vertical-rl] [text-orientation:mixed]">
+                  Properties
+                </span>
+              </button>
+            </div>
+          )
         )}
       </div>
       )}
@@ -1220,7 +1236,7 @@ export function EditorShell(props: EditorShellProps) {
           onSaveUnsavedChanges={handleSaveAndMarkClean}
         />
       )}
-      {showConsole && !showSystemKpis && (
+      {!showSystemKpis && (
         <ConsolePanel
           showConsole={showConsole}
           dragConsole={dragConsole}
