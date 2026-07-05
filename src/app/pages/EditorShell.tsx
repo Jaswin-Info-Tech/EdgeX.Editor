@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { ChevronLeft, PanelLeftOpen, PanelRightOpen } from "lucide-react";
-import { getTestPlanEditorModel } from "../api/testplans";
+import { getTestPlanEditorModel, importRemoteTestPlan, uploadTapPlan } from "../api/testplans";
 import { getResources, getResourceSchema } from "../api/resources";
 import { Toggle } from "../components/editor/atoms";
 import { ConsolePanel } from "../components/editor/ConsolePanel";
@@ -800,6 +800,37 @@ export function EditorShell(props: EditorShellProps) {
     setTestPlanSearchNonce((value) => value + 1);
   };
 
+  const handleUploadTapPlan = async (file: File, destinationPath?: string) => {
+    await uploadTapPlan(file, destinationPath);
+    toast.success(`Uploaded ${file.name} to API server`);
+    if (destinationPath?.trim()) {
+      setTestPlanQuery(destinationPath.trim());
+      setSubmittedTestPlanQuery(destinationPath.trim());
+      setHasSearchedTestPlans(true);
+      setTestPlanSearchNonce((value) => value + 1);
+    }
+  };
+
+  const handleImportRemoteTapPlan = async (payload: {
+    sourceType: "ftp" | "sftp" | "rest";
+    sourceUrl: string;
+    destinationPath?: string;
+    username?: string;
+    password?: string;
+    method?: "GET" | "POST";
+    headers?: Record<string, string>;
+    body?: string;
+  }) => {
+    await importRemoteTestPlan(payload);
+    toast.success("Remote test plan import requested");
+    if (payload.destinationPath?.trim()) {
+      setTestPlanQuery(payload.destinationPath.trim());
+      setSubmittedTestPlanQuery(payload.destinationPath.trim());
+      setHasSearchedTestPlans(true);
+      setTestPlanSearchNonce((value) => value + 1);
+    }
+  };
+
   const getPlanSignature = (steps: any[], meta: any) => {
     const normalizeStep = (step: any): any => ({
       id: step.id,
@@ -1380,6 +1411,8 @@ export function EditorShell(props: EditorShellProps) {
             setPendingTestPlan(null);
           }}
           onSaveUnsavedChanges={handleSaveAndMarkClean}
+          onUploadTapPlan={handleUploadTapPlan}
+          onImportRemotePlan={handleImportRemoteTapPlan}
         />
       )}
       {!showSystemKpis && (
