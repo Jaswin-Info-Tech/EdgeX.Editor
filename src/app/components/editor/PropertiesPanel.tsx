@@ -27,6 +27,7 @@ interface PropertiesPanelProps {
   setAddStepParentId: any;
   setShowAddStep: any;
   updateProperty: any;
+  onResourcesChanged?: () => void;
 }
 
 export function PropertiesPanel({
@@ -44,9 +45,6 @@ export function PropertiesPanel({
   const [schemaCollapsed, setSchemaCollapsed] = useState(false);
   const [schemaSearch, setSchemaSearch] = useState("");
   const [schemaSavedSnapshot, setSchemaSavedSnapshot] = useState("{}");
-  // console.log("PropertiesPanel selectedStep:", selectedStep);
-  // console.log("PropertiesPanel resources:", resources);
-  // Reads from the `properties` slice
   const resolvedTypeNames = useAppSelector((state: any) => state.properties.resolvedTypeNames);
   const schemaCache = useAppSelector((state: any) => state.properties.cache);
   const errorsByTypeName = useAppSelector((state: any) => state.properties.errorsByTypeName);
@@ -265,8 +263,7 @@ useEffect(() => {
     } else if (isObjectLikeEditor(prop)) {
       values[prop.name] = value ?? null;
     } else if (isNameProp) {
-      // Fall back to the step's real name instead of blanking it out,
-      // and self-heal any previously-saved empty value.
+
       const hasRealValue = value != null && String(value).trim() !== "";
       values[prop.name] = hasRealValue ? value : (selectedStep.name ?? "");
     } else {
@@ -375,8 +372,7 @@ useEffect(() => {
       return {
         ...step,
         properties: [...keepProps, ...newProps],
-        // Preserve the original stepTypeName chosen for this step.
-        // Saving schema properties should not change the step identity in payloads.
+
         stepTypeName: step.stepTypeName,
         assembly: meta?.assembly ?? step.assembly,
         baseType: meta?.baseType ?? step.baseType,
@@ -473,7 +469,7 @@ useEffect(() => {
                 <div className="font-semibold">
                   Instrument-family mismatch detected (expected {stepInstrumentFamily?.toUpperCase()}).
                 </div>
-                {incompatibleInstrumentSelections.map((item, index) => (
+                {incompatibleInstrumentSelections.map((item: any, index: number) => (
                   <div key={`${item.propLabel}-${item.name}-${index}`} className="mt-1">
                     {item.propLabel}: {item.name} ({item.actualFamily.toUpperCase()})
                   </div>

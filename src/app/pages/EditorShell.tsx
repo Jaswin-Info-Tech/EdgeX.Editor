@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { ChevronLeft, PanelLeftOpen, PanelRightOpen } from "lucide-react";
 import { getTestPlanEditorModel, importRemoteTestPlan, uploadTapPlan } from "../api/testplans";
 import { getResources, getResourceSchema } from "../api/resources";
@@ -558,8 +558,7 @@ export function EditorShell(props: EditorShellProps) {
       // Capture the current instrument name to validate response matches
       const currentInstrumentName = selectedResourceInstrument;
 
-      // Use instrument name directly as pluginTypeName
-      // The instrument name is the specific type we want to query
+
       const pluginTypeName = currentInstrumentName?.trim();
 
       if (!pluginTypeName) {
@@ -614,29 +613,29 @@ export function EditorShell(props: EditorShellProps) {
     setResourceSchemaValues(nextValues);
   }, [resourceSchemaProperties]);
 
+
+ const fetchResourcePlans = useCallback(async () => {
+   setIsResourcesLoading(true);
+   setIsResourcesError(false);
+   try {
+     const data = await getResources();
+     setResourcePlans(data);
+   } catch {
+     setIsResourcesError(true);
+   } finally {
+     setIsResourcesLoading(false);
+   }
+ }, []);
+
   useEffect(() => {
     let cancelled = false;
-    const fetchResources = async () => {
-      setIsResourcesLoading(true);
-      setIsResourcesError(false);
-      try {
-        const data = await getResources();
-        if (cancelled) return;
-        setResourcePlans(data);
-      } catch (error) {
-        if (cancelled) return;
-        setIsResourcesError(true);
-      } finally {
-        if (!cancelled) setIsResourcesLoading(false);
-      }
-    };
 
-    fetchResources();
+   fetchResourcePlans();
     return () => {
       cancelled = true;
     };
-  }, []);
-
+// - }, []);
+ }, [fetchResourcePlans]);
 
   const closeCreateResourceModal = () => {
     setShowCreateResource(false);
@@ -1318,6 +1317,7 @@ export function EditorShell(props: EditorShellProps) {
           isLoading={isInstrumentsLoading}
           isError={isInstrumentsError}
           onClose={() => setShowInstrumentsPanel(false)}
+          onResourcesChanged={fetchResourcePlans}
         />
       )}
 
