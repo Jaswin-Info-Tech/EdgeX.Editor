@@ -5,6 +5,7 @@ import {
   ArrowUp,
   ChevronDown,
   ChevronRight,
+  CopyPlus,
   Edit3,
   Eye,
   EyeOff,
@@ -14,7 +15,7 @@ import {
 } from "lucide-react";
 import type { TestStep } from "../../types/editor";
 import { TYPE_LABEL, TYPE_STRIPE } from "../../constants/editor";
-import { deleteIn, formatFreq, moveIn, updateIn } from "../../utils/editor";
+import {  deleteIn, formatFreq, moveIn, updateIn, addToParent, uid } from "../../utils/editor";
 import { StatusIcon, StatusPill, TypeIcon } from "./atoms";
 
 function canAcceptChildSteps(step: TestStep) {
@@ -358,6 +359,25 @@ export function SequenceStep(props: SequenceStepProps) {
             >
               <ArrowDown size={11} />
             </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const cloneRecursive = (s: TestStep): TestStep => ({
+                    ...s,
+                    id: uid(),
+                    name: `${s.name} (copy)`,
+                    status: "pending",
+                    children: s.children ? s.children.map(c => cloneRecursive(c)) : undefined,
+                  });
+                  const clone = cloneRecursive(step);
+                  setPlan((prev: any) => addToParent(prev, parentId ?? null, clone, idx + 1));
+                  setSelectedId(clone.id);
+                }}
+                className="p-1 text-muted-foreground hover:text-foreground hover:bg-secondary"
+                title="Clone step"
+              >
+                <CopyPlus size={11} />
+              </button>
             <button
               onClick={(e) => {
                 e.stopPropagation();
