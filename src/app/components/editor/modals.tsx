@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Check, ChevronLeft, ChevronRight, Download, FilePlus, Package, Plus, RefreshCw, Search, Upload, X } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, Download, Filter, FilePlus, Package, Plus, RefreshCw, Search, Upload, X } from "lucide-react";
 import type { CtxMenu, DutItem, InstrumentItem, LibraryItem, PlanMeta, Plugin } from "../../types/editor";
 import { TYPE_LABEL, TYPE_STRIPE } from "../../constants/editor";
 import { TypeIcon } from "./atoms";
@@ -281,6 +281,63 @@ export function AddStepModal({
   );
 }
 
+// ─── Filter Dropdown (shared) ─────────────────────────────────────────────────
+
+function FilterDropdown({
+  open,
+  onOpenChange,
+  activeCount,
+  title,
+  onClear,
+  children,
+  popoverWidth,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  activeCount: number;
+  title: string;
+  onClear: () => void;
+  children: React.ReactNode;
+  popoverWidth?: string;
+}) {
+  return (
+    <div className="relative shrink-0">
+      <button
+        onClick={() => onOpenChange(!open)}
+        className={`flex h-9 items-center gap-1.5 border px-2.5 text-[11px] font-mono transition-colors ${activeCount > 0
+          ? "border-primary/50 bg-primary/10 text-primary"
+          : "border-border text-muted-foreground hover:bg-secondary hover:text-foreground"
+          }`}
+        title="Filter"
+      >
+        <Filter size={14} />
+        {activeCount > 0 && (
+          <span className="ml-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold leading-none text-primary-foreground">
+            {activeCount}
+          </span>
+        )}
+      </button>
+
+      {open && (
+        <>
+          <div className="fixed inset-0 z-10" onClick={() => onOpenChange(false)} />
+          <div className={`absolute right-0 top-full z-20 mt-1 ${popoverWidth ?? "w-60"} border border-border bg-popover`}>
+            <div className="flex items-center justify-between border-b border-border px-3 py-2">
+              <span className="text-[11px] font-mono font-semibold uppercase tracking-widest text-muted-foreground">{title}</span>
+              {activeCount > 0 && (
+                <button onClick={onClear} className="text-[10px] font-mono text-primary hover:underline">
+                  Clear
+                </button>
+              )}
+            </div>
+            <div className="max-h-64 overflow-y-auto py-1">{children}</div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 // ─── Plugin Manager ───────────────────────────────────────────────────────────
 export function PluginManager({
   plugins, installedPlugins, onInstall, onUninstall, onUninstallPackage, onUpload, onClose,
@@ -298,10 +355,43 @@ export function PluginManager({
   const [uploading, setUploading] = useState(false);
   const [installingId, setInstallingId] = useState<string | null>(null);
   const [uninstallingId, setUninstallingId] = useState<string | null>(null);
+
+  // ── Filter state: Installed tab (filter by base type) ──
+  const [installedFilterOpen, setInstalledFilterOpen] = useState(false);
+  const [installedTypeFilters, setInstalledTypeFilters] = useState<Set<string>>(new Set());
+
+  // ── Filter state: Available tab (filter by status + author) ──
+  const [availableFilterOpen, setAvailableFilterOpen] = useState(false);
+  const [availableStatusFilter, setAvailableStatusFilter] = useState<"all" | "installed" | "not_installed">("all");
+
   const installedTotal = installedPlugins.length;
   const availableTotal = plugins.length;
-  const installed = installedPlugins.filter(plugin => matchesPluginSearch(plugin, installedSearch));
-  const available = plugins.filter(plugin => matchesPluginSearch(plugin, browseSearch));
+
+  const installedBaseTypes = Array.from(
+    new Set(installedPlugins.map(p => p.baseType).filter((v): v is string => Boolean(v)))
+  ).sort();
+
+  const toggleInstalledType = (t: string) => {
+    setInstalledTypeFilters(prev => {
+      const next = new Set(prev);
+      if (next.has(t)) next.delete(t); else next.add(t);
+      return next;
+    });
+  };
+
+  const installedActiveFilterCount = installedTypeFilters.size;
+  const availableActiveFilterCount = (availableStatusFilter !== "all" ? 1 : 0);
+
+  const installed = installedPlugins.filter(plugin =>
+    matchesPluginSearch(plugin, installedSearch) &&
+    (installedTypeFilters.size === 0 || (plugin.baseType ? installedTypeFilters.has(plugin.baseType) : false))
+  );
+
+  const available = plugins.filter(plugin =>
+    matchesPluginSearch(plugin, browseSearch) &&
+    (availableStatusFilter === "all" || (availableStatusFilter === "installed" ? Boolean(plugin.isInstalled) : !plugin.isInstalled))
+  );
+
   const handleUpload = async () => {
     if (!uploadFile) return;
     setUploading(true);
@@ -423,6 +513,31 @@ export function PluginManager({
                       </button>
                     )}
                   </div>
+
+                  <FilterDropdown
+                    open={installedFilterOpen}
+                    onOpenChange={setInstalledFilterOpen}
+                    activeCount={installedActiveFilterCount}
+                    title="Filter by Type"
+                    onClear={() => setInstalledTypeFilters(new Set())}
+                  >
+                    {installedBaseTypes.length === 0 ? (
+                      <div className="px-3 py-3 text-[11px] font-mono text-muted-foreground">No types available</div>
+                    ) : (
+                      installedBaseTypes.map(t => (
+                        <label key={t} className="flex cursor-pointer items-center gap-2 px-3 py-1.5 text-[12px] font-mono text-foreground hover:bg-secondary">
+                          <input
+                            type="checkbox"
+                            checked={installedTypeFilters.has(t)}
+                            onChange={() => toggleInstalledType(t)}
+                            className="accent-primary"
+                          />
+                          <span className="truncate" title={t}>{t}</span>
+                        </label>
+                      ))
+                    )}
+                  </FilterDropdown>
+
                   <div className="text-[11px] font-mono text-muted-foreground">{installed.length} visible</div>
                 </div>
               </div>
@@ -431,7 +546,7 @@ export function PluginManager({
                 <div className="py-12 text-center text-[12px] font-mono text-muted-foreground">Loading installed plugins...</div>
               ) : installed.length === 0 ? (
                 <div className="py-12 text-center text-[12px] font-mono text-muted-foreground">
-                  {installedSearch ? "No matching plugins" : "No plugins installed"}
+                  {installedSearch || installedActiveFilterCount > 0 ? "No matching plugins" : "No plugins installed"}
                 </div>
               ) : (
                 <div>
@@ -490,6 +605,38 @@ export function PluginManager({
                       </button>
                     )}
                   </div>
+
+                  <FilterDropdown
+                    open={availableFilterOpen}
+                    onOpenChange={setAvailableFilterOpen}
+                    activeCount={availableActiveFilterCount}
+                    title="Filter"
+                    onClear={() => setAvailableStatusFilter("all")}
+                    popoverWidth="w-44"
+                  >
+                    <div className="border-border px-3 py-2">
+                      <div className="mb-1.5 text-[10px] font-mono uppercase tracking-widest text-muted-foreground/80">Status</div>
+                      <div className="space-y-1">
+                        {([
+                          { value: "all", label: "All" },
+                          { value: "installed", label: "Installed" },
+                          { value: "not_installed", label: "Not Installed" },
+                        ] as const).map(opt => (
+                          <label key={opt.value} className="flex cursor-pointer items-center gap-2 text-[12px] font-mono text-foreground">
+                            <input
+                              type="radio"
+                              name="available-status-filter"
+                              checked={availableStatusFilter === opt.value}
+                              onChange={() => setAvailableStatusFilter(opt.value)}
+                              className="accent-primary"
+                            />
+                            {opt.label}
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  </FilterDropdown>
+
                   <div className="text-[11px] font-mono text-muted-foreground">{available.length} visible</div>
                 </div>
               </div>
@@ -498,7 +645,7 @@ export function PluginManager({
                 <div className="py-12 text-center text-[12px] font-mono text-muted-foreground">Loading packages...</div>
               ) : available.length === 0 ? (
                 <div className="py-12 text-center text-[12px] font-mono text-muted-foreground">
-                  {browseSearch ? "No matching packages" : "No packages available"}
+                  {browseSearch || availableActiveFilterCount > 0 ? "No matching packages" : "No packages available"}
                 </div>
               ) : (
                 <div>
@@ -559,8 +706,8 @@ export function PluginManager({
                 <div className="text-[13px] font-mono text-muted-foreground">
                   {uploadFile ? <span className="text-primary">{uploadFile.name}</span> : <>Drop file here or <span className="text-primary underline">browse</span></>}
                 </div>
-                <div className="mt-1 text-[11px] text-muted-foreground/60">Supported: .tappackage, .dll</div>
-                <input type="file" className="hidden" accept=".tappackage,.dll" onChange={e => { if (e.target.files?.[0]) setUploadFile(e.target.files[0]); }} />
+                <div className="mt-1 text-[11px] text-muted-foreground/60">Supported: .zip, .dll</div>
+                <input type="file" className="hidden" accept=".zip,.dll" onChange={e => { if (e.target.files?.[0]) setUploadFile(e.target.files[0]); }} />
               </label>
 
               {uploadError && <div className="mt-3 text-[12px] font-mono text-red-500">{uploadError}</div>}
