@@ -285,6 +285,7 @@ interface GenericResourcePanelProps {
   isLoading: boolean;
   isError: boolean;
   onClose: () => void;
+  onResourcesChanged?: () => void;
 }
 
 function GenericResourcePanel({
@@ -295,6 +296,7 @@ function GenericResourcePanel({
   isLoading,
   isError,
   onClose,
+  onResourcesChanged,
 }: GenericResourcePanelProps) {
   const [selectedKey, setSelectedKey] = useState("");
   const [resourceName, setResourceName] = useState("");
@@ -575,6 +577,7 @@ function GenericResourcePanel({
       );
       setActiveBlade("resources");
       resetToBlank();
+      onResourcesChanged?.();
     } catch (error) {
       const message =
         error instanceof Error
@@ -620,6 +623,7 @@ function GenericResourcePanel({
       }
       toast.success(`${resourceToDelete.name} deleted successfully`, { id: toastId });
       setResourcePendingDelete(null);
+      onResourcesChanged?.();
     } catch (error) {
       const message =
         error instanceof Error
@@ -1228,6 +1232,7 @@ interface InstrumentsPanelProps {
   isLoading: boolean;
   isError: boolean;
   onClose: () => void;
+  onResourcesChanged?: () => void;
 }
 
 export function InstrumentsPanel({
@@ -1237,6 +1242,7 @@ export function InstrumentsPanel({
   isLoading,
   isError,
   onClose,
+  onResourcesChanged,
 }: InstrumentsPanelProps) {
   return (
     <GenericResourcePanel
@@ -1247,6 +1253,7 @@ export function InstrumentsPanel({
       isLoading={isLoading}
       isError={isError}
       onClose={onClose}
+      onResourcesChanged={onResourcesChanged}
     />
   );
 }
