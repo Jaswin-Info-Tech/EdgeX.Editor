@@ -226,13 +226,19 @@ export function useEditorController() {
     return formattedStep;
   }, []);
 
+  const buildOutputPath = useCallback((name: string) => {
+    const safeName = (name ?? "Untitled Test Plan").trim() || "Untitled Test Plan";
+    const normalizedName = safeName.replace(/[<>:"/\\|?*\u0000-\u001f]/g, "_");
+    return `D:\\plans\\${normalizedName}.TapPlan`;
+  }, []);
+
   const buildSaveSignature = useCallback((steps: TestStep[], meta: PlanMeta) => {
     return JSON.stringify({
-      outputPath: `D:\\plans\\${meta.name}.TapPlan`,
+      outputPath: buildOutputPath(meta.name),
       overwrite: true,
       steps: steps.map(formatStepForSave),
     });
-  }, [formatStepForSave]);
+  }, [buildOutputPath, formatStepForSave]);
 
   const currentSaveSignature = useMemo(
     () => buildSaveSignature(plan, planMeta),
@@ -1142,7 +1148,8 @@ export function useEditorController() {
     setActiveRunId(null);
     setShowConsole(true);
 
-    const runPath = "D:\\plans\\SamplePlan.TapPlan";
+    const runPath = buildOutputPath(planMeta.name);
+
     addLog("INFO", "EdgeX", `=== Run started - "${planMeta.name}" ===`);
     addLog("INFO", "TestPlans", `Run request: ${runPath}`);
 
@@ -1473,8 +1480,9 @@ export function useEditorController() {
       formattedSteps.map((step) => normalizeFormattedStepTypeNames(step)),
     );
 
+    const outputPath = buildOutputPath(planMeta.name);
     const jsonData = {
-      outputPath: `D:\\plans\\${planMeta.name}.TapPlan`,
+      outputPath,
       overwrite: true,
       steps: normalizedSteps,
     };
