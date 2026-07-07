@@ -801,7 +801,6 @@ export function EditorShell(props: EditorShellProps) {
 
   const handleUploadTapPlan = async (file: File, destinationPath?: string) => {
     await uploadTapPlan(file, destinationPath);
-    toast.success(`Uploaded ${file.name} to API server`);
     if (destinationPath?.trim()) {
       setTestPlanQuery(destinationPath.trim());
       setSubmittedTestPlanQuery(destinationPath.trim());

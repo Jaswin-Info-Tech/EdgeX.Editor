@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, CheckCircle2, ChevronRight, ClipboardList, Clock3, Filter, Info, Loader2, Search, Server, Upload, X } from "lucide-react";
+import { AlertTriangle, CheckCircle2, ChevronRight, ClipboardList, Clock3, Info, Loader2, Search, Server, Upload, X } from "lucide-react";
+import { toast } from "sonner";
 
 interface TestPlansPanelProps {
   testPlans: any[];
@@ -30,62 +31,6 @@ interface TestPlansPanelProps {
   }) => Promise<void>;
 }
 
-function FilterDropdown({
-  open,
-  onOpenChange,
-  activeCount,
-  title,
-  onClear,
-  children,
-}: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  activeCount: number;
-  title: string;
-  onClear: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="relative shrink-0">
-      <button
-        onClick={() => onOpenChange(!open)}
-        className={`flex h-[38px] items-center gap-1.5 border px-2.5 text-[11px] font-mono transition-colors ${open
-          ? "border-primary/50 bg-primary/10 text-primary"
-          : activeCount > 0
-          ? "border-primary/50 bg-primary/10 text-primary"
-          : "border-border text-muted-foreground hover:bg-secondary hover:text-foreground"
-          }`}
-        title="Filter"
-      >
-        <Filter size={12} />
-        Filter
-        {activeCount > 0 && (
-          <span className="ml-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold leading-none text-primary-foreground">
-            {activeCount}
-          </span>
-        )}
-      </button>
-
-      {open && (
-        <>
-          <div className="fixed inset-0 z-10" onClick={() => onOpenChange(false)} />
-          <div className="absolute right-0 top-full z-20 mt-1 w-60 border border-border bg-popover shadow-2xl">
-            <div className="flex items-center justify-between border-b border-border px-3 py-2">
-              <span className="text-[11px] font-mono font-semibold uppercase tracking-widest text-muted-foreground">{title}</span>
-              {activeCount > 0 && (
-                <button onClick={onClear} className="text-[10px] font-mono text-primary hover:underline">
-                  Clear
-                </button>
-              )}
-            </div>
-            <div className="max-h-72 overflow-y-auto">{children}</div>
-          </div>
-        </>
-      )}
-    </div>
-  );
-}
-
 export function TestPlansPanel({
   testPlans,
   query,
@@ -107,8 +52,6 @@ export function TestPlansPanel({
 }: TestPlansPanelProps) {
   type SourceMode = "browse" | "upload" | "remote";
   type FieldErrorKey = "uploadFile" | "remoteUrl" | "remoteHeaders";
-  type StepCountFilter = "all" | "small" | "medium" | "large";
-  type ModifiedFilter = "all" | "today" | "week" | "month";
   const SOURCE_MODE_META: Record<SourceMode, { title: string; description: string; tip: string }> = {
     browse: {
       title: "Browse Local Path",
@@ -147,11 +90,6 @@ export function TestPlansPanel({
   const [transferDensity, setTransferDensity] = useState<"comfortable" | "compact">("comfortable");
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<FieldErrorKey, string>>>({});
 
-  // ── Filter state: Browse Local Path results ──
-  const [resultsFilterOpen, setResultsFilterOpen] = useState(false);
-  const [stepCountFilter, setStepCountFilter] = useState<StepCountFilter>("all");
-  const [modifiedFilter, setModifiedFilter] = useState<ModifiedFilter>("all");
-
   const activeModeMeta = SOURCE_MODE_META[sourceMode];
   const isCompact = transferDensity === "compact";
   const fieldHeightClass = isCompact ? "h-7" : "h-8";
@@ -159,33 +97,9 @@ export function TestPlansPanel({
   const formGapClass = isCompact ? "space-y-2" : "space-y-3";
   const helpTextClass = isCompact ? "text-[10px]" : "text-[11px]";
 
-  const resultsActiveFilterCount = (stepCountFilter !== "all" ? 1 : 0) + (modifiedFilter !== "all" ? 1 : 0);
-
-  const filteredTestPlans = useMemo(() => {
-    const now = Date.now();
-    const day = 1000 * 60 * 60 * 24;
-    return testPlans.filter((plan: any) => {
-      const stepCount = Number(plan?.stepCount) || 0;
-      if (stepCountFilter === "small" && stepCount > 10) return false;
-      if (stepCountFilter === "medium" && (stepCount <= 10 || stepCount > 50)) return false;
-      if (stepCountFilter === "large" && stepCount <= 50) return false;
-
-      if (modifiedFilter !== "all") {
-        const parsed = new Date(String(plan?.lastModified ?? ""));
-        if (Number.isNaN(parsed.getTime())) return false;
-        const diff = now - parsed.getTime();
-        if (modifiedFilter === "today" && diff > day) return false;
-        if (modifiedFilter === "week" && diff > day * 7) return false;
-        if (modifiedFilter === "month" && diff > day * 30) return false;
-      }
-
-      return true;
-    });
-  }, [testPlans, stepCountFilter, modifiedFilter]);
-
   const filteredLabel = hasSearched && query.trim().length > 0
-    ? `${filteredTestPlans.length} matching test plans`
-    : `${filteredTestPlans.length} test plans`;
+    ? `${testPlans.length} matching test plans`
+    : `${testPlans.length} test plans`;
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -266,6 +180,7 @@ export function TestPlansPanel({
     setIsSubmittingTransfer(true);
     try {
       await onUploadTapPlan(uploadFile, uploadDestination.trim() || undefined);
+      toast.success(`Uploaded ${uploadFile.name} to API server.`);
       setTransferSuccess(`Uploaded ${uploadFile.name} to API server.`);
       if (uploadDestination.trim()) {
         setQuery(uploadDestination.trim());
@@ -273,7 +188,9 @@ export function TestPlansPanel({
       setSourceMode("browse");
       setUploadFile(null);
     } catch (error) {
-      setTransferError(error instanceof Error ? error.message : "Upload failed.");
+      const message = error instanceof Error ? error.message : "Upload failed.";
+      toast.error(message);
+      setTransferError(message);
     } finally {
       setIsSubmittingTransfer(false);
     }
@@ -465,62 +382,6 @@ export function TestPlansPanel({
                 </button>
               )}
             </div>
-
-            <FilterDropdown
-              open={resultsFilterOpen}
-              onOpenChange={setResultsFilterOpen}
-              activeCount={resultsActiveFilterCount}
-              title="Filter Results"
-              onClear={() => {
-                setStepCountFilter("all");
-                setModifiedFilter("all");
-              }}
-            >
-              <div className="border-b border-border px-3 py-2">
-                <div className="mb-1.5 text-[10px] font-mono uppercase tracking-widest text-muted-foreground/80">Steps</div>
-                <div className="space-y-1">
-                  {([
-                    { value: "all", label: "Any" },
-                    { value: "small", label: "1-10 steps" },
-                    { value: "medium", label: "11-50 steps" },
-                    { value: "large", label: "50+ steps" },
-                  ] as const).map((opt) => (
-                    <label key={opt.value} className="flex cursor-pointer items-center gap-2 text-[12px] font-mono text-foreground">
-                      <input
-                        type="radio"
-                        name="testplan-stepcount-filter"
-                        checked={stepCountFilter === opt.value}
-                        onChange={() => setStepCountFilter(opt.value)}
-                        className="accent-primary"
-                      />
-                      {opt.label}
-                    </label>
-                  ))}
-                </div>
-              </div>
-              <div className="px-3 py-2">
-                <div className="mb-1.5 text-[10px] font-mono uppercase tracking-widest text-muted-foreground/80">Last Modified</div>
-                <div className="space-y-1">
-                  {([
-                    { value: "all", label: "Any time" },
-                    { value: "today", label: "Last 24 hours" },
-                    { value: "week", label: "Last 7 days" },
-                    { value: "month", label: "Last 30 days" },
-                  ] as const).map((opt) => (
-                    <label key={opt.value} className="flex cursor-pointer items-center gap-2 text-[12px] font-mono text-foreground">
-                      <input
-                        type="radio"
-                        name="testplan-modified-filter"
-                        checked={modifiedFilter === opt.value}
-                        onChange={() => setModifiedFilter(opt.value)}
-                        className="accent-primary"
-                      />
-                      {opt.label}
-                    </label>
-                  ))}
-                </div>
-              </div>
-            </FilterDropdown>
 
             <button
               onClick={handleSearch}
@@ -918,9 +779,9 @@ export function TestPlansPanel({
             <div className="px-5 py-8 text-center text-[12px] font-mono text-muted-foreground">
               No test plans found for your search.
             </div>
-          ) : hasSearched && filteredTestPlans.length === 0 ? (
+          ) : hasSearched && testPlans.length === 0 ? (
             <div className="px-5 py-8 text-center text-[12px] font-mono text-muted-foreground">
-              No test plans match the selected filters.
+              No test plans found for your search.
             </div>
           ) : (
             <>
@@ -930,7 +791,7 @@ export function TestPlansPanel({
                 <span>Last Modified</span>
                 <span />
               </div>
-              {filteredTestPlans.map((plan: any, index: number) => {
+              {testPlans.map((plan: any, index: number) => {
                 const isOpening = openingPath === plan.path;
                 return (
                   <button

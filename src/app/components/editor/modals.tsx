@@ -356,35 +356,17 @@ export function PluginManager({
   const [installingId, setInstallingId] = useState<string | null>(null);
   const [uninstallingId, setUninstallingId] = useState<string | null>(null);
 
-  // ── Filter state: Installed tab (filter by base type) ──
-  const [installedFilterOpen, setInstalledFilterOpen] = useState(false);
-  const [installedTypeFilters, setInstalledTypeFilters] = useState<Set<string>>(new Set());
-
-  // ── Filter state: Available tab (filter by status + author) ──
+  // ── Filter state: Available tab only ──
   const [availableFilterOpen, setAvailableFilterOpen] = useState(false);
   const [availableStatusFilter, setAvailableStatusFilter] = useState<"all" | "installed" | "not_installed">("all");
 
   const installedTotal = installedPlugins.length;
   const availableTotal = plugins.length;
 
-  const installedBaseTypes = Array.from(
-    new Set(installedPlugins.map(p => p.baseType).filter((v): v is string => Boolean(v)))
-  ).sort();
-
-  const toggleInstalledType = (t: string) => {
-    setInstalledTypeFilters(prev => {
-      const next = new Set(prev);
-      if (next.has(t)) next.delete(t); else next.add(t);
-      return next;
-    });
-  };
-
-  const installedActiveFilterCount = installedTypeFilters.size;
   const availableActiveFilterCount = (availableStatusFilter !== "all" ? 1 : 0);
 
   const installed = installedPlugins.filter(plugin =>
-    matchesPluginSearch(plugin, installedSearch) &&
-    (installedTypeFilters.size === 0 || (plugin.baseType ? installedTypeFilters.has(plugin.baseType) : false))
+    matchesPluginSearch(plugin, installedSearch)
   );
 
   const available = plugins.filter(plugin =>
@@ -514,30 +496,6 @@ export function PluginManager({
                     )}
                   </div>
 
-                  <FilterDropdown
-                    open={installedFilterOpen}
-                    onOpenChange={setInstalledFilterOpen}
-                    activeCount={installedActiveFilterCount}
-                    title="Filter by Type"
-                    onClear={() => setInstalledTypeFilters(new Set())}
-                  >
-                    {installedBaseTypes.length === 0 ? (
-                      <div className="px-3 py-3 text-[11px] font-mono text-muted-foreground">No types available</div>
-                    ) : (
-                      installedBaseTypes.map(t => (
-                        <label key={t} className="flex cursor-pointer items-center gap-2 px-3 py-1.5 text-[12px] font-mono text-foreground hover:bg-secondary">
-                          <input
-                            type="checkbox"
-                            checked={installedTypeFilters.has(t)}
-                            onChange={() => toggleInstalledType(t)}
-                            className="accent-primary"
-                          />
-                          <span className="truncate" title={t}>{t}</span>
-                        </label>
-                      ))
-                    )}
-                  </FilterDropdown>
-
                   <div className="text-[11px] font-mono text-muted-foreground">{installed.length} visible</div>
                 </div>
               </div>
@@ -546,7 +504,7 @@ export function PluginManager({
                 <div className="py-12 text-center text-[12px] font-mono text-muted-foreground">Loading installed plugins...</div>
               ) : installed.length === 0 ? (
                 <div className="py-12 text-center text-[12px] font-mono text-muted-foreground">
-                  {installedSearch || installedActiveFilterCount > 0 ? "No matching plugins" : "No plugins installed"}
+                  {installedSearch ? "No matching plugins" : "No plugins installed"}
                 </div>
               ) : (
                 <div>
