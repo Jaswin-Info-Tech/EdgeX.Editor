@@ -130,9 +130,9 @@ export function ServerSettingsModal({
     const next = hasProfiles
       ? loaded
       : {
-          servers: [createEmptyProfile(0)],
-          activeServerId: null,
-        };
+        servers: [createEmptyProfile(0)],
+        activeServerId: null,
+      };
 
     setSettings(next);
     setSelectedServerId(next.activeServerId ?? next.servers[0]?.id ?? null);
@@ -701,21 +701,33 @@ export function ServerSettingsModal({
                   Use this profile as active backend server
                 </label>
 
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={handleTestConnection}
-                    disabled={isTesting}
-                    className="flex h-8 items-center gap-2 border border-primary/30 bg-primary/10 px-3 text-[11px] font-mono font-semibold text-primary transition-colors hover:bg-primary/20 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    <PlugZap size={12} />
-                    {isTesting ? "Testing..." : "Test Connection"}
-                  </button>
-                  {testStatus !== "idle" && (
-                    <span
-                      className={`text-[11px] font-mono ${testStatus === "success" ? "text-emerald-600 dark:text-emerald-300" : "text-destructive"}`}
+
+                <div className="flex flex-col gap-1.5">
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={handleTestConnection}
+                      disabled={isTesting}
+                      className="flex h-8 shrink-0 items-center gap-2 border border-primary/30 bg-primary/10 px-3 text-[11px] font-mono font-semibold text-primary transition-colors hover:bg-primary/20 disabled:cursor-not-allowed disabled:opacity-50"
                     >
-                      {testMessage}
-                    </span>
+                      <PlugZap size={12} />
+                      {isTesting ? "Testing..." : "Test Connection"}
+                    </button>
+                  </div>
+
+                  {testStatus !== "idle" && (
+                    <div
+                      className={`flex items-start gap-1.5 border px-2.5 py-1.5 text-[11px] font-mono break-all ${testStatus === "success"
+                          ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+                          : "border-destructive/30 bg-destructive/10 text-destructive"
+                        }`}
+                    >
+                      {testStatus === "success" ? (
+                        <CheckCircle2 size={12} className="mt-0.5 shrink-0" />
+                      ) : (
+                        <AlertTriangle size={12} className="mt-0.5 shrink-0" />
+                      )}
+                      <span>{testMessage}</span>
+                    </div>
                   )}
                 </div>
 
