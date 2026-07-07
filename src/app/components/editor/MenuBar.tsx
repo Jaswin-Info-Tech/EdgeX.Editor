@@ -3,7 +3,7 @@ import { Moon, PanelLeftOpen, PanelRightOpen, Sun, Check, Settings } from "lucid
 const MENU_ITEMS: Record<string, string[]> = {
   File: ["Import Plan","Export Plan"],
   View: ["Step Library", "Properties", "Console", "-", "Reset Layout"],
-  Modules: ["Instruments", "DUTs", "Connections", "Result Listeners", "Trace Listeners"],
+  Bench: ["Instruments", "DUTs", "Connections", "Result Listeners", "Trace Listeners"],
 };
 
 interface MenuBarProps {

@@ -182,7 +182,7 @@ export function LeftPanel({
         {(
           [
             ["plan", "MyPlan", <List size={12} />],
-            ["library", "StepsDB", <Database size={12} />],
+            ["library", "Steps", <Database size={12} />],
           ] as const
         ).map(([tab, label, icon]) => (
           <button
