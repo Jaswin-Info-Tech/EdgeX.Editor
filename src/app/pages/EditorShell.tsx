@@ -107,6 +107,7 @@ interface EditorShellProps {
   isTraceListenersError: boolean;
   plan: any;
   planMeta: any;
+  setOutputPath: (path: string | null) => void;
   stats: any;
   activeMenu: any;
   setActiveMenu: any;
@@ -136,6 +137,10 @@ interface EditorShellProps {
   showNewPlan: any;
   handleCreatePlan: any;
   showAddStep: any;
+  showSaveDestination: boolean;
+  defaultOutputPath: string;
+  handleConfirmSaveDestination: (path: string) => void;
+  handleCancelSaveDestination: () => void;
   addStepParentId: any;
   addStepIdx: any;
   showPluginMgr: any;
@@ -230,6 +235,7 @@ export function EditorShell(props: EditorShellProps) {
     isTraceListenersError,
     plan,
     planMeta,
+    setOutputPath,
     stats,
     activeMenu,
     setActiveMenu,
@@ -259,6 +265,10 @@ export function EditorShell(props: EditorShellProps) {
     showNewPlan,
     handleCreatePlan,
     showAddStep,
+    showSaveDestination,
+    defaultOutputPath,
+    handleConfirmSaveDestination,
+    handleCancelSaveDestination,
     addStepParentId,
     addStepIdx,
     showPluginMgr,
@@ -878,6 +888,7 @@ export function EditorShell(props: EditorShellProps) {
   const handleSaveAndMarkClean = async () => {
     const snapshotSignature = getPlanSignature(plan || [], planMeta);
     const result = await handleSave();
+    if (!result) return result;
     setSavedPlanSignature(snapshotSignature);
     setShowUnsavedPlanWarning(false);
     setPendingTestPlan(null);
@@ -1011,6 +1022,7 @@ export function EditorShell(props: EditorShellProps) {
 
       setPlanMeta(meta);
       setPlan(steps);
+      setOutputPath(path);
       setSavedPlanSignature(getPlanSignature(steps, meta));
       setShowUnsavedPlanWarning(false);
       setHasPlan(true);
@@ -1440,6 +1452,10 @@ export function EditorShell(props: EditorShellProps) {
         handleCreatePlan={handleCreatePlan}
         showAddStep={showAddStep}
         setShowAddStep={setShowAddStep}
+        showSaveDestination={showSaveDestination}
+        defaultOutputPath={defaultOutputPath}
+        handleConfirmSaveDestination={handleConfirmSaveDestination}
+        handleCancelSaveDestination={handleCancelSaveDestination}
         library={library}
         handleAddStep={handleAddStep}
         addStepParentId={addStepParentId}

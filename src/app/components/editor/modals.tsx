@@ -166,6 +166,66 @@ export function NewPlanModal({ onClose, onCreate }: { onClose: () => void; onCre
 
 // ─── Add Step Modal ───────────────────────────────────────────────────────────
 
+export function SaveDestinationModal({
+  defaultPath,
+  onCancel,
+  onSave,
+}: {
+  defaultPath: string;
+  onCancel: () => void;
+  onSave: (path: string) => void;
+}) {
+  const [destinationPath, setDestinationPath] = useState("");
+
+  return (
+    <div className="fixed inset-0 bg-black/75 flex items-center justify-center z-50" onClick={onCancel}>
+      <div className="bg-card border border-border w-[520px] max-w-[94vw] flex flex-col shadow-2xl" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-5 py-3 border-b border-border bg-muted/30">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="flex h-8 w-8 items-center justify-center border border-primary/30 bg-primary/10 text-primary shrink-0">
+              <Download size={16} className="text-primary" />
+            </div>
+            <div className="min-w-0">
+              <div className="truncate text-[15px] font-semibold text-foreground">Save Test Plan</div>
+              <div className="truncate text-[12px] font-mono text-muted-foreground">Choose destination path for this plan</div>
+            </div>
+          </div>
+          <button
+            onClick={onCancel}
+            className="flex h-8 w-8 items-center justify-center border border-transparent text-muted-foreground transition-colors hover:border-border hover:bg-secondary hover:text-foreground"
+          >
+            <X size={14} />
+          </button>
+        </div>
+
+        <div className="px-5 py-5">
+          <Field
+            label="Destination Path"
+            value={destinationPath}
+            onChange={(event: any) => setDestinationPath(event.target.value)}
+            placeholder={defaultPath}
+            helper={`Leave empty to use ${defaultPath}`}
+          />
+        </div>
+
+        <div className="flex justify-between items-center px-5 py-3 border-t border-border bg-muted/20">
+          <div className="text-[11px] font-mono text-muted-foreground"></div>
+          <div className="flex gap-2">
+            <button onClick={onCancel} className="h-8 px-3 border border-border text-[12px] font-mono text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground">Cancel</button>
+            <button
+              onClick={() => onSave(destinationPath)}
+              className="flex items-center gap-1 px-4 h-8 bg-primary text-primary-foreground text-[12px] font-mono font-semibold transition-colors hover:bg-primary/90"
+            >
+              <Check size={12} />
+              Save
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function AddStepModal({
   library,
   onAdd,

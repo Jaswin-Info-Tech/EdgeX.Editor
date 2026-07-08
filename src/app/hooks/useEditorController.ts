@@ -33,6 +33,7 @@ import {
 } from "../api/plugin";
 
 const PLAN_SNAPSHOT_STORAGE_KEY = "edgex.editor.planSnapshot.v1";
+const DEFAULT_TEST_PLAN_ROOT = "D:\\plans";
 
 type PersistedPlanSnapshot = {
   hasPlan: boolean;
@@ -42,6 +43,15 @@ type PersistedPlanSnapshot = {
   expandedIds: string[];
   leftTab: "plan" | "library" | "plugins" | "instruments";
   savedPlanSignature: string | null;
+  outputPath: string | null;
+};
+
+const joinOutputPath = (folderPath: string, planName: string) => {
+  const separator = folderPath.includes("/") && !folderPath.includes("\\") ? "/" : "\\";
+  const normalizedFolder = folderPath.trim().replace(/[\\/]+$/, "");
+  const safeName = (planName || "Untitled Test Plan").trim() || "Untitled Test Plan";
+  const normalizedName = safeName.replace(/[<>:"/\\|?*\u0000-\u001f]/g, "_");
+  return `${normalizedFolder}${separator}${normalizedName}.TapPlan`;
 };
 
 
@@ -90,6 +100,8 @@ export function useEditorController() {
   const [isDark, setIsDark] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
   const [savedPlanSignature, setSavedPlanSignature] = useState<string | null>(null);
+  const [outputPath, setOutputPath] = useState<string | null>(null);
+  const [showSaveDestination, setShowSaveDestination] = useState(false);
   const [activeRunId, setActiveRunId] = useState<string | null>(null);
   const [draggedStepId, setDraggedStepId] = useState<string | null>(null);
 
@@ -116,6 +128,7 @@ export function useEditorController() {
   const logEndRef = useRef<HTMLDivElement>(null);
   const runTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
   const renameRef = useRef<HTMLInputElement>(null);
+  const saveDestinationResolver = useRef<((value: string | null) => void) | null>(null);
   const lastPolledRunPhaseRef = useRef<"running" | "paused" | "completed" | null>(null);
   const runStatusPollingDisabledRef = useRef(false);
   const seenRunLogKeysRef = useRef<Set<string>>(new Set());
@@ -226,23 +239,17 @@ export function useEditorController() {
     return formattedStep;
   }, []);
 
-  const buildOutputPath = useCallback((name: string) => {
-    const safeName = (name ?? "Untitled Test Plan").trim() || "Untitled Test Plan";
-    const normalizedName = safeName.replace(/[<>:"/\\|?*\u0000-\u001f]/g, "_");
-    return `D:\\plans\\${normalizedName}.TapPlan`;
-  }, []);
-
-  const buildSaveSignature = useCallback((steps: TestStep[], meta: PlanMeta) => {
+  const buildSaveSignature = useCallback((steps: TestStep[], meta: PlanMeta, targetOutputPath: string | null) => {
     return JSON.stringify({
-      outputPath: buildOutputPath(meta.name),
+      outputPath: targetOutputPath ?? joinOutputPath(DEFAULT_TEST_PLAN_ROOT, meta.name),
       overwrite: true,
       steps: steps.map(formatStepForSave),
     });
-  }, [buildOutputPath, formatStepForSave]);
+  }, [formatStepForSave]);
 
   const currentSaveSignature = useMemo(
-    () => buildSaveSignature(plan, planMeta),
-    [buildSaveSignature, plan, planMeta],
+    () => buildSaveSignature(plan, planMeta, outputPath),
+    [buildSaveSignature, outputPath, plan, planMeta],
   );
 
   useEffect(() => { document.documentElement.classList.toggle("dark", isDark); }, [isDark]);
@@ -287,6 +294,7 @@ export function useEditorController() {
         setLeftTab(restoredLeftTab);
       }
 
+      setOutputPath(typeof parsed.outputPath === "string" && parsed.outputPath.trim() ? parsed.outputPath : null);
       setSavedPlanSignature(typeof parsed.savedPlanSignature === "string" ? parsed.savedPlanSignature : null);
       setRunState("idle");
       setActiveRunId(null);
@@ -326,13 +334,14 @@ export function useEditorController() {
         expandedIds: Array.from(expanded),
         leftTab,
         savedPlanSignature,
+        outputPath,
       };
 
       localStorage.setItem(PLAN_SNAPSHOT_STORAGE_KEY, JSON.stringify(snapshot));
     } catch {
       // Ignore persistence errors (e.g., private mode quota issues).
     }
-  }, [expanded, hasPlan, leftTab, plan, planMeta, savedPlanSignature, selectedId]);
+  }, [expanded, hasPlan, leftTab, outputPath, plan, planMeta, savedPlanSignature, selectedId]);
   useEffect(() => {
     const asBool = (value: unknown, fallback = false) => {
       if (typeof value === "boolean") return value;
@@ -1054,6 +1063,7 @@ export function useEditorController() {
     setLogs([]);
     setHasPlan(true);
     setSavedPlanSignature(null);
+    setOutputPath(null);
     setIsSaved(false);
     setShowNewPlan(false);
     setLeftTab("library");
@@ -1139,6 +1149,33 @@ export function useEditorController() {
     })));
   };
 
+  const getDefaultOutputPath = useCallback(
+    () => joinOutputPath(DEFAULT_TEST_PLAN_ROOT, planMeta.name),
+    [planMeta.name],
+  );
+
+  const requestSaveDestination = useCallback(() => {
+    if (outputPath) return Promise.resolve(outputPath);
+
+    setShowSaveDestination(true);
+    return new Promise<string | null>((resolve) => {
+      saveDestinationResolver.current = resolve;
+    });
+  }, [outputPath]);
+
+  const handleConfirmSaveDestination = (destinationPath: string) => {
+    const selectedOutputPath = destinationPath.trim() || getDefaultOutputPath();
+    saveDestinationResolver.current?.(selectedOutputPath);
+    saveDestinationResolver.current = null;
+    setShowSaveDestination(false);
+  };
+
+  const handleCancelSaveDestination = () => {
+    saveDestinationResolver.current?.(null);
+    saveDestinationResolver.current = null;
+    setShowSaveDestination(false);
+  };
+
   const handleRun = async () => {
     if (runState === "running" || plan.length === 0 || !isSaved) return;
     runTimers.current.forEach(clearTimeout);
@@ -1148,8 +1185,7 @@ export function useEditorController() {
     setActiveRunId(null);
     setShowConsole(true);
 
-    const runPath = buildOutputPath(planMeta.name);
-
+    const runPath = outputPath ?? getDefaultOutputPath();
     addLog("INFO", "EdgeX", `=== Run started - "${planMeta.name}" ===`);
     addLog("INFO", "TestPlans", `Run request: ${runPath}`);
 
@@ -1475,23 +1511,26 @@ export function useEditorController() {
   const formatStepForCompose = (step: TestStep): any => formatStepForSave(step);
 
   const handleSave = async () => {
+    const selectedOutputPath = await requestSaveDestination();
+    if (!selectedOutputPath) return null;
+
     const formattedSteps = plan.map(formatStepForCompose);
     const normalizedSteps = await Promise.all(
       formattedSteps.map((step) => normalizeFormattedStepTypeNames(step)),
     );
 
-    const outputPath = buildOutputPath(planMeta.name);
     const jsonData = {
-      outputPath,
+      outputPath: selectedOutputPath,
       overwrite: true,
       steps: normalizedSteps,
     };
     console.log(JSON.stringify(jsonData, null, 2));
 
     try {
-      const response = await composeTestPlan(jsonData);``
+      const response = await composeTestPlan(jsonData);
       addLog("INFO", "TestPlans", `Saved: ${jsonData.outputPath}`);
-      setSavedPlanSignature(currentSaveSignature);
+      setOutputPath(selectedOutputPath);
+      setSavedPlanSignature(buildSaveSignature(plan, planMeta, selectedOutputPath));
       setIsSaved(true);
       return response;
     } catch (error) {
@@ -1626,6 +1665,7 @@ export function useEditorController() {
     setRunState("idle");
     setActiveRunId(null);
     setSavedPlanSignature(null);
+    setOutputPath(null);
     setIsSaved(false);
     addLog("INFO", "TestPlans", "Plan imported successfully.");
   };
@@ -1729,6 +1769,7 @@ export function useEditorController() {
     isTraceListenersError,
     plan,
     planMeta,
+    setOutputPath,
     stats,
     activeMenu,
     setActiveMenu,
@@ -1759,6 +1800,10 @@ export function useEditorController() {
     showNewPlan,
     handleCreatePlan,
     showAddStep,
+    showSaveDestination,
+    defaultOutputPath: getDefaultOutputPath(),
+    handleConfirmSaveDestination,
+    handleCancelSaveDestination,
     addStepParentId,
     addStepIdx,
     showPluginMgr,
