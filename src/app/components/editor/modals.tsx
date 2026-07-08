@@ -200,7 +200,7 @@ export function SaveDestinationModal({
 
         <div className="px-5 py-5">
           <Field
-            label="Destination Path"
+            label="Destination Path (Optional)"
             value={destinationPath}
             onChange={(event: any) => setDestinationPath(event.target.value)}
             placeholder={defaultPath}
@@ -211,7 +211,7 @@ export function SaveDestinationModal({
         <div className="flex justify-between items-center px-5 py-3 border-t border-border bg-muted/20">
           <div className="text-[11px] font-mono text-muted-foreground"></div>
           <div className="flex gap-2">
-            <button onClick={onCancel} className="h-8 px-3 border border-border text-[12px] font-mono text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground">Cancel</button>
+            {/* <button onClick={onCancel} className="h-8 px-3 border border-border text-[12px] font-mono text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground">Cancel</button> */}
             <button
               onClick={() => onSave(destinationPath)}
               className="flex items-center gap-1 px-4 h-8 bg-primary text-primary-foreground text-[12px] font-mono font-semibold transition-colors hover:bg-primary/90"
