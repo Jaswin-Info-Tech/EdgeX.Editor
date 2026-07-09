@@ -29,6 +29,7 @@ describe('API adapters', () => {
   it('normalizes package lists and sends package mutations', async () => {
     api.get.mockResolvedValueOnce({ data: null }).mockResolvedValueOnce({ data: { packages: ['a'] } })
     expect(await getInstalledPackages()).toEqual([])
+     expect(api.get).toHaveBeenNthCalledWith(1, '/packages/installed')
     expect(await getAvailablePackages('scope')).toEqual(['a'])
     expect(api.get).toHaveBeenLastCalledWith('/packages/available', { params: { search: 'scope' } })
 
@@ -104,10 +105,11 @@ describe('API adapters', () => {
   })
 
   // Covers optional list filters, multipart plan uploads, and remote import forwarding.
+// Covers optional list filters, multipart plan uploads, and remote imports.
   it('handles test-plan query parameters, form data, and remote imports', async () => {
     api.get.mockResolvedValue({ data: [] })
     await getTestPlans()
-    expect(api.get).toHaveBeenCalledWith('/api/testplans', { params: undefined })
+    expect(api.get).toHaveBeenCalledWith('/testplans', { params: undefined })
 
     api.post.mockResolvedValue({ data: 'ok' })
     const file = new File(['plan'], 'plan.tap')
@@ -118,6 +120,6 @@ describe('API adapters', () => {
 
     const payload = { sourceType: 'rest' as const, sourceUrl: 'https://example.test/plan' }
     await importRemoteTestPlan(payload)
-    expect(api.post).toHaveBeenLastCalledWith('/api/testplans/import-remote', payload)
+    expect(api.post).toHaveBeenLastCalledWith('/testplans/import-remote', payload)
   })
 })
