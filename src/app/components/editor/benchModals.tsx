@@ -15,6 +15,7 @@ import {
   Trash2,
   X,
   Zap,
+  ArrowLeft
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -284,6 +285,7 @@ interface GenericResourcePanelProps {
   isLoading: boolean;
   isError: boolean;
   onClose: () => void;
+  onResourcesChanged?: () => void;
 }
 
 function GenericResourcePanel({
@@ -294,6 +296,7 @@ function GenericResourcePanel({
   isLoading,
   isError,
   onClose,
+  onResourcesChanged,
 }: GenericResourcePanelProps) {
   const [selectedKey, setSelectedKey] = useState("");
   const [resourceName, setResourceName] = useState("");
@@ -574,6 +577,7 @@ function GenericResourcePanel({
       );
       setActiveBlade("resources");
       resetToBlank();
+      onResourcesChanged?.();
     } catch (error) {
       const message =
         error instanceof Error
@@ -619,6 +623,7 @@ function GenericResourcePanel({
       }
       toast.success(`${resourceToDelete.name} deleted successfully`, { id: toastId });
       setResourcePendingDelete(null);
+      onResourcesChanged?.();
     } catch (error) {
       const message =
         error instanceof Error
@@ -796,7 +801,7 @@ function GenericResourcePanel({
                             className="flex h-8 items-center gap-2 border border-border px-2 text-[10px] font-mono font-semibold text-muted-foreground transition-colors hover:bg-secondary/70 hover:text-foreground"
                             title="Back to instrument types"
                           >
-                            <X size={13} />
+                            <ArrowLeft size={13} />
                             Back to Types
                           </button>
                           <button
@@ -1227,6 +1232,7 @@ interface InstrumentsPanelProps {
   isLoading: boolean;
   isError: boolean;
   onClose: () => void;
+  onResourcesChanged?: () => void;
 }
 
 export function InstrumentsPanel({
@@ -1236,6 +1242,7 @@ export function InstrumentsPanel({
   isLoading,
   isError,
   onClose,
+  onResourcesChanged,
 }: InstrumentsPanelProps) {
   return (
     <GenericResourcePanel
@@ -1246,6 +1253,7 @@ export function InstrumentsPanel({
       isLoading={isLoading}
       isError={isError}
       onClose={onClose}
+      onResourcesChanged={onResourcesChanged}
     />
   );
 }

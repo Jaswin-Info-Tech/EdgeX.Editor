@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Check, ChevronLeft, ChevronRight, Download, FilePlus, Package, Plus, RefreshCw, Search, Upload, X } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, Download, Filter, FilePlus, Package, Plus, RefreshCw, Search, Upload, X,Save } from "lucide-react";
 import type { CtxMenu, DutItem, InstrumentItem, LibraryItem, PlanMeta, Plugin } from "../../types/editor";
 import { TYPE_LABEL, TYPE_STRIPE } from "../../constants/editor";
 import { TypeIcon } from "./atoms";
@@ -166,6 +166,66 @@ export function NewPlanModal({ onClose, onCreate }: { onClose: () => void; onCre
 
 // ─── Add Step Modal ───────────────────────────────────────────────────────────
 
+export function SaveDestinationModal({
+  defaultPath,
+  onCancel,
+  onSave,
+}: {
+  defaultPath: string;
+  onCancel: () => void;
+  onSave: (path: string) => void;
+}) {
+  const [destinationPath, setDestinationPath] = useState("");
+
+  return (
+    <div className="fixed inset-0 bg-black/75 flex items-center justify-center z-50" onClick={onCancel}>
+      <div className="bg-card border border-border w-[520px] max-w-[94vw] flex flex-col shadow-2xl" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-5 py-3 border-b border-border bg-muted/30">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="flex h-8 w-8 items-center justify-center border border-primary/30 bg-primary/10 text-primary shrink-0">
+              <Download size={16} className="text-primary" />
+            </div>
+            <div className="min-w-0">
+              <div className="truncate text-[15px] font-semibold text-foreground">Save Test Plan</div>
+              <div className="truncate text-[12px] font-mono text-muted-foreground">Choose destination path for this plan</div>
+            </div>
+          </div>
+          <button
+            onClick={onCancel}
+            className="flex h-8 w-8 items-center justify-center border border-transparent text-muted-foreground transition-colors hover:border-border hover:bg-secondary hover:text-foreground"
+          >
+            <X size={14} />
+          </button>
+        </div>
+
+        <div className="px-5 py-5">
+          <Field
+            label="Destination Path (Optional)"
+            value={destinationPath}
+            onChange={(event: any) => setDestinationPath(event.target.value)}
+            placeholder={defaultPath}
+            helper={`Leave empty to use ${defaultPath}`}
+          />
+        </div>
+
+        <div className="flex justify-between items-center px-5 py-3 border-t border-border bg-muted/20">
+          <div className="text-[11px] font-mono text-muted-foreground"></div>
+          <div className="flex gap-2">
+            {/* <button onClick={onCancel} className="h-8 px-3 border border-border text-[12px] font-mono text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground">Cancel</button> */}
+            <button
+              onClick={() => onSave(destinationPath)}
+              className="flex items-center gap-4 px-4 h-8 bg-primary text-primary-foreground text-[12px] font-mono font-semibold transition-colors hover:bg-primary/90"
+            >
+              <Save size={14} />
+              Save
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function AddStepModal({
   library,
   onAdd,
@@ -281,6 +341,63 @@ export function AddStepModal({
   );
 }
 
+// ─── Filter Dropdown (shared) ─────────────────────────────────────────────────
+
+function FilterDropdown({
+  open,
+  onOpenChange,
+  activeCount,
+  title,
+  onClear,
+  children,
+  popoverWidth,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  activeCount: number;
+  title: string;
+  onClear: () => void;
+  children: React.ReactNode;
+  popoverWidth?: string;
+}) {
+  return (
+    <div className="relative shrink-0">
+      <button
+        onClick={() => onOpenChange(!open)}
+        className={`flex h-9 items-center gap-1.5 border px-2.5 text-[11px] font-mono transition-colors ${activeCount > 0
+          ? "border-primary/50 bg-primary/10 text-primary"
+          : "border-border text-muted-foreground hover:bg-secondary hover:text-foreground"
+          }`}
+        title="Filter"
+      >
+        <Filter size={14} />
+        {activeCount > 0 && (
+          <span className="ml-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold leading-none text-primary-foreground">
+            {activeCount}
+          </span>
+        )}
+      </button>
+
+      {open && (
+        <>
+          <div className="fixed inset-0 z-10" onClick={() => onOpenChange(false)} />
+          <div className={`absolute right-0 top-full z-20 mt-1 ${popoverWidth ?? "w-60"} border border-border bg-popover`}>
+            <div className="flex items-center justify-between border-b border-border px-3 py-2">
+              <span className="text-[11px] font-mono font-semibold uppercase tracking-widest text-muted-foreground">{title}</span>
+              {activeCount > 0 && (
+                <button onClick={onClear} className="text-[10px] font-mono text-primary hover:underline">
+                  Clear
+                </button>
+              )}
+            </div>
+            <div className="max-h-64 overflow-y-auto py-1">{children}</div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 // ─── Plugin Manager ───────────────────────────────────────────────────────────
 export function PluginManager({
   plugins, installedPlugins, onInstall, onUninstall, onUninstallPackage, onUpload, onClose,
@@ -298,10 +415,25 @@ export function PluginManager({
   const [uploading, setUploading] = useState(false);
   const [installingId, setInstallingId] = useState<string | null>(null);
   const [uninstallingId, setUninstallingId] = useState<string | null>(null);
+
+  // ── Filter state: Available tab only ──
+  const [availableFilterOpen, setAvailableFilterOpen] = useState(false);
+  const [availableStatusFilter, setAvailableStatusFilter] = useState<"all" | "installed" | "not_installed">("all");
+
   const installedTotal = installedPlugins.length;
   const availableTotal = plugins.length;
-  const installed = installedPlugins.filter(plugin => matchesPluginSearch(plugin, installedSearch));
-  const available = plugins.filter(plugin => matchesPluginSearch(plugin, browseSearch));
+
+  const availableActiveFilterCount = (availableStatusFilter !== "all" ? 1 : 0);
+
+  const installed = installedPlugins.filter(plugin =>
+    matchesPluginSearch(plugin, installedSearch)
+  );
+
+  const available = plugins.filter(plugin =>
+    matchesPluginSearch(plugin, browseSearch) &&
+    (availableStatusFilter === "all" || (availableStatusFilter === "installed" ? Boolean(plugin.isInstalled) : !plugin.isInstalled))
+  );
+
   const handleUpload = async () => {
     if (!uploadFile) return;
     setUploading(true);
@@ -423,6 +555,7 @@ export function PluginManager({
                       </button>
                     )}
                   </div>
+
                   <div className="text-[11px] font-mono text-muted-foreground">{installed.length} visible</div>
                 </div>
               </div>
@@ -490,6 +623,38 @@ export function PluginManager({
                       </button>
                     )}
                   </div>
+
+                  <FilterDropdown
+                    open={availableFilterOpen}
+                    onOpenChange={setAvailableFilterOpen}
+                    activeCount={availableActiveFilterCount}
+                    title="Filter"
+                    onClear={() => setAvailableStatusFilter("all")}
+                    popoverWidth="w-44"
+                  >
+                    <div className="border-border px-3 py-2">
+                      <div className="mb-1.5 text-[10px] font-mono uppercase tracking-widest text-muted-foreground/80">Status</div>
+                      <div className="space-y-1">
+                        {([
+                          { value: "all", label: "All" },
+                          { value: "installed", label: "Installed" },
+                          { value: "not_installed", label: "Not Installed" },
+                        ] as const).map(opt => (
+                          <label key={opt.value} className="flex cursor-pointer items-center gap-2 text-[12px] font-mono text-foreground">
+                            <input
+                              type="radio"
+                              name="available-status-filter"
+                              checked={availableStatusFilter === opt.value}
+                              onChange={() => setAvailableStatusFilter(opt.value)}
+                              className="accent-primary"
+                            />
+                            {opt.label}
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  </FilterDropdown>
+
                   <div className="text-[11px] font-mono text-muted-foreground">{available.length} visible</div>
                 </div>
               </div>
@@ -498,7 +663,7 @@ export function PluginManager({
                 <div className="py-12 text-center text-[12px] font-mono text-muted-foreground">Loading packages...</div>
               ) : available.length === 0 ? (
                 <div className="py-12 text-center text-[12px] font-mono text-muted-foreground">
-                  {browseSearch ? "No matching packages" : "No packages available"}
+                  {browseSearch || availableActiveFilterCount > 0 ? "No matching packages" : "No packages available"}
                 </div>
               ) : (
                 <div>
@@ -559,8 +724,8 @@ export function PluginManager({
                 <div className="text-[13px] font-mono text-muted-foreground">
                   {uploadFile ? <span className="text-primary">{uploadFile.name}</span> : <>Drop file here or <span className="text-primary underline">browse</span></>}
                 </div>
-                <div className="mt-1 text-[11px] text-muted-foreground/60">Supported: .tappackage, .dll</div>
-                <input type="file" className="hidden" accept=".tappackage,.dll" onChange={e => { if (e.target.files?.[0]) setUploadFile(e.target.files[0]); }} />
+                <div className="mt-1 text-[11px] text-muted-foreground/60">Supported: .zip, .dll</div>
+                <input type="file" className="hidden" accept=".zip,.dll" onChange={e => { if (e.target.files?.[0]) setUploadFile(e.target.files[0]); }} />
               </label>
 
               {uploadError && <div className="mt-3 text-[12px] font-mono text-red-500">{uploadError}</div>}

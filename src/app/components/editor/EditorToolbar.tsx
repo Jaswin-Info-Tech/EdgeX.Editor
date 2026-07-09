@@ -52,8 +52,8 @@ export function EditorToolbar({
     <div className="flex items-center bg-card border-b border-border h-10 px-2 shrink-0 gap-1">
       <div className="flex items-center gap-0.5">
         <ToolBtn onClick={() => setShowNewPlan(true)} title="New Test Plan (Ctrl+N)"><FilePlus size={14} />{!isTablet && "New"}</ToolBtn>
-        <ToolBtn onClick={() => { }} title="Open (Ctrl+O)"><FolderOpen size={14} />{!isTablet && "Open"}</ToolBtn>
-        <ToolBtn onClick={handleSave} disabled={!hasPlan} title="Save (Ctrl+S)"><Save size={14} />{!isTablet && "Save"}</ToolBtn>
+       {/* <ToolBtn onClick={() => { }} disabled title="Open (Ctrl+O)"><FolderOpen size={14} />{!isTablet && "Open"}</ToolBtn> */}
+        <ToolBtn onClick={handleSave} title="Save (Ctrl+S)"><Save size={14} />{!isTablet && "Save"}</ToolBtn>
       </div>
 
       <div className="w-px h-6 bg-border mx-1.5 shrink-0" />
@@ -92,7 +92,7 @@ export function EditorToolbar({
       <div className="ml-auto flex items-center gap-3 font-mono text-[12px] text-muted-foreground shrink-0">
         {hasPlan && (
           <>
-            <span className="hidden md:block">{stats.total} steps</span>
+            {/* <span className="hidden md:block">{stats.total} steps</span> */}
             {stats.passed > 0 && <span className="text-emerald-500 font-semibold">{stats.passed} PASS</span>}
             {stats.failed > 0 && <span className="text-red-500 font-semibold">{stats.failed} FAIL</span>}
             {runState === "running" && <span className="text-yellow-500 font-semibold animate-pulse">RUNNING</span>}

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { ChevronLeft, PanelLeftOpen, PanelRightOpen } from "lucide-react";
 import { getTestPlanEditorModel, importRemoteTestPlan, uploadTapPlan } from "../api/testplans";
 import { getResources, getResourceSchema } from "../api/resources";
@@ -107,6 +107,7 @@ interface EditorShellProps {
   isTraceListenersError: boolean;
   plan: any;
   planMeta: any;
+  setOutputPath: (path: string | null) => void;
   stats: any;
   activeMenu: any;
   setActiveMenu: any;
@@ -136,6 +137,10 @@ interface EditorShellProps {
   showNewPlan: any;
   handleCreatePlan: any;
   showAddStep: any;
+  showSaveDestination: boolean;
+  defaultOutputPath: string;
+  handleConfirmSaveDestination: (path: string) => void;
+  handleCancelSaveDestination: () => void;
   addStepParentId: any;
   addStepIdx: any;
   showPluginMgr: any;
@@ -230,6 +235,7 @@ export function EditorShell(props: EditorShellProps) {
     isTraceListenersError,
     plan,
     planMeta,
+    setOutputPath,
     stats,
     activeMenu,
     setActiveMenu,
@@ -259,6 +265,10 @@ export function EditorShell(props: EditorShellProps) {
     showNewPlan,
     handleCreatePlan,
     showAddStep,
+    showSaveDestination,
+    defaultOutputPath,
+    handleConfirmSaveDestination,
+    handleCancelSaveDestination,
     addStepParentId,
     addStepIdx,
     showPluginMgr,
@@ -558,8 +568,7 @@ export function EditorShell(props: EditorShellProps) {
       // Capture the current instrument name to validate response matches
       const currentInstrumentName = selectedResourceInstrument;
 
-      // Use instrument name directly as pluginTypeName
-      // The instrument name is the specific type we want to query
+
       const pluginTypeName = currentInstrumentName?.trim();
 
       if (!pluginTypeName) {
@@ -614,29 +623,29 @@ export function EditorShell(props: EditorShellProps) {
     setResourceSchemaValues(nextValues);
   }, [resourceSchemaProperties]);
 
+
+  const fetchResourcePlans = useCallback(async () => {
+    setIsResourcesLoading(true);
+    setIsResourcesError(false);
+    try {
+      const data = await getResources();
+      setResourcePlans(data);
+    } catch {
+      setIsResourcesError(true);
+    } finally {
+      setIsResourcesLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
-    const fetchResources = async () => {
-      setIsResourcesLoading(true);
-      setIsResourcesError(false);
-      try {
-        const data = await getResources();
-        if (cancelled) return;
-        setResourcePlans(data);
-      } catch (error) {
-        if (cancelled) return;
-        setIsResourcesError(true);
-      } finally {
-        if (!cancelled) setIsResourcesLoading(false);
-      }
-    };
 
-    fetchResources();
+    fetchResourcePlans();
     return () => {
       cancelled = true;
     };
-  }, []);
-
+    // - }, []);
+  }, [fetchResourcePlans]);
 
   const closeCreateResourceModal = () => {
     setShowCreateResource(false);
@@ -803,14 +812,16 @@ export function EditorShell(props: EditorShellProps) {
   const handleUploadTapPlan = async (file: File, destinationPath?: string) => {
     await uploadTapPlan(file, destinationPath);
     toast.success(`Uploaded ${file.name} to API server`);
-    if (destinationPath?.trim()) {
-      setTestPlanQuery(destinationPath.trim());
-      setSubmittedTestPlanQuery(destinationPath.trim());
-      setHasSearchedTestPlans(true);
-      setTestPlanSearchNonce((value) => value + 1);
-    }
-  };
 
+    const targetPath = destinationPath?.trim() || testPlanQuery.trim();
+    if (targetPath) {
+      setTestPlanQuery(targetPath);
+      setSubmittedTestPlanQuery(targetPath);
+    }
+    setHasSearchedTestPlans(true);
+    setTestPlanSearchNonce((value) => value + 1);
+  };
+  
   const handleImportRemoteTapPlan = async (payload: {
     sourceType: "ftp" | "sftp" | "rest";
     sourceUrl: string;
@@ -823,12 +834,14 @@ export function EditorShell(props: EditorShellProps) {
   }) => {
     await importRemoteTestPlan(payload);
     toast.success("Remote test plan import requested");
-    if (payload.destinationPath?.trim()) {
-      setTestPlanQuery(payload.destinationPath.trim());
-      setSubmittedTestPlanQuery(payload.destinationPath.trim());
-      setHasSearchedTestPlans(true);
-      setTestPlanSearchNonce((value) => value + 1);
+
+    const targetPath = payload.destinationPath?.trim() || testPlanQuery.trim();
+    if (targetPath) {
+      setTestPlanQuery(targetPath);
+      setSubmittedTestPlanQuery(targetPath);
     }
+    setHasSearchedTestPlans(true);
+    setTestPlanSearchNonce((value) => value + 1);
   };
 
   const getPlanSignature = (steps: any[], meta: any) => {
@@ -875,6 +888,7 @@ export function EditorShell(props: EditorShellProps) {
   const handleSaveAndMarkClean = async () => {
     const snapshotSignature = getPlanSignature(plan || [], planMeta);
     const result = await handleSave();
+    if (!result) return result;
     setSavedPlanSignature(snapshotSignature);
     setShowUnsavedPlanWarning(false);
     setPendingTestPlan(null);
@@ -1008,6 +1022,7 @@ export function EditorShell(props: EditorShellProps) {
 
       setPlanMeta(meta);
       setPlan(steps);
+      setOutputPath(path);
       setSavedPlanSignature(getPlanSignature(steps, meta));
       setShowUnsavedPlanWarning(false);
       setHasPlan(true);
@@ -1202,112 +1217,112 @@ export function EditorShell(props: EditorShellProps) {
           onClose={() => setShowSystemKpis(false)}
         />
       ) : (
-      <div className="flex flex-1 overflow-hidden relative">
-        {isTablet && leftOpen && (
-          <div
-            className="absolute inset-0 z-40"
-            onClick={() => setLeftOpen(false)}
-          >
+        <div className="flex flex-1 overflow-hidden relative">
+          {isTablet && leftOpen && (
             <div
-              className="absolute left-0 top-0 bottom-0 w-64 bg-card border-r border-border flex flex-col shadow-2xl z-50"
-              onClick={(e) => e.stopPropagation()}
+              className="absolute inset-0 z-40"
+              onClick={() => setLeftOpen(false)}
             >
-              {leftPanel}
+              <div
+                className="absolute left-0 top-0 bottom-0 w-64 bg-card border-r border-border flex flex-col shadow-2xl z-50"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {leftPanel}
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {!isTablet && leftOpen && (
-          <>
-            <div
-              className="shrink-0 flex flex-col border-r border-border bg-card overflow-hidden"
-              style={{ width: leftW }}
-            >
-              {leftPanel}
-            </div>
-            <Splitter
-              dir="h"
-              onMouseDown={dragLeft}
-              actionButton={(
-                <button
-                  type="button"
-                  onClick={() => setLeftOpen(false)}
-                  className="flex h-6 w-6 items-center justify-center border border-border bg-card text-muted-foreground transition-colors hover:border-primary/40 hover:bg-secondary hover:text-foreground"
-                  title="Collapse left panel"
-                >
-                  <ChevronLeft size={11} />
-                </button>
-              )}
-            />
-          </>
-        )}
+          {!isTablet && leftOpen && (
+            <>
+              <div
+                className="shrink-0 flex flex-col border-r border-border bg-card overflow-hidden"
+                style={{ width: leftW }}
+              >
+                {leftPanel}
+              </div>
+              <Splitter
+                dir="h"
+                onMouseDown={dragLeft}
+                actionButton={(
+                  <button
+                    type="button"
+                    onClick={() => setLeftOpen(false)}
+                    className="flex h-6 w-6 items-center justify-center border border-border bg-card text-muted-foreground transition-colors hover:border-primary/40 hover:bg-secondary hover:text-foreground"
+                    title="Collapse left panel"
+                  >
+                    <ChevronLeft size={11} />
+                  </button>
+                )}
+              />
+            </>
+          )}
 
-        {!isTablet && !leftOpen && (
-          <div className="shrink-0 w-9 border-r border-border bg-gradient-to-b from-card to-muted/20 flex items-start justify-center pt-2">
-            <button
-              onClick={() => setLeftOpen(true)}
-              title="Open left panel"
-              className="group flex h-40 w-7 flex-col items-center justify-start gap-2 border border-border/60 bg-card/70 py-2 text-muted-foreground transition-colors hover:border-primary/40 hover:bg-secondary/70 hover:text-foreground"
-            >
-              <PanelLeftOpen size={13} className="shrink-0" />
-              <span className="text-[9px] font-mono font-semibold uppercase tracking-[0.2em] [writing-mode:vertical-rl] [text-orientation:mixed]">
-                Steps
-              </span>
-            </button>
-          </div>
-        )}
-
-        <SequenceEditor
-          hasPlan={hasPlan}
-          plan={plan}
-          planMeta={planMeta}
-          stats={stats}
-          selectedId={selectedId}
-          setSelectedId={setSelectedId}
-          dragLibItem={dragLibItem}
-          dropIdx={dropIdx}
-          setDropIdx={setDropIdx}
-          handleSeqDrop={handleSeqDrop}
-          handleAddGroup={handleAddGroup}
-          setShowNewPlan={setShowNewPlan}
-          setAddStepParentId={setAddStepParentId}
-          setAddStepIdx={setAddStepIdx}
-          setShowAddStep={setShowAddStep}
-          sequenceStepProps={sequenceStepProps}
-          draggedStepId={draggedStepId}
-          handleStepReorder={handleStepReorder}
-        />
-
-        {rightOpen ? (
-          <PropertiesDock
-            isTablet={isTablet}
-            rightOpen={rightOpen}
-            setRightOpen={setRightOpen}
-            selectedStep={selectedStep}
-            selectedId={selectedId}
-            setPlan={setPlan}
-            rightW={rightW}
-            dragRight={dragRight}
-          >
-            {propertiesPanel}
-          </PropertiesDock>
-        ) : (
-          !isTablet && (
-            <div className="shrink-0 w-9 border-l border-border bg-gradient-to-b from-card to-muted/20 flex items-start justify-center pt-2">
+          {!isTablet && !leftOpen && (
+            <div className="shrink-0 w-9 border-r border-border bg-gradient-to-b from-card to-muted/20 flex items-start justify-center pt-2">
               <button
-                onClick={() => setRightOpen(true)}
-                title="Open properties"
+                onClick={() => setLeftOpen(true)}
+                title="Open left panel"
                 className="group flex h-40 w-7 flex-col items-center justify-start gap-2 border border-border/60 bg-card/70 py-2 text-muted-foreground transition-colors hover:border-primary/40 hover:bg-secondary/70 hover:text-foreground"
               >
-                <PanelRightOpen size={13} className="shrink-0" />
+                <PanelLeftOpen size={13} className="shrink-0" />
                 <span className="text-[9px] font-mono font-semibold uppercase tracking-[0.2em] [writing-mode:vertical-rl] [text-orientation:mixed]">
-                  Properties
+                  Steps
                 </span>
               </button>
             </div>
-          )
-        )}
-      </div>
+          )}
+
+          <SequenceEditor
+            hasPlan={hasPlan}
+            plan={plan}
+            planMeta={planMeta}
+            stats={stats}
+            selectedId={selectedId}
+            setSelectedId={setSelectedId}
+            dragLibItem={dragLibItem}
+            dropIdx={dropIdx}
+            setDropIdx={setDropIdx}
+            handleSeqDrop={handleSeqDrop}
+            handleAddGroup={handleAddGroup}
+            setShowNewPlan={setShowNewPlan}
+            setAddStepParentId={setAddStepParentId}
+            setAddStepIdx={setAddStepIdx}
+            setShowAddStep={setShowAddStep}
+            sequenceStepProps={sequenceStepProps}
+            draggedStepId={draggedStepId}
+            handleStepReorder={handleStepReorder}
+          />
+
+          {rightOpen ? (
+            <PropertiesDock
+              isTablet={isTablet}
+              rightOpen={rightOpen}
+              setRightOpen={setRightOpen}
+              selectedStep={selectedStep}
+              selectedId={selectedId}
+              setPlan={setPlan}
+              rightW={rightW}
+              dragRight={dragRight}
+            >
+              {propertiesPanel}
+            </PropertiesDock>
+          ) : (
+            !isTablet && (
+              <div className="shrink-0 w-9 border-l border-border bg-gradient-to-b from-card to-muted/20 flex items-start justify-center pt-2">
+                <button
+                  onClick={() => setRightOpen(true)}
+                  title="Open properties"
+                  className="group flex h-40 w-7 flex-col items-center justify-start gap-2 border border-border/60 bg-card/70 py-2 text-muted-foreground transition-colors hover:border-primary/40 hover:bg-secondary/70 hover:text-foreground"
+                >
+                  <PanelRightOpen size={13} className="shrink-0" />
+                  <span className="text-[9px] font-mono font-semibold uppercase tracking-[0.2em] [writing-mode:vertical-rl] [text-orientation:mixed]">
+                    Properties
+                  </span>
+                </button>
+              </div>
+            )
+          )}
+        </div>
       )}
 
       {showInstrumentsPanel && (
@@ -1318,6 +1333,7 @@ export function EditorShell(props: EditorShellProps) {
           isLoading={isInstrumentsLoading}
           isError={isInstrumentsError}
           onClose={() => setShowInstrumentsPanel(false)}
+          onResourcesChanged={fetchResourcePlans}
         />
       )}
 
@@ -1436,6 +1452,10 @@ export function EditorShell(props: EditorShellProps) {
         handleCreatePlan={handleCreatePlan}
         showAddStep={showAddStep}
         setShowAddStep={setShowAddStep}
+        showSaveDestination={showSaveDestination}
+        defaultOutputPath={defaultOutputPath}
+        handleConfirmSaveDestination={handleConfirmSaveDestination}
+        handleCancelSaveDestination={handleCancelSaveDestination}
         library={library}
         handleAddStep={handleAddStep}
         addStepParentId={addStepParentId}

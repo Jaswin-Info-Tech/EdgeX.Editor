@@ -118,8 +118,8 @@ export function MenuBar({
       setRightOpen(true);
       setShowConsole(true);
     }
-    if (item === "Export Plan...") handleExportPlan();
-    if (item === "Import Plan...") handleImportPlan();
+    if (item === "Export Plan") handleExportPlan();
+    if (item === "Import Plan") handleImportPlan();
   };
 
   return (
@@ -175,7 +175,7 @@ export function MenuBar({
         {hasPlan && (
           <div className="flex items-center gap-2 border-r border-border pr-3 mr-1">
             {planMeta.dutName && <span className="text-[11px] font-mono text-muted-foreground hidden lg:block">DUT: {planMeta.dutName}</span>}
-            <span className="text-[11px] font-mono text-muted-foreground hidden md:block">{planMeta.name}</span>
+            {/* <span className="text-[11px] font-mono text-muted-foreground hidden md:block">{planMeta.name}</span> */}
           </div>
         )}
         <span

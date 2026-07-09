@@ -1,14 +1,14 @@
 import axiosClient from "./client";
 
 export const getTestPlans = async (rootPath?: string) => {
-  const { data } = await axiosClient.get("/api/testplans", {
+  const { data } = await axiosClient.get("/testplans", {
     params: rootPath ? { rootPath } : undefined,
   });
   return data;
 };
 
 export const getTestPlanEditorModel = async (path: string) => {
-  const { data } = await axiosClient.post("/api/testplans/editor-model", { path });
+  const { data } = await axiosClient.post("/testplans/editor-model", { path });
   return data;
 };
 
@@ -19,7 +19,7 @@ export const uploadTapPlan = async (file: File, destinationPath?: string) => {
     formData.append("destinationPath", destinationPath.trim());
   }
 
-  const { data } = await axiosClient.post("/api/testplans/upload", formData, {
+  const { data } = await axiosClient.post("/testplans/upload", formData, {
     headers: {
       "Content-Type": "multipart/form-data",
     },
@@ -40,6 +40,6 @@ export interface RemoteTestPlanImportPayload {
 }
 
 export const importRemoteTestPlan = async (payload: RemoteTestPlanImportPayload) => {
-  const { data } = await axiosClient.post("/api/testplans/import-remote", payload);
+  const { data } = await axiosClient.post("/testplans/import-remote", payload);
   return data;
 };

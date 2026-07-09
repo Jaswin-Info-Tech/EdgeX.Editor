@@ -1,4 +1,4 @@
-import { AddStepModal, ContextMenu, NewPlanModal, PluginManager } from "./modals";
+import { AddStepModal, ContextMenu, NewPlanModal, PluginManager, SaveDestinationModal } from "./modals";
 
 interface ModalsHostProps {
   showNewPlan: boolean;
@@ -6,6 +6,10 @@ interface ModalsHostProps {
   handleCreatePlan: (value: any) => void;
   showAddStep: boolean;
   setShowAddStep: (value: boolean) => void;
+  showSaveDestination: boolean;
+  defaultOutputPath: string;
+  handleConfirmSaveDestination: (path: string) => void;
+  handleCancelSaveDestination: () => void;
   library: any[];
   handleAddStep: (item: any, parentId?: string | null, atIdx?: number) => void;
   addStepParentId: string | null;
@@ -38,6 +42,10 @@ export function ModalsHost({
   handleCreatePlan,
   showAddStep,
   setShowAddStep,
+  showSaveDestination,
+  defaultOutputPath,
+  handleConfirmSaveDestination,
+  handleCancelSaveDestination,
   library,
   handleAddStep,
   addStepParentId,
@@ -75,6 +83,13 @@ export function ModalsHost({
           library={library}
           onClose={() => setShowAddStep(false)}
           onAdd={item => handleAddStep(item, addStepParentId, addStepIdx)}
+        />
+      )}
+      {showSaveDestination && (
+        <SaveDestinationModal
+          defaultPath={defaultOutputPath}
+          onCancel={handleCancelSaveDestination}
+          onSave={handleConfirmSaveDestination}
         />
       )}
       {showPluginMgr && (

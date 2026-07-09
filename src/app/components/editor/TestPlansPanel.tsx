@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, CheckCircle2, ChevronRight, ClipboardList, Clock3, Info, Loader2, Search, Server, Upload, X } from "lucide-react";
+import { toast } from "sonner";
 
 interface TestPlansPanelProps {
   testPlans: any[];
@@ -70,9 +71,6 @@ export function TestPlansPanel({
   };
   const RECENT_PATHS_STORAGE_KEY = "edgex.testplans.recentPaths";
   const RECENT_PATHS_LIMIT = 6;
-  const filteredLabel = hasSearched && query.trim().length > 0
-    ? `${testPlans.length} matching test plans`
-    : `${testPlans.length} test plans`;
   const trimmedQuery = query.trim();
   const [recentPaths, setRecentPaths] = useState<string[]>([]);
   const [sourceMode, setSourceMode] = useState<SourceMode>("browse");
@@ -91,12 +89,17 @@ export function TestPlansPanel({
   const [transferSuccess, setTransferSuccess] = useState("");
   const [transferDensity, setTransferDensity] = useState<"comfortable" | "compact">("comfortable");
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<FieldErrorKey, string>>>({});
+
   const activeModeMeta = SOURCE_MODE_META[sourceMode];
   const isCompact = transferDensity === "compact";
   const fieldHeightClass = isCompact ? "h-7" : "h-8";
   const fieldTextClass = isCompact ? "text-[11px]" : "text-[12px]";
   const formGapClass = isCompact ? "space-y-2" : "space-y-3";
   const helpTextClass = isCompact ? "text-[10px]" : "text-[11px]";
+
+  const filteredLabel = hasSearched && query.trim().length > 0
+    ? `${testPlans.length} matching test plans`
+    : `${testPlans.length} test plans`;
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -177,6 +180,7 @@ export function TestPlansPanel({
     setIsSubmittingTransfer(true);
     try {
       await onUploadTapPlan(uploadFile, uploadDestination.trim() || undefined);
+      toast.success(`Uploaded ${uploadFile.name} to API server.`);
       setTransferSuccess(`Uploaded ${uploadFile.name} to API server.`);
       if (uploadDestination.trim()) {
         setQuery(uploadDestination.trim());
@@ -184,7 +188,9 @@ export function TestPlansPanel({
       setSourceMode("browse");
       setUploadFile(null);
     } catch (error) {
-      setTransferError(error instanceof Error ? error.message : "Upload failed.");
+      const message = error instanceof Error ? error.message : "Upload failed.";
+      toast.error(message);
+      setTransferError(message);
     } finally {
       setIsSubmittingTransfer(false);
     }
@@ -376,6 +382,7 @@ export function TestPlansPanel({
                 </button>
               )}
             </div>
+
             <button
               onClick={handleSearch}
               className="flex h-[38px] shrink-0 items-center gap-2 bg-primary px-4 text-[12px] font-mono font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
@@ -767,6 +774,10 @@ export function TestPlansPanel({
                   </div>
                 </div>
               </div>
+            </div>
+          ) : hasSearched && testPlans.length === 0 ? (
+            <div className="px-5 py-8 text-center text-[12px] font-mono text-muted-foreground">
+              No test plans found for your search.
             </div>
           ) : hasSearched && testPlans.length === 0 ? (
             <div className="px-5 py-8 text-center text-[12px] font-mono text-muted-foreground">
