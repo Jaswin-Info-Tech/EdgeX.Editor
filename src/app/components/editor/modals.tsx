@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Check, ChevronLeft, ChevronRight, Download, Filter, FilePlus, Package, Plus, RefreshCw, Search, Upload, X } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, Download, Filter, FilePlus, Package, Plus, RefreshCw, Search, Upload, X,Save } from "lucide-react";
 import type { CtxMenu, DutItem, InstrumentItem, LibraryItem, PlanMeta, Plugin } from "../../types/editor";
 import { TYPE_LABEL, TYPE_STRIPE } from "../../constants/editor";
 import { TypeIcon } from "./atoms";
@@ -214,9 +214,9 @@ export function SaveDestinationModal({
             {/* <button onClick={onCancel} className="h-8 px-3 border border-border text-[12px] font-mono text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground">Cancel</button> */}
             <button
               onClick={() => onSave(destinationPath)}
-              className="flex items-center gap-1 px-4 h-8 bg-primary text-primary-foreground text-[12px] font-mono font-semibold transition-colors hover:bg-primary/90"
+              className="flex items-center gap-4 px-4 h-8 bg-primary text-primary-foreground text-[12px] font-mono font-semibold transition-colors hover:bg-primary/90"
             >
-              <Check size={12} />
+              <Save size={14} />
               Save
             </button>
           </div>
