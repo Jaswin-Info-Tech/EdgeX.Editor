@@ -22,15 +22,14 @@ import { useDebounce } from "./useDebounce";
 import { moveStepToPosition } from "../utils/editor";
 import {
   cancelRun,
-  composeTestPlan,
-  getStepSchema,
   getRunLogs,
   getRunLogsStreamUrl,
   getRunStatus,
   pauseRun,
   resumeRun,
-  runTestPlan,
 } from "../api/plugin";
+
+import { composeTestPlan,getStepSchema,runTestPlan } from "../api/testplans";
 
 const PLAN_SNAPSHOT_STORAGE_KEY = "edgex.editor.planSnapshot.v1";
 const DEFAULT_TEST_PLAN_ROOT = "D:\\plans";
