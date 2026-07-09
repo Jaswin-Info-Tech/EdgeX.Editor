@@ -207,4 +207,136 @@ describe('API adapters', () => {
     expect(schema).toEqual({ count: 3 })
   })
 
+  // Verifies package response normalization and the exact install/uninstall request contracts.
+  it('normalizes package lists and sends package mutations', async () => {
+    api.get.mockResolvedValueOnce({ data: null }).mockResolvedValueOnce({ data: { packages: ['a'] } })
+    expect(await getInstalledPackages()).toEqual([])
+    expect(api.get).toHaveBeenNthCalledWith(1, '/packages/installed')
+    expect(await getAvailablePackages('scope')).toEqual(['a'])
+    expect(api.get).toHaveBeenLastCalledWith('/packages/available', { params: { search: 'scope' } })
+
+    api.post.mockResolvedValue({ data: { ok: true } })
+    await installPackage('a')
+    await uninstallPackage('a')
+    expect(api.post).toHaveBeenNthCalledWith(1, '/packages/install', ['a'])
+    expect(api.post).toHaveBeenNthCalledWith(2, '/packages/uninstall', ['a'])
+  })
+
+  // Confirms the installed-packages endpoint path and that a genuine array payload
+  // passes through untouched (not just the null-fallback branch).
+  it('installed packages returns raw array and correct endpoint', async () => {
+    api.get.mockResolvedValueOnce({ data: ['p1', 'p2'] })
+    expect(await getInstalledPackages()).toEqual(['p1', 'p2'])
+    expect(api.get).toHaveBeenCalledWith('/packages/installed')
+  })
+
+  // Exercises the flat-array and malformed/empty payload branches of
+  // getAvailablePackages, which the happy-path "packages" wrapper test doesn't reach.
+  it('available packages handles flat array and malformed payloads', async () => {
+    api.get.mockResolvedValueOnce({ data: ['x'] })
+    expect(await getAvailablePackages()).toEqual(['x'])
+    expect(api.get).toHaveBeenLastCalledWith('/packages/available', { params: {} })
+
+    api.get.mockResolvedValueOnce({ data: {} })
+    expect(await getAvailablePackages()).toEqual([])
+
+    api.get.mockResolvedValueOnce({ data: null })
+    expect(await getAvailablePackages()).toEqual([])
+  })
+
+  // Verifies the search param is omitted entirely (not sent as undefined/empty string)
+  // when no search term or an empty string is supplied.
+  it('omits search param when not provided or empty', async () => {
+    api.get.mockResolvedValue({ data: [] })
+    await getAvailablePackages()
+    expect(api.get).toHaveBeenLastCalledWith('/packages/available', { params: {} })
+    await getAvailablePackages('')
+    expect(api.get).toHaveBeenLastCalledWith('/packages/available', { params: {} })
+  })
+
+  // Ensures install/uninstall thread the given package name through (rather than a
+  // hardcoded value) and that both return the server's response payload.
+  it('install/uninstall thread the package name and return response data', async () => {
+    api.post.mockResolvedValue({ data: { ok: true } })
+    expect(await installPackage('x')).toEqual({ ok: true })
+    expect(await uninstallPackage('y')).toEqual({ ok: true })
+    expect(api.post).toHaveBeenNthCalledWith(1, '/packages/install', ['x'])
+    expect(api.post).toHaveBeenNthCalledWith(2, '/packages/uninstall', ['y'])
+  })
+
+
+
+
+
+
+  // Covers optional list filters, multipart plan uploads, and remote import forwarding.
+  it('handles test-plan query parameters, form data, and remote imports', async () => {
+    api.get.mockResolvedValue({ data: [] })
+    await getTestPlans()
+    expect(api.get).toHaveBeenCalledWith('/testplans', { params: undefined })
+
+    api.post.mockResolvedValue({ data: 'ok' })
+    const file = new File(['plan'], 'plan.tap')
+    await uploadTapPlan(file, ' plans/demo ')
+    const uploadForm = api.post.mock.calls[0][1] as FormData
+    expect(uploadForm.get('file')).toBe(file)
+    expect(uploadForm.get('destinationPath')).toBe('plans/demo')
+
+    const payload = { sourceType: 'rest' as const, sourceUrl: 'https://example.test/plan' }
+    await importRemoteTestPlan(payload)
+    expect(api.post).toHaveBeenLastCalledWith('/testplans/import-remote', payload)
+  })
+
+  // Confirms a rootPath argument is forwarded as a query param, and that omitting
+  // it (or trimming to empty) sends no destinationPath in the multipart upload.
+  it('passes rootPath as a query param and skips blank destination paths on upload', async () => {
+    api.get.mockResolvedValue({ data: [] })
+    await getTestPlans('lab/suite')
+    expect(api.get).toHaveBeenCalledWith('/testplans', { params: { rootPath: 'lab/suite' } })
+
+    api.post.mockResolvedValue({ data: 'ok' })
+    const file = new File(['plan'], 'plan.tap')
+    await uploadTapPlan(file, '   ')
+    const uploadForm = api.post.mock.calls[0][1] as FormData
+    expect(uploadForm.get('file')).toBe(file)
+    expect(uploadForm.get('destinationPath')).toBeNull()
+
+    await uploadTapPlan(file)
+    const uploadFormNoPath = api.post.mock.calls[1][1] as FormData
+    expect(uploadFormNoPath.get('destinationPath')).toBeNull()
+  })
+
+  // Ensures the editor-model, compose, create, and run endpoints send the given
+  // path/payload unchanged and return the server's response data.
+  it('sends editor-model, compose, create, and run requests unchanged', async () => {
+    api.post.mockResolvedValue({ data: 'model' })
+    expect(await getTestPlanEditorModel('lab/suite/plan.tap')).toBe('model')
+    expect(api.post).toHaveBeenNthCalledWith(1, '/testplans/editor-model', { path: 'lab/suite/plan.tap' })
+
+    const composePayload = { name: 'Plan A', steps: [] }
+    api.post.mockResolvedValue({ data: 'composed' })
+    expect(await composeTestPlan(composePayload)).toBe('composed')
+    expect(api.post).toHaveBeenNthCalledWith(2, '/testplans/compose', composePayload)
+
+    const createPayload = { name: 'Plan B' }
+    api.post.mockResolvedValue({ data: 'created' })
+    expect(await createTestPlan(createPayload)).toBe('created')
+    expect(api.post).toHaveBeenNthCalledWith(3, '/testplans/create', createPayload)
+
+    const runPayload = { planId: '123' }
+    api.post.mockResolvedValue({ data: 'started' })
+    expect(await runTestPlan(runPayload)).toBe('started')
+    expect(api.post).toHaveBeenNthCalledWith(4, '/testplans/run', runPayload)
+  })
+
+  // Confirms the multipart upload sets the correct Content-Type header, distinct
+  // from JSON-body endpoints in this module.
+  it('sends the correct multipart Content-Type header for tap plan uploads', async () => {
+    api.post.mockResolvedValue({ data: 'ok' })
+    const file = new File(['plan'], 'plan.tap')
+    await uploadTapPlan(file, 'plans/demo')
+    const [, , config] = api.post.mock.calls[0]
+    expect(config).toMatchObject({ headers: { 'Content-Type': 'multipart/form-data' } })
+  })
+
 })
