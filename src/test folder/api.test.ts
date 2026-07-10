@@ -29,7 +29,7 @@ describe('API adapters', () => {
   it('normalizes package lists and sends package mutations', async () => {
     api.get.mockResolvedValueOnce({ data: null }).mockResolvedValueOnce({ data: { packages: ['a'] } })
     expect(await getInstalledPackages()).toEqual([])
-     expect(api.get).toHaveBeenNthCalledWith(1, '/packages/installed')
+    expect(api.get).toHaveBeenNthCalledWith(1, '/packages/installed')
     expect(await getAvailablePackages('scope')).toEqual(['a'])
     expect(api.get).toHaveBeenLastCalledWith('/packages/available', { params: { search: 'scope' } })
 
@@ -66,12 +66,14 @@ describe('API adapters', () => {
 
   // Confirms heterogeneous backend resource groups become one consistent UI model.
   it('maps grouped resources, aliases, property arrays, errors, and fallback IDs', async () => {
-    api.get.mockResolvedValue({ data: {
-      instruments: [{ name: 'Scope', type: 'Vendor.Scope', properties: [{ name: 'Address', value: 'USB' }] }],
-      conections: [{ type: 'Vendor.Connection', properties: [{ name: 'Error', value: 'bad' }] }],
-      result_listeners: [{ name: 'CSV' }],
-      duts: [{ dutName: 'Phone', properties: { Name: 'Device' } }],
-    } })
+    api.get.mockResolvedValue({
+      data: {
+        instruments: [{ name: 'Scope', type: 'Vendor.Scope', properties: [{ name: 'Address', value: 'USB' }] }],
+        conections: [{ type: 'Vendor.Connection', properties: [{ name: 'Error', value: 'bad' }] }],
+        result_listeners: [{ name: 'CSV' }],
+        duts: [{ dutName: 'Phone', properties: { Name: 'Device' } }],
+      }
+    })
     const resources = await getResources()
     expect(resources).toHaveLength(4)
     expect(resources[0]).toMatchObject({ id: 'Scope', instrument: 'Scope', status: 'Active', properties: { Address: 'USB' } })
@@ -105,7 +107,7 @@ describe('API adapters', () => {
   })
 
   // Covers optional list filters, multipart plan uploads, and remote import forwarding.
-// Covers optional list filters, multipart plan uploads, and remote imports.
+  // Covers optional list filters, multipart plan uploads, and remote imports.
   it('handles test-plan query parameters, form data, and remote imports', async () => {
     api.get.mockResolvedValue({ data: [] })
     await getTestPlans()

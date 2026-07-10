@@ -132,38 +132,38 @@ describe("ContextMenu", () => {
 
 
   it("renders label and separator", async () => {
-  const user = userEvent.setup();
+    const user = userEvent.setup();
 
-  render(
-    <ContextMenu>
-      <ContextMenuTrigger>
-        Menu
-      </ContextMenuTrigger>
+    render(
+      <ContextMenu>
+        <ContextMenuTrigger>
+          Menu
+        </ContextMenuTrigger>
 
-      <ContextMenuContent>
-        <ContextMenuLabel>
-          Actions
-        </ContextMenuLabel>
+        <ContextMenuContent>
+          <ContextMenuLabel>
+            Actions
+          </ContextMenuLabel>
 
-        <ContextMenuSeparator />
+          <ContextMenuSeparator />
 
-        <ContextMenuItem>
-          Open
-        </ContextMenuItem>
-      </ContextMenuContent>
-    </ContextMenu>
-  );
+          <ContextMenuItem>
+            Open
+          </ContextMenuItem>
+        </ContextMenuContent>
+      </ContextMenu>
+    );
 
-  await user.pointer({
-    keys: "[MouseRight]",
-    target: screen.getByText("Menu"),
-  });
+    await user.pointer({
+      keys: "[MouseRight]",
+      target: screen.getByText("Menu"),
+    });
 
-  expect(
-    screen.getByText("Actions")
-  ).toBeInTheDocument();
+    expect(
+      screen.getByText("Actions")
+    ).toBeInTheDocument();
 
-}); // closes it()
+  }); // closes it()
 
 
 }); // closes describe()
