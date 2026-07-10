@@ -1,5 +1,5 @@
 import { createSlice, createAsyncThunk, type PayloadAction } from "@reduxjs/toolkit";
-import { getStepSchema } from "../../api/plugin";
+import { getStepSchema } from "../../api/testplans";
 import type { RootState } from "../index";
 
 interface PropertiesState {
