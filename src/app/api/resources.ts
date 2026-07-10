@@ -7,6 +7,43 @@ export interface Resource {
   status: string;
   [key: string]: any;
 }
+export interface ResourceSchemaProperty {
+  name: string;
+  displayName: string;
+  type: string;
+  editorType?: string;
+  isEditable: boolean;
+  isReadable?: boolean;
+  value: any;
+  enumValues: string[];
+}
+
+export interface ResourceSchema {
+  resourceKind: string;
+  pluginTypeName: string;
+  fullTypeName: string;
+  count: number;
+  properties: ResourceSchemaProperty[];
+}
+
+export interface AddResourcePayload {
+  resourceKind: string;
+  pluginTypeName: string;
+  name: string;
+  properties: Record<string, any>;
+}
+
+export interface UpdateResourcePayload {
+  resourceKind: string;
+  name: string;
+  newName: string;
+  properties: Record<string, any>;
+}
+
+export interface DeleteResourcePayload {
+  resourceKind: string;
+  name: string;
+}
 
 /**
  * Normalize a properties payload into a flat { propName: value } map,
@@ -160,44 +197,6 @@ export const extractTypeName = (fullType: string): string => {
   const parts = fullType.split(".");
   return parts[parts.length - 1] || fullType;
 };
-
-export interface ResourceSchemaProperty {
-  name: string;
-  displayName: string;
-  type: string;
-  editorType?: string;
-  isEditable: boolean;
-  isReadable?: boolean;
-  value: any;
-  enumValues: string[];
-}
-
-export interface ResourceSchema {
-  resourceKind: string;
-  pluginTypeName: string;
-  fullTypeName: string;
-  count: number;
-  properties: ResourceSchemaProperty[];
-}
-
-export interface AddResourcePayload {
-  resourceKind: string;
-  pluginTypeName: string;
-  name: string;
-  properties: Record<string, any>;
-}
-
-export interface UpdateResourcePayload {
-  resourceKind: string;
-  name: string;
-  newName: string;
-  properties: Record<string, any>;
-}
-
-export interface DeleteResourcePayload {
-  resourceKind: string;
-  name: string;
-}
 
 export const addResource = async (payload: AddResourcePayload) => {
   const response = await axiosClient.post('plugins/resources/add', payload);
