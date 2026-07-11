@@ -53,10 +53,6 @@ const buildCandidateUrls = (config: MqttResourceConfig, override?: { port?: numb
 
   const candidates = [
     { port: 8083, path: "/mqtt" },
-    { port: 9001, path: "" },
-    { port: 8000, path: "/mqtt" },
-    { port: 8080, path: "/mqtt" },
-    { port: config.port, path: "" },
   ];
 
   const seen = new Set<number>();
