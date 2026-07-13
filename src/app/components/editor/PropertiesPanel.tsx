@@ -55,24 +55,89 @@ export function PropertiesPanel({
     const type = normalizeEditorType(prop.editorType);
     return type === "object" || type === "json";
   };
-
+  console.log(plan);
+  console.log(selectedStep);
   // helper: is this resource a DUT or connection? (exclude from instrument dropdown)
   const isConnectionOrDut = (type: string = "") =>
     /connection/i.test(type) || /dut/i.test(type);
 
-  // helper: classify a resource's "family" from its backend type string
-  const getInstrumentFamily = (type: string = "") => {
-    if (/rest/i.test(type)) return "rest";
-    if (/scpi/i.test(type)) return "scpi";
-    return "other";
-  };
+  // helper: is this resource a listener? (exclude from instrument dropdown)
+  const isListener = (type: string = "") =>
+    /listener/i.test(type) || /result-listener/i.test(type) || /trace-listener/i.test(type);
 
-  const getResourceFamily = (resource: any) =>
-    getInstrumentFamily(
-      [resource?.type, resource?.instrument, resource?.name]
-        .filter(Boolean)
-        .join(" "),
-    );
+  // helper: classify a resource's "family" from its backend type string
+type InstrumentFamily = "rest" | "scpi" | "other";
+
+const getResourceSearchText = (resource: any): string =>
+  [
+    resource?.name,
+    resource?.type,
+    resource?.typeName,
+    resource?.fullTypeName,
+    resource?.pluginTypeName,
+    resource?.instrument,
+    resource?.assembly,
+    resource?.baseType,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+
+const getInstrumentFamily = (resource: any): InstrumentFamily => {
+  const text = getResourceSearchText(resource);
+
+  if (text.includes("rest")) {
+    return "rest";
+  }
+
+  if (
+    text.includes("scpi") ||
+    text.includes("scpiinstrument") ||
+    text.includes("scpivisa")
+  ) {
+    return "scpi";
+  }
+
+  return "other";
+};
+
+const isListenerResource = (resource: any): boolean => {
+  const text = getResourceSearchText(resource);
+
+  return (
+    text.includes("resultlistener") ||
+    text.includes("result-listener") ||
+    text.includes("tracelistener") ||
+    text.includes("trace-listener")
+  );
+};
+
+const isDutResource = (resource: any): boolean => {
+  const kind = String(
+    resource?.resourceKind ??
+      resource?.kind ??
+      resource?.category ??
+      "",
+  ).toLowerCase();
+
+  const baseType = String(resource?.baseType ?? "").toLowerCase();
+
+  return kind === "dut" || baseType === "dut";
+};
+
+const isActualConnectionResource = (resource: any): boolean => {
+  const kind = String(
+    resource?.resourceKind ??
+      resource?.kind ??
+      resource?.category ??
+      "",
+  ).toLowerCase();
+
+  return kind === "connection";
+};
+
+const getResourceFamily = (resource: any) =>
+  getInstrumentFamily(resource);
 
   const stepTypeName = useMemo(() => {
     if (!selectedStep) return null;
@@ -88,51 +153,109 @@ export function PropertiesPanel({
   }, [selectedStep?.id, resolvedTypeNames]);
 
   // derive which family the *selected step* expects, from its resolved type name
-  const stepInstrumentFamily = useMemo(() => {
-    const name = String(stepTypeName || selectedStep?.name || "");
-    if (/rest/i.test(name)) return "rest";
-    if (/scpi/i.test(name)) return "scpi";
-    return null; // unknown -> don't filter by family
-  }, [stepTypeName, selectedStep?.name]);
+const stepInstrumentFamily = useMemo<InstrumentFamily | null>(() => {
+  const stepText = [
+    stepTypeName,
+    selectedStep?.name,
+    selectedStep?.type,
+    selectedStep?.fullName,
+    selectedStep?.baseType,
+    selectedStep?.assembly,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
 
-  const editorContext = useMemo<EditorContext>(() => {
-    const instrumentOptions = (resources ?? [])
-      .filter((r: any) => r?.name)
-      .filter((r: any) => !isConnectionOrDut(r.type || r.instrument))
-      .filter((r: any) =>
-        !stepInstrumentFamily ||
-        getInstrumentFamily(r.type || r.instrument) === stepInstrumentFamily
+  if (stepText.includes("rest")) {
+    return "rest";
+  }
+
+  if (stepText.includes("scpi")) {
+    return "scpi";
+  }
+
+  return null;
+}, [
+  stepTypeName,
+  selectedStep?.name,
+  selectedStep?.type,
+  selectedStep?.fullName,
+  selectedStep?.baseType,
+  selectedStep?.assembly,
+]);
+
+const editorContext = useMemo<EditorContext>(() => {
+  const instrumentOptions = (resources ?? [])
+    .filter((resource: any) => Boolean(resource?.name))
+    .filter((resource: any) => !isListenerResource(resource))
+    .filter((resource: any) => !isDutResource(resource))
+    .filter((resource: any) => !isActualConnectionResource(resource))
+    .filter((resource: any) => {
+      const resourceFamily = getInstrumentFamily(resource);
+
+      if (stepInstrumentFamily) {
+        return resourceFamily === stepInstrumentFamily;
+      }
+
+      return resourceFamily === "other";
+    })
+    .map((resource: any) => ({
+      label: String(resource.name),
+      value: String(resource.name),
+      description: [
+        resource.fullTypeName ??
+          resource.type ??
+          resource.instrument ??
+          resource.pluginTypeName,
+        resource.status,
+      ]
+        .filter(Boolean)
+        .join(" | "),
+    }));
+
+  return {
+    instrumentOptions,
+
+    resourceOptions: (resources ?? [])
+      .filter((resource: any) => resource?.name)
+      .map((resource: any) => ({
+        label: String(resource.name),
+        value: String(resource.name),
+        description: [
+          resource.fullTypeName ??
+            resource.type ??
+            resource.instrument ??
+            resource.pluginTypeName,
+          resource.status,
+        ]
+          .filter(Boolean)
+          .join(" | "),
+      })),
+
+    testStepOptions: testSteps
+      .filter(
+        (step: any) =>
+          step?.canCreateInstance !== false &&
+          step?.isBrowsable !== false,
       )
-      .map((r: any) => ({
-        label: r.name,
-        value: r.name,
-        description: [r?.instrument, r?.status].filter(Boolean).join(" | "),
-      }));
+      .filter((step: any) => step?.name)
+      .map(toBackendRecordOption),
 
-    // console.log("computed instrumentOptions:", instrumentOptions); // 👈 temp debug
-
-    return {
-      instrumentOptions,
-      resourceOptions: (resources ?? [])
-        .filter((resource: any) => resource?.name)
-        .map((resource: any) => ({
-          label: String(resource.name),
-          value: String(resource.name),
-          description: [resource?.instrument, resource?.status].filter(Boolean).join(" | "),
-        })),
-      testStepOptions: testSteps
-        .filter((step: any) => step?.canCreateInstance !== false && step?.isBrowsable !== false)
-        .filter((step: any) => step?.name)
-        .map(toBackendRecordOption),
-      planStepOptions: flatAll(plan || [])
-        .filter((step: any) => step.id !== selectedStep?.id)
-        .map((step: any) => ({
-          label: step.name,
-          value: step.id,
-          description: step.type,
-        })),
-    };
-  }, [resources, testSteps, plan, selectedStep?.id, stepInstrumentFamily]);
+    planStepOptions: flatAll(plan || [])
+      .filter((step: any) => step.id !== selectedStep?.id)
+      .map((step: any) => ({
+        label: step.name,
+        value: step.id,
+        description: step.type,
+      })),
+  };
+}, [
+  resources,
+  testSteps,
+  plan,
+  selectedStep?.id,
+  stepInstrumentFamily,
+]);
 
 
 
