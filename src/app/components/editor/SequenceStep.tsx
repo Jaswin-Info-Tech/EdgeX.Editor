@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import type { TestStep } from "../../types/editor";
 import { TYPE_LABEL, TYPE_STRIPE } from "../../constants/editor";
-import {  deleteIn, formatFreq, moveIn, updateIn, addToParent, uid } from "../../utils/editor";
+import { deleteIn, formatFreq, moveIn, updateIn, addToParent, uid } from "../../utils/editor";
 import { StatusIcon, StatusPill, TypeIcon } from "./atoms";
 
 function canAcceptChildSteps(step: TestStep) {
@@ -229,6 +229,7 @@ export function SequenceStep(props: SequenceStepProps) {
           <div className="flex-1 flex items-center gap-2.5 px-3 py-2 min-w-0">
             {hasKids && (
               <button
+                data-testid="expand-button"
                 onClick={(e) => {
                   e.stopPropagation();
                   toggleExpand(step.id);
@@ -359,25 +360,25 @@ export function SequenceStep(props: SequenceStepProps) {
             >
               <ArrowDown size={11} />
             </button>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  const cloneRecursive = (s: TestStep): TestStep => ({
-                    ...s,
-                    id: uid(),
-                    name: `${s.name} (copy)`,
-                    status: "pending",
-                    children: s.children ? s.children.map(c => cloneRecursive(c)) : undefined,
-                  });
-                  const clone = cloneRecursive(step);
-                  setPlan((prev: any) => addToParent(prev, parentId ?? null, clone, idx + 1));
-                  setSelectedId(clone.id);
-                }}
-                className="p-1 text-muted-foreground hover:text-foreground hover:bg-secondary"
-                title="Clone step"
-              >
-                <CopyPlus size={11} />
-              </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                const cloneRecursive = (s: TestStep): TestStep => ({
+                  ...s,
+                  id: uid(),
+                  name: `${s.name} (copy)`,
+                  status: "pending",
+                  children: s.children ? s.children.map(c => cloneRecursive(c)) : undefined,
+                });
+                const clone = cloneRecursive(step);
+                setPlan((prev: any) => addToParent(prev, parentId ?? null, clone, idx + 1));
+                setSelectedId(clone.id);
+              }}
+              className="p-1 text-muted-foreground hover:text-foreground hover:bg-secondary"
+              title="Clone step"
+            >
+              <CopyPlus size={11} />
+            </button>
             <button
               onClick={(e) => {
                 e.stopPropagation();
@@ -438,18 +439,16 @@ export function SequenceStep(props: SequenceStepProps) {
               e.stopPropagation();
               onLibraryDropOnChildLane(e, step.id);
             }}
-            className={`ml-6 border-b px-3 py-2 transition-all duration-150 ${
-              isReorderDropInto
+            className={`ml-6 border-b px-3 py-2 transition-all duration-150 ${isReorderDropInto
                 ? "border-primary/40 bg-primary/10"
                 : "border-transparent bg-transparent hover:border-primary/20 hover:bg-primary/[0.03]"
-            }`}
+              }`}
           >
             <div
-              className={`ml-3 flex items-center gap-2 border border-dashed px-3 py-2 ${
-                isReorderDropInto
+              className={`ml-3 flex items-center gap-2 border border-dashed px-3 py-2 ${isReorderDropInto
                   ? "border-primary/40 bg-primary/10 shadow-[inset_0_0_0_1px_rgba(59,130,246,0.08)]"
                   : "border-border/60 bg-muted/10"
-              }`}
+                }`}
             >
               <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-sm border border-border/70 bg-background text-[10px] font-mono text-muted-foreground">
                 +
