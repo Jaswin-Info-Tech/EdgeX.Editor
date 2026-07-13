@@ -8,6 +8,7 @@ import { addToParent, deleteIn, flatAll, makeSequence, makeStep, moveIn, nowTs, 
 import { removePlugin, uploadPlugin } from "../api/plugin";
 import { installPackage, uninstallPackage } from "../api/package";
 import { useAvailablePackages } from "./usePackage";
+import { useMqttResultListener } from "./useMqttResultListener";
 import {
   useInstalledPlugins,
   useDuts,
@@ -433,6 +434,49 @@ export function useEditorController() {
   const addLog = useCallback((level: LogEntry["level"], source: string, message: string) => {
     setLogs(prev => [...prev, { id: logId.current++, timestamp: nowTs(), level, source, message }]);
   }, []);
+
+  const formatMqttResultMessage = (data: any): string[] => {
+    if (!data || typeof data !== "object" || data.type !== "result-table") {
+      return [typeof data === "string" ? data : JSON.stringify(data)];
+    }
+
+    // const tableName = String(data.table ?? "Result");
+    const columns = Array.isArray(data.columns) ? data.columns : [];
+
+    const lines: string[] = [];
+    columns.forEach((col: any) => {
+      const colName = String(col?.name ?? "Value");
+      const values = Array.isArray(col?.values) ? col.values : [col?.values];
+
+      values.forEach((rawValue: any) => {
+        // Try to parse stringified JSON bodies (e.g. REST.Body) for pretty display
+        if (typeof rawValue === "string") {
+          try {
+            const parsed = JSON.parse(rawValue);
+            // lines.push(`${tableName}.${colName}:`);
+            lines.push(JSON.stringify(parsed, null, 2));
+            return;
+          } catch {
+            // not JSON, fall through to plain display
+          }
+        }
+        // lines.push(`${tableName}.${colName} = ${rawValue}`);
+      });
+    });
+
+    return lines;
+  };
+
+  useMqttResultListener(
+    (topic, data) => {
+      const lines = formatMqttResultMessage(data);
+      lines.forEach((line) => addLog("INFO", "MQTT", line));
+    },
+    (level, message) => {
+      addLog(level, "MQTT", message);
+    },
+    { enabled: runState === "running" || runState === "paused" },
+  );
 
   const logApiErrorDetails = useCallback((
     source: string,
