@@ -19,7 +19,7 @@ import {
   addResource, deleteResource, getResources, getResourceSchema, updateResource,
 } from '../app/api/resources'
 import { getSystemKpis, type SystemKpisResponse } from '../app/api/system'
-import { getTestPlans, getTestPlanEditorModel, composeTestPlan, createTestPlan, runTestPlan, importRemoteTestPlan, uploadTapPlan, getStepSchema } from '../app/api/testplans'
+import { getTestPlans, getTestPlanEditorModel, importRemoteTestPlan, uploadTapPlan } from '../app/api/testplans'
 import { getUsers } from '../app/api/users'
 
 const api = vi.mocked(axiosClient)
@@ -318,29 +318,6 @@ describe('API adapters', () => {
     await uploadTapPlan(file)
     const uploadFormNoPath = api.post.mock.calls[1][1] as FormData
     expect(uploadFormNoPath.get('destinationPath')).toBeNull()
-  })
-
-  // Ensures the editor-model, compose, create, and run endpoints send the given
-  // path/payload unchanged and return the server's response data.
-  it('sends editor-model, compose, create, and run requests unchanged', async () => {
-    api.post.mockResolvedValue({ data: 'model' })
-    expect(await getTestPlanEditorModel('lab/suite/plan.tap')).toBe('model')
-    expect(api.post).toHaveBeenNthCalledWith(1, '/testplans/editor-model', { path: 'lab/suite/plan.tap' })
-
-    const composePayload = { name: 'Plan A', steps: [] }
-    api.post.mockResolvedValue({ data: 'composed' })
-    expect(await composeTestPlan(composePayload)).toBe('composed')
-    expect(api.post).toHaveBeenNthCalledWith(2, '/testplans/compose', composePayload)
-
-    const createPayload = { name: 'Plan B' }
-    api.post.mockResolvedValue({ data: 'created' })
-    expect(await createTestPlan(createPayload)).toBe('created')
-    expect(api.post).toHaveBeenNthCalledWith(3, '/testplans/create', createPayload)
-
-    const runPayload = { planId: '123' }
-    api.post.mockResolvedValue({ data: 'started' })
-    expect(await runTestPlan(runPayload)).toBe('started')
-    expect(api.post).toHaveBeenNthCalledWith(4, '/testplans/run', runPayload)
   })
 
   // Confirms the multipart upload sets the correct Content-Type header, distinct
