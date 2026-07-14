@@ -31,7 +31,7 @@ export const removePlugin = async (plugin: { pluginName: string; packageName?: s
 
 export const uploadPlugin = async (file: File) => {
   const formData = new FormData();
-  formData.append("file", file); 
+  formData.append("file", file);
   const response = await axiosClient.post("/plugins/upload", formData, {
     headers: { "Content-Type": "multipart/form-data" },
   });
