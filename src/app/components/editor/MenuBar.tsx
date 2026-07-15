@@ -1,4 +1,5 @@
-import { Moon, PanelLeftOpen, PanelRightOpen, Sun, Check, Settings } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Check, Copy, Minus, Moon, PanelLeftOpen, PanelRightOpen, Settings, Square, Sun, X } from "lucide-react";
 
 const MENU_ITEMS: Record<string, string[]> = {
   File: ["Import Plan","Export Plan"],
@@ -73,6 +74,24 @@ export function MenuBar({
   handlePause,
   handleReset,
 }: MenuBarProps) {
+  const electronAPI = window.electronAPI;
+  const [isWindowMaximized, setIsWindowMaximized] = useState(false);
+
+  useEffect(() => {
+    if (!electronAPI) return;
+
+    let mounted = true;
+    void electronAPI.isWindowMaximized().then((maximized) => {
+      if (mounted) setIsWindowMaximized(maximized);
+    });
+    const unsubscribe = electronAPI.onWindowMaximizedChange(setIsWindowMaximized);
+
+    return () => {
+      mounted = false;
+      unsubscribe();
+    };
+  }, [electronAPI]);
+
   const runStatusStyle = runState === "running" ? "text-yellow-500 border-yellow-500/40 bg-yellow-500/10 animate-pulse"
     : runState === "paused" ? "text-orange-500 border-orange-500/40 bg-orange-500/10"
       : runState === "completed" ? "text-emerald-500 border-emerald-500/40 bg-emerald-500/10"
@@ -123,7 +142,7 @@ export function MenuBar({
   };
 
   return (
-    <div className="flex items-center bg-card border-b-2 border-primary h-8 px-3 shrink-0 gap-0">
+    <div className="electron-drag-region flex items-center bg-card border-b-2 border-primary h-8 pl-3 shrink-0 gap-0">
       <div className="flex items-center gap-2 mr-5 shrink-0">
         <div className="w-[3px] h-5 bg-primary" />
         <span className="text-[14px] font-black tracking-[0.15em] font-mono">
@@ -133,7 +152,7 @@ export function MenuBar({
       </div>
 
       {Object.keys(MENU_ITEMS).map(menu => (
-        <div key={menu} className="relative">
+        <div key={menu} className="electron-no-drag relative">
           <button
             onClick={e => {
               e.stopPropagation();
@@ -210,6 +229,39 @@ export function MenuBar({
         >
           {isDark ? <Sun size={13} /> : <Moon size={13} />}
         </button>
+        {electronAPI && (
+          <div className="electron-no-drag ml-1 flex h-8 items-stretch" aria-label="Window controls">
+            <button
+              type="button"
+              onClick={() => void electronAPI.minimizeWindow()}
+              title="Minimize"
+              aria-label="Minimize window"
+              className="flex w-11 items-center justify-center text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+            >
+              <Minus size={14} strokeWidth={1.5} />
+            </button>
+            <button
+              type="button"
+              onClick={() => void electronAPI.toggleMaximizeWindow().then(setIsWindowMaximized)}
+              title={isWindowMaximized ? "Restore" : "Maximize"}
+              aria-label={isWindowMaximized ? "Restore window" : "Maximize window"}
+              className="flex w-11 items-center justify-center text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+            >
+              {isWindowMaximized
+                ? <Copy size={12} strokeWidth={1.5} />
+                : <Square size={12} strokeWidth={1.5} />}
+            </button>
+            <button
+              type="button"
+              onClick={() => void electronAPI.closeWindow()}
+              title="Close"
+              aria-label="Close window"
+              className="flex w-11 items-center justify-center text-muted-foreground transition-colors hover:bg-red-600 hover:text-white"
+            >
+              <X size={15} strokeWidth={1.5} />
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

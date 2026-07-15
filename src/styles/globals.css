@@ -1,0 +1,12 @@
+.electron-drag-region {
+  -webkit-app-region: drag;
+}
+
+.electron-no-drag,
+.electron-drag-region button,
+.electron-drag-region input,
+.electron-drag-region select,
+.electron-drag-region textarea,
+.electron-drag-region a {
+  -webkit-app-region: no-drag;
+}

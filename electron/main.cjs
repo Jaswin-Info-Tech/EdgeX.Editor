@@ -8,6 +8,7 @@ function createWindow() {
     width: 1440,
     height: 900,
     show: false,
+    frame: false,
 
     // Automatically hide menu bar
     autoHideMenuBar: true,
@@ -18,6 +19,15 @@ function createWindow() {
       nodeIntegration: false,
     },
   });
+
+  const sendMaximizedState = () => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send("window:maximized-changed", mainWindow.isMaximized());
+    }
+  };
+
+  mainWindow.on("maximize", sendMaximizedState);
+  mainWindow.on("unmaximize", sendMaximizedState);
 
   // Completely remove the application menu
   Menu.setApplicationMenu(null);
@@ -41,6 +51,24 @@ function createWindow() {
 
 app.whenReady().then(() => {
   ipcMain.handle("app:get-version", () => app.getVersion());
+  ipcMain.handle("window:minimize", (event) => {
+    BrowserWindow.fromWebContents(event.sender)?.minimize();
+  });
+  ipcMain.handle("window:toggle-maximize", (event) => {
+    const targetWindow = BrowserWindow.fromWebContents(event.sender);
+    if (!targetWindow) return false;
+
+    if (targetWindow.isMaximized()) targetWindow.unmaximize();
+    else targetWindow.maximize();
+
+    return targetWindow.isMaximized();
+  });
+  ipcMain.handle("window:is-maximized", (event) =>
+    BrowserWindow.fromWebContents(event.sender)?.isMaximized() ?? false
+  );
+  ipcMain.handle("window:close", (event) => {
+    BrowserWindow.fromWebContents(event.sender)?.close();
+  });
 
   createWindow();
 
