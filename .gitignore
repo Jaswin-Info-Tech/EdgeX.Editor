@@ -4,6 +4,12 @@ node_modules/
 # production build
 dist/
 build/
+release/
+
+# Electron build artifacts
+*.blockmap
+*.dmg
+*.AppImage
 
 
 # logs
