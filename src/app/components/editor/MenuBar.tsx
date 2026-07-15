@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
-import { Check, Copy, Minus, Moon, PanelLeftOpen, PanelRightOpen, Settings, Square, Sun, X } from "lucide-react";
+import { Check, Copy, Download, FolderOpen, Minus, Moon, PanelLeftOpen, PanelRightOpen, Settings, Square, Sun, X } from "lucide-react";
+import { toast } from "sonner";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "../ui/dialog";
 
 const MENU_ITEMS: Record<string, string[]> = {
   File: ["Import Plan","Export Plan"],
@@ -76,6 +78,65 @@ export function MenuBar({
 }: MenuBarProps) {
   const electronAPI = window.electronAPI;
   const [isWindowMaximized, setIsWindowMaximized] = useState(false);
+  const [showInstallDialog, setShowInstallDialog] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [downloadedPath, setDownloadedPath] = useState<string | null>(null);
+  const [downloadProgress, setDownloadProgress] = useState(0);
+
+  const installerUrl = import.meta.env.VITE_DESKTOP_INSTALLER_URL as string | undefined;
+
+  const downloadInstaller = async () => {
+    setIsDownloading(true);
+    setDownloadedPath(null);
+    setDownloadProgress(0);
+    try {
+      if (!installerUrl) {
+        toast.error("The desktop installer has not been published yet.");
+        setIsDownloading(false);
+        return;
+      }
+      if (electronAPI) {
+        const result = await electronAPI.downloadInstaller({ url: installerUrl });
+        if (result.status === "started") {
+          toast.info("Download started. The installer will be saved in Downloads.");
+        } else {
+          toast.error(result.message || "Unable to download the installer.");
+          setIsDownloading(false);
+        }
+      } else {
+        const link = document.createElement("a");
+        link.href = installerUrl;
+        link.target = "_blank";
+        link.rel = "noopener noreferrer";
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        toast.info("Download started. Check your browser's Downloads section.");
+        setShowInstallDialog(false);
+        setIsDownloading(false);
+      }
+    } catch {
+      toast.error("The download could not be started. Please try again.");
+    } finally {
+      if (!electronAPI) setIsDownloading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!electronAPI) return;
+    return electronAPI.onInstallerDownloadProgress((progress) => {
+      if (progress.totalBytes > 0) setDownloadProgress(Math.round((progress.receivedBytes / progress.totalBytes) * 100));
+      if (progress.state === "completed" && progress.filePath) {
+        setIsDownloading(false);
+        setDownloadedPath(progress.filePath);
+        setDownloadProgress(100);
+        toast.success("Installer downloaded to your Downloads folder.");
+      } else if (progress.state === "cancelled" || progress.state === "interrupted") {
+        setIsDownloading(false);
+        toast.error("The installer download was interrupted.");
+      }
+    });
+  }, [electronAPI]);
 
   useEffect(() => {
     if (!electronAPI) return;
@@ -205,6 +266,15 @@ export function MenuBar({
           <span>Server: {activeServerName || "Not configured"}</span>
         </span>
         <span className={`text-[11px] font-mono px-2 py-0.5 border font-semibold ${runStatusStyle}`}>{runState.toUpperCase()}</span>
+        <button
+          type="button"
+          onClick={() => { setDownloadedPath(null); setShowInstallDialog(true); }}
+          title="Download the EdgeX Editor desktop application"
+          className="electron-no-drag flex h-7 items-center gap-1.5 border border-primary bg-primary px-2.5 text-[11px] font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
+        >
+          <Download size={13} />
+          <span className="hidden xl:inline">Install app</span>
+        </button>
         {isTablet && (
           <>
             <button onClick={() => setLeftOpen((value: boolean) => !value)} className={`p-1.5 border transition-colors ${leftOpen ? "bg-primary text-primary-foreground border-primary" : "border-border text-muted-foreground hover:text-foreground hover:bg-secondary"}`}>
@@ -263,6 +333,50 @@ export function MenuBar({
           </div>
         )}
       </div>
+
+      <Dialog open={showInstallDialog} onOpenChange={(open) => !isDownloading && setShowInstallDialog(open)}>
+        <DialogContent className="electron-no-drag sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Install EdgeX Editor</DialogTitle>
+            <DialogDescription>
+              Download the desktop installer for offline access and a native application experience.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 text-sm">
+            <div className="rounded-md border border-border bg-secondary/40 p-3 text-muted-foreground">
+              {electronAPI
+                ? "The installer will be saved automatically in your Downloads folder."
+                : "The installer will appear in your browser's Downloads section and use its normal download location."}
+            </div>
+            {isDownloading && electronAPI && (
+              <div className="space-y-2">
+                <div className="flex justify-between text-xs text-muted-foreground"><span>Downloading installer…</span><span>{downloadProgress}%</span></div>
+                <div className="h-2 overflow-hidden rounded bg-secondary"><div className="h-full bg-primary transition-all" style={{ width: `${downloadProgress}%` }} /></div>
+              </div>
+            )}
+            {downloadedPath && (
+              <div className="rounded-md border border-emerald-500/40 bg-emerald-500/10 p-3">
+                <div className="font-medium text-emerald-600">Installer ready</div>
+                <div className="mt-1 break-all text-xs text-muted-foreground">{downloadedPath}</div>
+              </div>
+            )}
+            <div className="flex justify-end gap-2">
+              {downloadedPath && electronAPI ? (
+                <button type="button" onClick={() => void electronAPI.showDownloadedInstaller(downloadedPath)} className="flex items-center gap-2 border border-border px-3 py-2 hover:bg-secondary">
+                  <FolderOpen size={14} /> Show in folder
+                </button>
+              ) : (
+                <button type="button" disabled={isDownloading} onClick={() => setShowInstallDialog(false)} className="border border-border px-3 py-2 hover:bg-secondary disabled:opacity-50">Cancel</button>
+              )}
+              {!downloadedPath && (
+                <button type="button" disabled={isDownloading} onClick={() => void downloadInstaller()} className="flex items-center gap-2 bg-primary px-3 py-2 font-medium text-primary-foreground hover:bg-primary/90 disabled:cursor-wait disabled:opacity-60">
+                  <Download size={14} /> {isDownloading ? "Downloading…" : "Download installer"}
+                </button>
+              )}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

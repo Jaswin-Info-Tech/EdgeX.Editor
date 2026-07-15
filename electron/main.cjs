@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, Menu } = require("electron");
+const { app, BrowserWindow, ipcMain, Menu, shell } = require("electron");
 const path = require("node:path");
 
 let mainWindow;
@@ -51,6 +51,26 @@ function createWindow() {
 
 app.whenReady().then(() => {
   ipcMain.handle("app:get-version", () => app.getVersion());
+  ipcMain.handle("app:download-installer", async (event, { url }) => {
+    const targetWindow = BrowserWindow.fromWebContents(event.sender);
+    if (!targetWindow) return { status: "error", message: "The application window is unavailable." };
+
+    let source;
+    try {
+      source = new URL(url);
+      if (!['https:', 'http:'].includes(source.protocol)) throw new Error("Unsupported protocol");
+    } catch {
+      return { status: "error", message: "The installer download address is invalid." };
+    }
+
+    try {
+      targetWindow.webContents.downloadURL(source.toString());
+      return { status: "started" };
+    } catch (error) {
+      return { status: "error", message: error instanceof Error ? error.message : "The installer could not be downloaded." };
+    }
+  });
+  ipcMain.handle("app:show-downloaded-installer", (_event, filePath) => shell.showItemInFolder(filePath));
   ipcMain.handle("window:minimize", (event) => {
     BrowserWindow.fromWebContents(event.sender)?.minimize();
   });
@@ -68,6 +88,33 @@ app.whenReady().then(() => {
   );
   ipcMain.handle("window:close", (event) => {
     BrowserWindow.fromWebContents(event.sender)?.close();
+  });
+
+  app.on("web-contents-created", (_event, contents) => {
+    contents.session.on("will-download", (_downloadEvent, item, webContents) => {
+      const savePath = path.join(app.getPath("downloads"), item.getFilename());
+      item.setSavePath(savePath);
+      webContents.send("app:installer-download-progress", {
+        state: "progressing",
+        receivedBytes: item.getReceivedBytes(),
+        totalBytes: item.getTotalBytes(),
+      });
+      item.on("updated", (_event, state) => {
+        webContents.send("app:installer-download-progress", {
+          state,
+          receivedBytes: item.getReceivedBytes(),
+          totalBytes: item.getTotalBytes(),
+        });
+      });
+      item.once("done", (_event, state) => {
+        webContents.send("app:installer-download-progress", {
+          state,
+          filePath: state === "completed" ? savePath : undefined,
+          receivedBytes: item.getReceivedBytes(),
+          totalBytes: item.getTotalBytes(),
+        });
+      });
+    });
   });
 
   createWindow();
