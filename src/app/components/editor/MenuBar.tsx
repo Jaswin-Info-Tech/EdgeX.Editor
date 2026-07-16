@@ -1,12 +1,37 @@
 import { useEffect, useState } from "react";
-import { Check, Copy, Download, FolderOpen, Minus, Moon, PanelLeftOpen, PanelRightOpen, Settings, Square, Sun, X } from "lucide-react";
+import {
+  Check,
+  Copy,
+  Download,
+  FolderOpen,
+  Minus,
+  Moon,
+  PanelLeftOpen,
+  PanelRightOpen,
+  Settings,
+  Square,
+  Sun,
+  X,
+} from "lucide-react";
 import { toast } from "sonner";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "../ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "../ui/dialog";
 
 const MENU_ITEMS: Record<string, string[]> = {
-  File: ["Import Plan","Export Plan"],
+  File: ["Import Plan", "Export Plan"],
   View: ["Step Library", "Properties", "Console", "-", "Reset Layout"],
-  Bench: ["Instruments", "DUTs", "Connections", "Result Listeners", "Trace Listeners"],
+  Bench: [
+    "Instruments",
+    "DUTs",
+    "Connections",
+    "Result Listeners",
+    "Trace Listeners",
+  ],
 };
 
 interface MenuBarProps {
@@ -78,60 +103,26 @@ export function MenuBar({
 }: MenuBarProps) {
   const electronAPI = window.electronAPI;
   const [isWindowMaximized, setIsWindowMaximized] = useState(false);
-  const [showInstallDialog, setShowInstallDialog] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   const [downloadedPath, setDownloadedPath] = useState<string | null>(null);
   const [downloadProgress, setDownloadProgress] = useState(0);
 
-  const installerUrl = import.meta.env.VITE_DESKTOP_INSTALLER_URL as string | undefined;
-
-  const downloadInstaller = async () => {
-    setIsDownloading(true);
-    setDownloadedPath(null);
-    setDownloadProgress(0);
-    try {
-      if (!installerUrl) {
-        toast.error("The desktop installer has not been published yet.");
-        setIsDownloading(false);
-        return;
-      }
-      if (electronAPI) {
-        const result = await electronAPI.downloadInstaller({ url: installerUrl });
-        if (result.status === "started") {
-          toast.info("Download started. The installer will be saved in Downloads.");
-        } else {
-          toast.error(result.message || "Unable to download the installer.");
-          setIsDownloading(false);
-        }
-      } else {
-        const link = document.createElement("a");
-        link.href = installerUrl;
-        link.target = "_blank";
-        link.rel = "noopener noreferrer";
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
-        toast.info("Download started. Check your browser's Downloads section.");
-        setShowInstallDialog(false);
-        setIsDownloading(false);
-      }
-    } catch {
-      toast.error("The download could not be started. Please try again.");
-    } finally {
-      if (!electronAPI) setIsDownloading(false);
-    }
-  };
-
   useEffect(() => {
     if (!electronAPI) return;
     return electronAPI.onInstallerDownloadProgress((progress) => {
-      if (progress.totalBytes > 0) setDownloadProgress(Math.round((progress.receivedBytes / progress.totalBytes) * 100));
+      if (progress.totalBytes > 0)
+        setDownloadProgress(
+          Math.round((progress.receivedBytes / progress.totalBytes) * 100),
+        );
       if (progress.state === "completed" && progress.filePath) {
         setIsDownloading(false);
         setDownloadedPath(progress.filePath);
         setDownloadProgress(100);
         toast.success("Installer downloaded to your Downloads folder.");
-      } else if (progress.state === "cancelled" || progress.state === "interrupted") {
+      } else if (
+        progress.state === "cancelled" ||
+        progress.state === "interrupted"
+      ) {
         setIsDownloading(false);
         toast.error("The installer download was interrupted.");
       }
@@ -145,7 +136,8 @@ export function MenuBar({
     void electronAPI.isWindowMaximized().then((maximized) => {
       if (mounted) setIsWindowMaximized(maximized);
     });
-    const unsubscribe = electronAPI.onWindowMaximizedChange(setIsWindowMaximized);
+    const unsubscribe =
+      electronAPI.onWindowMaximizedChange(setIsWindowMaximized);
 
     return () => {
       mounted = false;
@@ -153,10 +145,14 @@ export function MenuBar({
     };
   }, [electronAPI]);
 
-  const runStatusStyle = runState === "running" ? "text-yellow-500 border-yellow-500/40 bg-yellow-500/10 animate-pulse"
-    : runState === "paused" ? "text-orange-500 border-orange-500/40 bg-orange-500/10"
-      : runState === "completed" ? "text-emerald-500 border-emerald-500/40 bg-emerald-500/10"
-        : "text-muted-foreground border-border";
+  const runStatusStyle =
+    runState === "running"
+      ? "text-yellow-500 border-yellow-500/40 bg-yellow-500/10 animate-pulse"
+      : runState === "paused"
+        ? "text-orange-500 border-orange-500/40 bg-orange-500/10"
+        : runState === "completed"
+          ? "text-emerald-500 border-emerald-500/40 bg-emerald-500/10"
+          : "text-muted-foreground border-border";
 
   const serverHealthStyles =
     activeServerHealth === "healthy"
@@ -207,15 +203,18 @@ export function MenuBar({
       <div className="flex items-center gap-2 mr-5 shrink-0">
         <div className="w-[3px] h-5 bg-primary" />
         <span className="text-[14px] font-black tracking-[0.15em] font-mono">
-          <span className="text-foreground">EDGE</span><span className="text-primary">X</span>
+          <span className="text-foreground">EDGE</span>
+          <span className="text-primary">X</span>
         </span>
-        <span className="text-[10px] font-mono text-muted-foreground border border-border px-1.5 ml-0.5">v1.0</span>
+        <span className="text-[10px] font-mono text-muted-foreground border border-border px-1.5 ml-0.5">
+          v1.0
+        </span>
       </div>
 
-      {Object.keys(MENU_ITEMS).map(menu => (
+      {Object.keys(MENU_ITEMS).map((menu) => (
         <div key={menu} className="electron-no-drag relative">
           <button
-            onClick={e => {
+            onClick={(e) => {
               e.stopPropagation();
               setActiveMenu(activeMenu === menu ? null : menu);
             }}
@@ -225,9 +224,14 @@ export function MenuBar({
             {menu}
           </button>
           {activeMenu === menu && (
-            <div className="absolute top-8 left-0 bg-popover border border-border shadow-2xl z-50 w-48 py-1" onClick={e => e.stopPropagation()}>
+            <div
+              className="absolute top-8 left-0 bg-popover border border-border shadow-2xl z-50 w-48 py-1"
+              onClick={(e) => e.stopPropagation()}
+            >
               {MENU_ITEMS[menu].map((item, index) =>
-                item === "-" ? <div key={index} className="border-t border-border my-1" /> : (
+                item === "-" ? (
+                  <div key={index} className="border-t border-border my-1" />
+                ) : (
                   <button
                     key={item}
                     onClick={() => runMenuAction(item)}
@@ -244,7 +248,7 @@ export function MenuBar({
                       </div>
                     )}
                   </button>
-                )
+                ),
               )}
             </div>
           )}
@@ -254,33 +258,40 @@ export function MenuBar({
       <div className="ml-auto flex items-center gap-2 shrink-0">
         {hasPlan && (
           <div className="flex items-center gap-2 border-r border-border pr-3 mr-1">
-            {planMeta.dutName && <span className="text-[11px] font-mono text-muted-foreground hidden lg:block">DUT: {planMeta.dutName}</span>}
-            {/* <span className="text-[11px] font-mono text-muted-foreground hidden md:block">{planMeta.name}</span> */}
+            {planMeta.dutName && (
+              <span className="text-[11px] font-mono text-muted-foreground hidden lg:block">
+                DUT: {planMeta.dutName}
+              </span>
+            )}
           </div>
         )}
         <span
           className="hidden max-w-[260px] truncate border border-border px-2 py-0.5 text-[11px] font-mono text-muted-foreground lg:inline-flex lg:items-center lg:gap-1.5"
           title={`Server: ${activeServerName || "Not configured"} | Health: ${serverHealthLabel}`}
         >
-          <span className={`h-2 w-2 shrink-0 rounded-full ${serverHealthStyles}`} />
+          <span
+            className={`h-2 w-2 shrink-0 rounded-full ${serverHealthStyles}`}
+          />
           <span>Server: {activeServerName || "Not configured"}</span>
         </span>
-        <span className={`text-[11px] font-mono px-2 py-0.5 border font-semibold ${runStatusStyle}`}>{runState.toUpperCase()}</span>
-        <button
-          type="button"
-          onClick={() => { setDownloadedPath(null); setShowInstallDialog(true); }}
-          title="Download the EdgeX Editor desktop application"
-          className="electron-no-drag flex h-7 items-center gap-1.5 border border-primary bg-primary px-2.5 text-[11px] font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
+        <span
+          className={`text-[11px] font-mono px-2 py-0.5 border font-semibold ${runStatusStyle}`}
         >
-          <Download size={13} />
-          <span className="hidden xl:inline">Install app</span>
-        </button>
+          {runState.toUpperCase()}
+        </span>
+
         {isTablet && (
           <>
-            <button onClick={() => setLeftOpen((value: boolean) => !value)} className={`p-1.5 border transition-colors ${leftOpen ? "bg-primary text-primary-foreground border-primary" : "border-border text-muted-foreground hover:text-foreground hover:bg-secondary"}`}>
+            <button
+              onClick={() => setLeftOpen((value: boolean) => !value)}
+              className={`p-1.5 border transition-colors ${leftOpen ? "bg-primary text-primary-foreground border-primary" : "border-border text-muted-foreground hover:text-foreground hover:bg-secondary"}`}
+            >
               <PanelLeftOpen size={13} />
             </button>
-            <button onClick={() => setRightOpen((value: boolean) => !value)} className={`p-1.5 border transition-colors ${rightOpen ? "bg-primary text-primary-foreground border-primary" : "border-border text-muted-foreground hover:text-foreground hover:bg-secondary"}`}>
+            <button
+              onClick={() => setRightOpen((value: boolean) => !value)}
+              className={`p-1.5 border transition-colors ${rightOpen ? "bg-primary text-primary-foreground border-primary" : "border-border text-muted-foreground hover:text-foreground hover:bg-secondary"}`}
+            >
               <PanelRightOpen size={13} />
             </button>
           </>
@@ -300,7 +311,10 @@ export function MenuBar({
           {isDark ? <Sun size={13} /> : <Moon size={13} />}
         </button>
         {electronAPI && (
-          <div className="electron-no-drag ml-1 flex h-8 items-stretch" aria-label="Window controls">
+          <div
+            className="electron-no-drag ml-1 flex h-8 items-stretch"
+            aria-label="Window controls"
+          >
             <button
               type="button"
               onClick={() => void electronAPI.minimizeWindow()}
@@ -312,14 +326,22 @@ export function MenuBar({
             </button>
             <button
               type="button"
-              onClick={() => void electronAPI.toggleMaximizeWindow().then(setIsWindowMaximized)}
+              onClick={() =>
+                void electronAPI
+                  .toggleMaximizeWindow()
+                  .then(setIsWindowMaximized)
+              }
               title={isWindowMaximized ? "Restore" : "Maximize"}
-              aria-label={isWindowMaximized ? "Restore window" : "Maximize window"}
+              aria-label={
+                isWindowMaximized ? "Restore window" : "Maximize window"
+              }
               className="flex w-11 items-center justify-center text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
             >
-              {isWindowMaximized
-                ? <Copy size={12} strokeWidth={1.5} />
-                : <Square size={12} strokeWidth={1.5} />}
+              {isWindowMaximized ? (
+                <Copy size={12} strokeWidth={1.5} />
+              ) : (
+                <Square size={12} strokeWidth={1.5} />
+              )}
             </button>
             <button
               type="button"
@@ -333,50 +355,6 @@ export function MenuBar({
           </div>
         )}
       </div>
-
-      <Dialog open={showInstallDialog} onOpenChange={(open) => !isDownloading && setShowInstallDialog(open)}>
-        <DialogContent className="electron-no-drag sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Install EdgeX Editor</DialogTitle>
-            <DialogDescription>
-              Download the desktop installer for offline access and a native application experience.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 text-sm">
-            <div className="rounded-md border border-border bg-secondary/40 p-3 text-muted-foreground">
-              {electronAPI
-                ? "The installer will be saved automatically in your Downloads folder."
-                : "The installer will appear in your browser's Downloads section and use its normal download location."}
-            </div>
-            {isDownloading && electronAPI && (
-              <div className="space-y-2">
-                <div className="flex justify-between text-xs text-muted-foreground"><span>Downloading installer…</span><span>{downloadProgress}%</span></div>
-                <div className="h-2 overflow-hidden rounded bg-secondary"><div className="h-full bg-primary transition-all" style={{ width: `${downloadProgress}%` }} /></div>
-              </div>
-            )}
-            {downloadedPath && (
-              <div className="rounded-md border border-emerald-500/40 bg-emerald-500/10 p-3">
-                <div className="font-medium text-emerald-600">Installer ready</div>
-                <div className="mt-1 break-all text-xs text-muted-foreground">{downloadedPath}</div>
-              </div>
-            )}
-            <div className="flex justify-end gap-2">
-              {downloadedPath && electronAPI ? (
-                <button type="button" onClick={() => void electronAPI.showDownloadedInstaller(downloadedPath)} className="flex items-center gap-2 border border-border px-3 py-2 hover:bg-secondary">
-                  <FolderOpen size={14} /> Show in folder
-                </button>
-              ) : (
-                <button type="button" disabled={isDownloading} onClick={() => setShowInstallDialog(false)} className="border border-border px-3 py-2 hover:bg-secondary disabled:opacity-50">Cancel</button>
-              )}
-              {!downloadedPath && (
-                <button type="button" disabled={isDownloading} onClick={() => void downloadInstaller()} className="flex items-center gap-2 bg-primary px-3 py-2 font-medium text-primary-foreground hover:bg-primary/90 disabled:cursor-wait disabled:opacity-60">
-                  <Download size={14} /> {isDownloading ? "Downloading…" : "Download installer"}
-                </button>
-              )}
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
