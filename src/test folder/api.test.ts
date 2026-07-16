@@ -11,15 +11,21 @@ vi.mock('../app/config/serverSettings', () => ({
 }))
 
 import axiosClient from '../app/api/client'
+import { postUploadPackages } from '../app/api/PackageUpload'
 import { getAvailablePackages, getInstalledPackages, installPackage, uninstallPackage } from '../app/api/package'
 import {
-  cancelRun, getRunLogsStreamUrl, removePlugin, uploadPlugin,
+  cancelRun, getConnections, getDuts, getInstalledPlugins, getInstruments,
+  getResultListeners, getRunLogs, getRunLogsStreamUrl, getRunStatus, getSteps,
+  getTraceListeners, pauseRun, removePlugin, resumeRun, uploadPlugin,
 } from '../app/api/plugin'
 import {
-  addResource, deleteResource, getResources, getResourceSchema, updateResource,
+  addResource, deleteResource, extractTypeName, getResources, getResourceSchema, updateResource,
 } from '../app/api/resources'
 import { getSystemKpis, type SystemKpisResponse } from '../app/api/system'
-import { getTestPlans, getTestPlanEditorModel, importRemoteTestPlan, uploadTapPlan } from '../app/api/testplans'
+import {
+  composeTestPlan, createTestPlan, getStepSchema, getTestPlans,
+  getTestPlanEditorModel, importRemoteTestPlan, runTestPlan, uploadTapPlan,
+} from '../app/api/testplans'
 import { getUsers } from '../app/api/users'
 
 const api = vi.mocked(axiosClient)
@@ -330,5 +336,169 @@ describe('API adapters', () => {
     expect(config).toMatchObject({ headers: { 'Content-Type': 'multipart/form-data' } })
   })
 
-})
+  // Verifies the standalone package uploader builds multipart data, forwards the
+  // exact File object, sets the upload header, and returns the backend payload.
+  it('uploads and installs a package using multipart form data', async () => {
+    const file = new File(['package'], 'driver.zip', { type: 'application/zip' })
+    api.post.mockResolvedValueOnce({ data: { installed: true } })
 
+    await expect(postUploadPackages(file)).resolves.toEqual({ installed: true })
+    expect(api.post).toHaveBeenCalledWith(
+      '/packages/upload-install',
+      expect.any(FormData),
+      { headers: { 'Content-Type': 'multipart/form-data' } },
+    )
+    expect((api.post.mock.calls[0][1] as FormData).get('file')).toBe(file)
+  })
+
+  // Covers plugin discovery endpoints, including populated/empty payload pass-through
+  // and the optional search query contract.
+  it('gets installed plugins and plugin resource type lists', async () => {
+    api.get
+      .mockResolvedValueOnce({ data: [{ name: 'Scope' }] })
+      .mockResolvedValueOnce({ data: [] })
+      .mockResolvedValueOnce({ data: ['Step'] })
+      .mockResolvedValueOnce({ data: ['Instrument'] })
+      .mockResolvedValueOnce({ data: ['Dut'] })
+      .mockResolvedValueOnce({ data: ['Connection'] })
+      .mockResolvedValueOnce({ data: ['Result'] })
+      .mockResolvedValueOnce({ data: ['Trace'] })
+
+    await expect(getInstalledPlugins('scope')).resolves.toEqual([{ name: 'Scope' }])
+    expect(api.get).toHaveBeenNthCalledWith(1, '/plugins', { params: { search: 'scope' } })
+    await expect(getInstalledPlugins('')).resolves.toEqual([])
+    expect(api.get).toHaveBeenNthCalledWith(2, '/plugins', { params: {} })
+    await expect(getSteps()).resolves.toEqual(['Step'])
+    await expect(getInstruments()).resolves.toEqual(['Instrument'])
+    await expect(getDuts()).resolves.toEqual(['Dut'])
+    await expect(getConnections()).resolves.toEqual(['Connection'])
+    await expect(getResultListeners()).resolves.toEqual(['Result'])
+    await expect(getTraceListeners()).resolves.toEqual(['Trace'])
+
+    expect(api.get.mock.calls.slice(2).map(([url]) => url)).toEqual([
+      '/plugins/test-steps', '/plugins/instruments', '/plugins/duts',
+      '/plugins/connections', '/plugins/result-listeners', '/plugins/trace-listeners',
+    ])
+  })
+
+  // Verifies plugin removal uses DELETE with a JSON body and upload uses multipart data.
+  it('removes and uploads plugins with the required request formats', async () => {
+    const plugin = { pluginName: 'Scope', packageName: 'Vendor.Scope', assembly: 'Scope.dll' }
+    api.delete.mockResolvedValueOnce({ data: { removed: true } })
+    await expect(removePlugin(plugin)).resolves.toEqual({ removed: true })
+    expect(api.delete).toHaveBeenCalledWith('/plugins/remove', {
+      data: plugin,
+      headers: { 'Content-Type': 'application/json' },
+    })
+
+    const file = new File(['plugin'], 'plugin.zip')
+    api.post.mockResolvedValueOnce({ data: { uploaded: true } })
+    await expect(uploadPlugin(file)).resolves.toEqual({ uploaded: true })
+    expect(api.post).toHaveBeenLastCalledWith(
+      '/plugins/upload', expect.any(FormData),
+      { headers: { 'Content-Type': 'multipart/form-data' } },
+    )
+    expect((api.post.mock.calls[0][1] as FormData).get('file')).toBe(file)
+  })
+
+  // Covers every run endpoint and confirms the run ID is embedded in each URL.
+  it('gets run state and logs and controls a run', async () => {
+    api.get
+      .mockResolvedValueOnce({ data: { status: 'Running' } })
+      .mockResolvedValueOnce({ data: ['started'] })
+    api.post
+      .mockResolvedValueOnce({ data: { status: 'Cancelled' } })
+      .mockResolvedValueOnce({ data: { status: 'Paused' } })
+      .mockResolvedValueOnce({ data: { status: 'Running' } })
+
+    await expect(getRunStatus('run 1')).resolves.toEqual({ status: 'Running' })
+    await expect(getRunLogs('run 1')).resolves.toEqual(['started'])
+    await expect(cancelRun('run 1')).resolves.toEqual({ status: 'Cancelled' })
+    await expect(pauseRun('run 1')).resolves.toEqual({ status: 'Paused' })
+    await expect(resumeRun('run 1')).resolves.toEqual({ status: 'Running' })
+    expect(api.get.mock.calls.map(([url]) => url)).toEqual(['/runs/run 1', '/runs/run 1/logs'])
+    expect(api.post.mock.calls.map(([url]) => url)).toEqual([
+      '/runs/run 1/cancel', '/runs/run 1/pause', '/runs/run 1/resume',
+    ])
+  })
+
+  // The stream URL uses the configured Axios base URL and removes one trailing slash.
+  it('builds a run-log stream URL from the default server base URL', () => {
+    expect(getRunLogsStreamUrl('abc')).toBe('http://default.test/runs/abc/logs/stream')
+  })
+
+  // Covers editor/schema reads and all JSON test-plan mutations, checking both
+  // endpoint selection and exact payload pass-through.
+  it('gets test-plan models and schema and sends compose/create/run payloads', async () => {
+    const planPayload = { name: 'Smoke', steps: [{ type: 'Delay' }] }
+    api.post
+      .mockResolvedValueOnce({ data: { path: 'plans/a.tap' } })
+      .mockResolvedValueOnce({ data: { composed: true } })
+      .mockResolvedValueOnce({ data: { created: true } })
+      .mockResolvedValueOnce({ data: { runId: 'r1' } })
+    api.get.mockResolvedValueOnce({ data: { properties: [] } })
+
+    await expect(getTestPlanEditorModel('plans/a.tap')).resolves.toEqual({ path: 'plans/a.tap' })
+    await expect(getStepSchema('Vendor.Delay')).resolves.toEqual({ properties: [] })
+    await expect(composeTestPlan(planPayload)).resolves.toEqual({ composed: true })
+    await expect(createTestPlan(planPayload)).resolves.toEqual({ created: true })
+    await expect(runTestPlan(planPayload)).resolves.toEqual({ runId: 'r1' })
+
+    expect(api.post.mock.calls).toEqual([
+      ['/testplans/editor-model', { path: 'plans/a.tap' }],
+      ['/testplans/compose', planPayload],
+      ['/testplans/create', planPayload],
+      ['/testplans/run', planPayload],
+    ])
+    expect(api.get).toHaveBeenCalledWith('/testplans/steps/schema', {
+      params: { stepTypeName: 'Vendor.Delay' },
+    })
+  })
+
+  // Checks utility boundary values used by resource normalization.
+  it('extracts short type names and handles empty or trailing-dot values', () => {
+    expect(extractTypeName('Vendor.Driver.Scope')).toBe('Scope')
+    expect(extractTypeName('Scope')).toBe('Scope')
+    expect(extractTypeName('')).toBe('')
+    expect(extractTypeName('Vendor.')).toBe('Vendor.')
+  })
+
+  // Mutation/schema request contracts are checked independently from return values.
+  it('sends exact resource mutation payloads and explicit schema kinds', async () => {
+    const add = { resourceKind: 'dut', pluginTypeName: 'Phone', name: 'D1', properties: { Port: 1 } }
+    const update = { resourceKind: 'dut', name: 'D1', newName: 'D2', properties: { Port: 2 } }
+    const remove = { resourceKind: 'dut', name: 'D2' }
+    api.post.mockResolvedValue({ data: {} })
+    api.get.mockResolvedValueOnce({ data: { resourceKind: 'dut' } })
+
+    await addResource(add)
+    await updateResource(update)
+    await deleteResource(remove)
+    await getResourceSchema('Phone', 'dut')
+
+    expect(api.post.mock.calls).toEqual([
+      ['plugins/resources/add', add],
+      ['plugins/resources/update', update],
+      ['plugins/resources/delete', remove],
+    ])
+    expect(api.get).toHaveBeenCalledWith('plugins/resources/schema', {
+      params: { resourceKind: 'dut', pluginTypeName: 'Phone' },
+    })
+  })
+
+  // Every adapter intentionally leaves transport failures rejected for hooks/UI
+  // to handle; representative GET, POST, DELETE, and multipart calls verify that rule.
+  it('propagates transport errors from all request styles', async () => {
+    const error = new Error('server unavailable')
+    api.get.mockRejectedValue(error)
+    api.post.mockRejectedValue(error)
+    api.delete.mockRejectedValue(error)
+
+    await expect(getSteps()).rejects.toBe(error)
+    await expect(runTestPlan({})).rejects.toBe(error)
+    await expect(removePlugin({ pluginName: 'x' })).rejects.toBe(error)
+    await expect(postUploadPackages(new File(['x'], 'x.zip'))).rejects.toBe(error)
+    await expect(getResourceSchema('x')).rejects.toBe(error)
+  })
+
+})
