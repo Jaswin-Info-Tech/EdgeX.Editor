@@ -1007,8 +1007,8 @@ function GenericResourcePanel({
                     </button>
                   </div>
 
-                  <div className="min-h-0 flex-1 overflow-y-auto space-y-2 p-3">
-                    <section className="border border-border bg-background">
+                  <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-3">
+                    <section className="mt-0 border border-border bg-background">
                       <button
                         type="button"
                         onClick={() => setShowBasicsPanel((prev) => !prev)}
@@ -1038,7 +1038,7 @@ function GenericResourcePanel({
                       )}
                     </section>
 
-                    <section className="border border-border bg-background">
+                    <section className="mt-0 border border-border bg-background">
                       <button
                         type="button"
                         onClick={() => setShowConfigPanel((prev) => !prev)}

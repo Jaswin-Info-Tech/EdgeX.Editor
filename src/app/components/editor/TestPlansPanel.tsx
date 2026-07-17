@@ -785,7 +785,7 @@ export function TestPlansPanel({
             </div>
           ) : (
             <>
-              <div className="sticky top-0 z-10 grid grid-cols-[minmax(0,1fr)_88px_180px_26px] items-center gap-2 border-b border-border bg-muted/45 px-4 py-1.5 text-[10px] font-mono uppercase tracking-[0.12em] text-muted-foreground">
+              <div className="sticky top-0 z-50 grid grid-cols-[minmax(0,1fr)_88px_180px_26px] items-center gap-2 border-b border-border bg-background px-4 py-1.5 text-[10px] font-mono uppercase tracking-[0.12em] text-muted-foreground">
                 <span>Name / Path</span>
                 <span className="text-right">Steps</span>
                 <span>Last Modified</span>
