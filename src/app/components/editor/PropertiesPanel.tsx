@@ -55,8 +55,8 @@ export function PropertiesPanel({
     const type = normalizeEditorType(prop.editorType);
     return type === "object" || type === "json";
   };
-  console.log(plan);
-  console.log(selectedStep);
+  // console.log(plan);
+  // console.log(selectedStep);
   // helper: is this resource a DUT or connection? (exclude from instrument dropdown)
   const isConnectionOrDut = (type: string = "") =>
     /connection/i.test(type) || /dut/i.test(type);
@@ -66,78 +66,83 @@ export function PropertiesPanel({
     /listener/i.test(type) || /result-listener/i.test(type) || /trace-listener/i.test(type);
 
   // helper: classify a resource's "family" from its backend type string
-type InstrumentFamily = "rest" | "scpi" | "other";
+  type InstrumentFamily = "rest" | "scpi" | "other";
 
-const getResourceSearchText = (resource: any): string =>
-  [
-    resource?.name,
-    resource?.type,
-    resource?.typeName,
-    resource?.fullTypeName,
-    resource?.pluginTypeName,
-    resource?.instrument,
-    resource?.assembly,
-    resource?.baseType,
-  ]
-    .filter(Boolean)
-    .join(" ")
-    .toLowerCase();
+  const getResourceSearchText = (resource: any): string =>
+    [
+      resource?.name,
+      resource?.type,
+      resource?.typeName,
+      resource?.fullTypeName,
+      resource?.pluginTypeName,
+      resource?.instrument,
+      resource?.assembly,
+      resource?.baseType,
+    ]
+      .filter(Boolean)
+      .join(" ")
+      .toLowerCase();
 
-const getInstrumentFamily = (resource: any): InstrumentFamily => {
-  const text = getResourceSearchText(resource);
+  const getInstrumentFamily = (resource: any): InstrumentFamily => {
+    const text = getResourceSearchText(resource);
 
-  if (text.includes("rest")) {
-    return "rest";
-  }
+    if (text.includes("rest")) {
+      return "rest";
+    }
 
-  if (
-    text.includes("scpi") ||
-    text.includes("scpiinstrument") ||
-    text.includes("scpivisa")
-  ) {
-    return "scpi";
-  }
+    if (
+      text.includes("scpi") ||
+      text.includes("scpiinstrument") ||
+      text.includes("scpivisa")
+    ) {
+      return "scpi";
+    }
 
-  return "other";
-};
+    return "other";
+  };
 
-const isListenerResource = (resource: any): boolean => {
-  const text = getResourceSearchText(resource);
+  const isListenerResource = (resource: any): boolean => {
+    const text = getResourceSearchText(resource);
 
-  return (
-    text.includes("resultlistener") ||
-    text.includes("result-listener") ||
-    text.includes("tracelistener") ||
-    text.includes("trace-listener")
-  );
-};
+    return (
+      text.includes("resultlistener") ||
+      text.includes("result-listener") ||
+      text.includes("tracelistener") ||
+      text.includes("trace-listener")
+    );
+  };
 
-const isDutResource = (resource: any): boolean => {
-  const kind = String(
-    resource?.resourceKind ??
+  const isDutResource = (resource: any): boolean => {
+    const kind = String(
+      resource?.resourceKind ??
       resource?.kind ??
       resource?.category ??
       "",
-  ).toLowerCase();
+    ).toLowerCase();
 
-  const baseType = String(resource?.baseType ?? "").toLowerCase();
+    const baseType = String(resource?.baseType ?? "").toLowerCase();
 
-  return kind === "dut" || baseType === "dut";
-};
+    return kind === "dut" || baseType === "dut";
+  };
 
-const isActualConnectionResource = (resource: any): boolean => {
-  const kind = String(
-    resource?.resourceKind ??
+  const isActualConnectionResource = (resource: any): boolean => {
+    const kind = String(
+      resource?.resourceKind ??
       resource?.kind ??
       resource?.category ??
       "",
-  ).toLowerCase();
+    ).toLowerCase();
 
-  return kind === "connection";
-};
+    return kind === "connection";
+  };
 
-const getResourceFamily = (resource: any) =>
-  getInstrumentFamily(resource);
+  const getResourceFamily = (resource: any) =>
+    getInstrumentFamily(resource);
+
+  const getResourceVisaAddress = (resource: any): string => {
+    const value = resource?.properties?.VisaAddress ?? resource?.VisaAddress;
+    return value == null ? "" : String(value);
+  };
 
   const stepTypeName = useMemo(() => {
     if (!selectedStep) return null;
@@ -153,109 +158,110 @@ const getResourceFamily = (resource: any) =>
   }, [selectedStep?.id, resolvedTypeNames]);
 
   // derive which family the *selected step* expects, from its resolved type name
-const stepInstrumentFamily = useMemo<InstrumentFamily | null>(() => {
-  const stepText = [
+  const stepInstrumentFamily = useMemo<InstrumentFamily | null>(() => {
+    const stepText = [
+      stepTypeName,
+      selectedStep?.name,
+      selectedStep?.type,
+      selectedStep?.fullName,
+      selectedStep?.baseType,
+      selectedStep?.assembly,
+    ]
+      .filter(Boolean)
+      .join(" ")
+      .toLowerCase();
+
+    if (stepText.includes("rest")) {
+      return "rest";
+    }
+
+    if (stepText.includes("scpi")) {
+      return "scpi";
+    }
+
+    return null;
+  }, [
     stepTypeName,
     selectedStep?.name,
     selectedStep?.type,
     selectedStep?.fullName,
     selectedStep?.baseType,
     selectedStep?.assembly,
-  ]
-    .filter(Boolean)
-    .join(" ")
-    .toLowerCase();
+  ]);
 
-  if (stepText.includes("rest")) {
-    return "rest";
-  }
+  const editorContext = useMemo<EditorContext>(() => {
+    const instrumentOptions = (resources ?? [])
+      .filter((resource: any) => Boolean(resource?.name))
+      .filter((resource: any) => !isListenerResource(resource))
+      .filter((resource: any) => !isDutResource(resource))
+      .filter((resource: any) => !isActualConnectionResource(resource))
+      .filter((resource: any) => {
+        const resourceFamily = getInstrumentFamily(resource);
 
-  if (stepText.includes("scpi")) {
-    return "scpi";
-  }
+        if (stepInstrumentFamily) {
+          return resourceFamily === stepInstrumentFamily;
+        }
 
-  return null;
-}, [
-  stepTypeName,
-  selectedStep?.name,
-  selectedStep?.type,
-  selectedStep?.fullName,
-  selectedStep?.baseType,
-  selectedStep?.assembly,
-]);
-
-const editorContext = useMemo<EditorContext>(() => {
-  const instrumentOptions = (resources ?? [])
-    .filter((resource: any) => Boolean(resource?.name))
-    .filter((resource: any) => !isListenerResource(resource))
-    .filter((resource: any) => !isDutResource(resource))
-    .filter((resource: any) => !isActualConnectionResource(resource))
-    .filter((resource: any) => {
-      const resourceFamily = getInstrumentFamily(resource);
-
-      if (stepInstrumentFamily) {
-        return resourceFamily === stepInstrumentFamily;
-      }
-
-      return resourceFamily === "other";
-    })
-    .map((resource: any) => ({
-      label: String(resource.name),
-      value: String(resource.name),
-      description: [
-        resource.fullTypeName ??
-          resource.type ??
-          resource.instrument ??
-          resource.pluginTypeName,
-        resource.status,
-      ]
-        .filter(Boolean)
-        .join(" | "),
-    }));
-
-  return {
-    instrumentOptions,
-
-    resourceOptions: (resources ?? [])
-      .filter((resource: any) => resource?.name)
+        return resourceFamily === "other";
+      })
       .map((resource: any) => ({
         label: String(resource.name),
         value: String(resource.name),
         description: [
           resource.fullTypeName ??
-            resource.type ??
-            resource.instrument ??
-            resource.pluginTypeName,
+          resource.type ??
+          resource.instrument ??
+          resource.pluginTypeName,
+          getResourceVisaAddress(resource),
           resource.status,
         ]
           .filter(Boolean)
           .join(" | "),
-      })),
+      }));
 
-    testStepOptions: testSteps
-      .filter(
-        (step: any) =>
-          step?.canCreateInstance !== false &&
-          step?.isBrowsable !== false,
-      )
-      .filter((step: any) => step?.name)
-      .map(toBackendRecordOption),
+    return {
+      instrumentOptions,
 
-    planStepOptions: flatAll(plan || [])
-      .filter((step: any) => step.id !== selectedStep?.id)
-      .map((step: any) => ({
-        label: step.name,
-        value: step.id,
-        description: step.type,
-      })),
-  };
-}, [
-  resources,
-  testSteps,
-  plan,
-  selectedStep?.id,
-  stepInstrumentFamily,
-]);
+      resourceOptions: (resources ?? [])
+        .filter((resource: any) => resource?.name)
+        .map((resource: any) => ({
+          label: String(resource.name),
+          value: String(resource.name),
+          description: [
+            resource.fullTypeName ??
+            resource.type ??
+            resource.instrument ??
+            resource.pluginTypeName,
+            resource.status,
+          ]
+            .filter(Boolean)
+            .join(" | "),
+        })),
+
+      testStepOptions: testSteps
+        .filter(
+          (step: any) =>
+            step?.canCreateInstance !== false &&
+            step?.isBrowsable !== false,
+        )
+        .filter((step: any) => step?.name)
+        .map(toBackendRecordOption),
+
+      planStepOptions: flatAll(plan || [])
+        .filter((step: any) => step.id !== selectedStep?.id)
+        .map((step: any) => ({
+          label: step.name,
+          value: step.id,
+          description: step.type,
+        })),
+    };
+  }, [
+    resources,
+    testSteps,
+    plan,
+    selectedStep?.id,
+    stepInstrumentFamily,
+  ]);
 
 
 
@@ -454,9 +460,11 @@ const editorContext = useMemo<EditorContext>(() => {
           prop.typeName ??
           prop.fullTypeName ??
           null; // no silent wrong-default — let it be null/flagged instead of lying
+        const visaAddress = getResourceVisaAddress(matchedResource);
         return {
           $type: resolvedType,
           Name: value,
+          ...(visaAddress ? { VisaAddress: visaAddress } : {}),
         };
       }
       case "object":
