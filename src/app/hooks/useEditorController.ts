@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import { useDragResize } from "../components/editor/resizable";
 // import { BASE_LIBRARY } from "../data/library";
 import type { CtxMenu, LibraryItem, LogEntry, PlanMeta, Plugin, RunState, StepStatus, TestStep } from "../types/editor";
-import { addToParent, deleteIn, flatAll, makeSequence, makeStep, moveIn, nowTs, parseFreq, resetAll, setStatusIn, uid, updateIn, toArray } from "../utils/editor";
+import { addToParent, deleteIn, ensureUniqueStepIds, flatAll, makeSequence, makeStep, moveIn, nowTs, parseFreq, resetAll, setStatusIn, uid, updateIn, toArray } from "../utils/editor";
 import { removePlugin, uploadPlugin } from "../api/plugin";
 import { installPackage, uninstallPackage } from "../api/package";
 import { useAvailablePackages } from "./usePackage";
@@ -256,6 +256,12 @@ export function useEditorController() {
   useEffect(() => { document.documentElement.classList.toggle("dark", isDark); }, [isDark]);
   useEffect(() => { logEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [logs]);
   useEffect(() => { renameRef.current?.focus(); }, [renaming]);
+  useEffect(() => {
+    setPlan((currentPlan) => {
+      const result = ensureUniqueStepIds(currentPlan);
+      return result.changed ? result.steps : currentPlan;
+    });
+  }, [plan]);
   useEffect(() => {
     try {
       const rawSnapshot = localStorage.getItem(PLAN_SNAPSHOT_STORAGE_KEY);

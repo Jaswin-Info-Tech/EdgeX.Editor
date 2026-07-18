@@ -22,12 +22,67 @@ export function flatAll(steps: TestStep[]): TestStep[] {
   return steps.flatMap(s => [s, ...(s.children ? flatAll(s.children) : [])]);
 }
 
+export function ensureUniqueStepIds(steps: TestStep[]): { steps: TestStep[]; changed: boolean } {
+  const seen = new Set<string>();
+  let changed = false;
+
+  const visit = (items: TestStep[]): TestStep[] =>
+    items.map((step) => {
+      const rawId = String(step.id ?? "").trim();
+      const nextId = rawId && !seen.has(rawId) ? rawId : uid();
+      seen.add(nextId);
+
+      const children = step.children ? visit(step.children) : undefined;
+      const idChanged = nextId !== step.id;
+      if (idChanged) changed = true;
+
+      if (idChanged || children !== step.children) {
+        return { ...step, id: nextId, children };
+      }
+
+      return step;
+    });
+
+  return { steps: visit(steps), changed };
+}
+
 export function updateIn(steps: TestStep[], id: string, fn: (s: TestStep) => TestStep): TestStep[] {
-  return steps.map(s => s.id === id ? fn(s) : { ...s, children: s.children ? updateIn(s.children, id, fn) : undefined });
+  let updated = false;
+
+  const visit = (items: TestStep[]): TestStep[] =>
+    items.map(s => {
+      if (!updated && s.id === id) {
+        updated = true;
+        return fn(s);
+      }
+
+      return {
+        ...s,
+        children: s.children ? visit(s.children) : undefined,
+      };
+    });
+
+  return visit(steps);
 }
 
 export function deleteIn(steps: TestStep[], id: string): TestStep[] {
-  return steps.filter(s => s.id !== id).map(s => ({ ...s, children: s.children ? deleteIn(s.children, id) : undefined }));
+  let deleted = false;
+
+  const visit = (items: TestStep[]): TestStep[] =>
+    items
+      .filter(s => {
+        if (!deleted && s.id === id) {
+          deleted = true;
+          return false;
+        }
+        return true;
+      })
+      .map(s => ({
+        ...s,
+        children: s.children ? visit(s.children) : undefined,
+      }));
+
+  return visit(steps);
 }
 
 export function moveIn(steps: TestStep[], id: string, dir: "up" | "down"): TestStep[] {
