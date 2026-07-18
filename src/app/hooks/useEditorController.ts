@@ -104,6 +104,7 @@ export function useEditorController() {
   const [outputPath, setOutputPath] = useState<string | null>(null);
   const [showSaveDestination, setShowSaveDestination] = useState(false);
   const [activeRunId, setActiveRunId] = useState<string | null>(null);
+  const [mqttCaptureEnabled, setMqttCaptureEnabled] = useState(false);
   const [draggedStepId, setDraggedStepId] = useState<string | null>(null);
 
   const [leftOpen, setLeftOpen] = useState(true);
@@ -137,6 +138,9 @@ export function useEditorController() {
   const runLogsPollingErrorNotifiedRef = useRef(false);
   const runLogsStreamErrorNotifiedRef = useRef(false);
   const runLogsClosedNotifiedRef = useRef(false);
+  const mqttSubscribedRef = useRef(false);
+  const bufferMqttResultsRef = useRef(false);
+  const bufferedMqttResultLinesRef = useRef<string[]>([]);
   const canonicalTypeNameCacheRef = useRef<Map<string, string>>(new Map());
 
   const resolveCanonicalStepTypeName = (stepLike: any): string => {
@@ -473,16 +477,44 @@ export function useEditorController() {
     return lines;
   };
 
-  useMqttResultListener(
+  const mqttListener = useMqttResultListener(
     (topic, data) => {
       const lines = formatMqttResultMessage(data);
+      if (bufferMqttResultsRef.current) {
+        bufferedMqttResultLinesRef.current.push(...lines);
+        return;
+      }
       lines.forEach((line) => addLog("INFO", "MQTT", line));
     },
     (level, message) => {
       addLog(level, "MQTT", message);
     },
-    { enabled: runState === "running" || runState === "paused" },
+    { enabled: mqttCaptureEnabled || (Boolean(activeRunId) && (runState === "running" || runState === "paused")) },
   );
+
+  useEffect(() => {
+    mqttSubscribedRef.current = mqttListener.isSubscribed;
+  }, [mqttListener.isSubscribed]);
+
+  const waitForMqttSubscription = useCallback(async (timeoutMs = 1500) => {
+    const startedAt = Date.now();
+    while (Date.now() - startedAt < timeoutMs) {
+      if (mqttSubscribedRef.current) return true;
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+    return false;
+  }, []);
+
+  const wait = useCallback(
+    (delayMs: number) => new Promise((resolve) => setTimeout(resolve, delayMs)),
+    [],
+  );
+
+  const flushBufferedMqttResults = useCallback(() => {
+    const lines = bufferedMqttResultLinesRef.current;
+    bufferedMqttResultLinesRef.current = [];
+    lines.forEach((line) => addLog("INFO", "MQTT", line));
+  }, [addLog]);
 
   const logApiErrorDetails = useCallback((
     source: string,
@@ -1250,6 +1282,18 @@ export function useEditorController() {
     setShowSaveDestination(false);
   };
 
+  const stopMqttCaptureAfter = useCallback((delayMs = 1000) => {
+    const timer = setTimeout(() => setMqttCaptureEnabled(false), delayMs);
+    runTimers.current.push(timer);
+  }, []);
+
+  useEffect(() => {
+    if (!mqttCaptureEnabled) return;
+    if (activeRunId) return;
+    if (runState !== "idle" && runState !== "completed") return;
+    stopMqttCaptureAfter();
+  }, [activeRunId, mqttCaptureEnabled, runState, stopMqttCaptureAfter]);
+
   const handleRun = async () => {
     if (runState === "running" || plan.length === 0 || !isSaved) return;
     runTimers.current.forEach(clearTimeout);
@@ -1257,6 +1301,9 @@ export function useEditorController() {
     setLogs([]);
     setRunState("running");
     setActiveRunId(null);
+    setMqttCaptureEnabled(true);
+    bufferMqttResultsRef.current = true;
+    bufferedMqttResultLinesRef.current = [];
     setShowConsole(true);
 
     const runPath = outputPath ?? getDefaultOutputPath();
@@ -1264,6 +1311,7 @@ export function useEditorController() {
     addLog("INFO", "TestPlans", `Run request: ${runPath}`);
 
     try {
+      await waitForMqttSubscription();
       const runResponse = await runTestPlan({
         path: runPath,
         cacheXml: true,
@@ -1308,41 +1356,80 @@ export function useEditorController() {
       const runId = stringify(payload?.runId) || "-";
       const failedToStart = String(payload?.failedToStart ?? "false").toLowerCase() === "true";
       const hasRunId = runId !== "-" && runId.trim() !== "";
-      const isRunningVerdict = verdict.toLowerCase() === "notset";
+      const statusText = String(payload?.status ?? payload?.state ?? payload?.runState ?? "").toLowerCase();
+      const hasExplicitActiveState =
+        statusText.includes("running") ||
+        statusText.includes("started") ||
+        statusText.includes("queued") ||
+        statusText.includes("paused");
+      const hasExplicitCompleteState =
+        payload?.completed === true ||
+        payload?.isCompleted === true ||
+        payload?.finished === true ||
+        payload?.ended === true ||
+        statusText.includes("completed") ||
+        statusText.includes("finished") ||
+        statusText.includes("stopped") ||
+        statusText.includes("cancel") ||
+        statusText.includes("aborted") ||
+        statusText.includes("failed") ||
+        statusText.includes("error");
+      const hasCompletedDuration =
+        duration !== "-" &&
+        duration.trim() !== "" &&
+        !/^0+(?::0+)*(\.0+)?$/.test(duration.trim());
+      const isNotSetVerdict = verdict.toLowerCase() === "notset";
+      const shouldTrackAsActive =
+        !failedToStart &&
+        hasRunId &&
+        (hasExplicitActiveState || (isNotSetVerdict && !hasCompletedDuration && !hasExplicitCompleteState));
 
-      if (hasRunId) {
+      if (shouldTrackAsActive) {
         setActiveRunId(runId);
       }
 
       addLog("INFO", "EdgeX", `Run summary: id=${runId} | verdict=${verdict} | duration=${duration}`);
+      if (!shouldTrackAsActive) {
+        await wait(350);
+      }
+      bufferMqttResultsRef.current = false;
+      flushBufferedMqttResults();
 
       if (failedToStart) {
         addLog("ERROR", "EdgeX", "=== Run complete - Failed to start ===");
         setRunState("idle");
         setActiveRunId(null);
-      } else if (isRunningVerdict) {
+        stopMqttCaptureAfter();
+      } else if (shouldTrackAsActive) {
         addLog("INFO", "EdgeX", "Run is active. Use Pause/Resume/Stop controls.");
         setRunState("running");
       } else {
-        addLog("INFO", "EdgeX", "=== Run complete ===");
+        addLog("INFO", "EdgeX", `=== Run complete - verdict=${verdict} ===`);
         setRunState("completed");
         setActiveRunId(null);
+        stopMqttCaptureAfter();
       }
     } catch (error) {
+      bufferMqttResultsRef.current = false;
+      flushBufferedMqttResults();
       console.error("Failed to run test plan:", error);
       setShowConsole(true);
       addLog("ERROR", "TestPlans", "Failed to start test plan run.");
       logApiErrorDetails("TestPlans", error, { method: "POST", url: "testplans/run" });
       setRunState("idle");
       setActiveRunId(null);
+      stopMqttCaptureAfter(0);
     }
   };
 
   const handleStop = async () => {
     runTimers.current.forEach(clearTimeout);
     if (!activeRunId || (runState !== "running" && runState !== "paused")) {
+      bufferMqttResultsRef.current = false;
+      bufferedMqttResultLinesRef.current = [];
       setRunState("idle");
       setActiveRunId(null);
+      setMqttCaptureEnabled(false);
       addLog("WARN", "EdgeX", "Run aborted by user.");
       return;
     }
@@ -1352,8 +1439,11 @@ export function useEditorController() {
       setShowConsole(true);
       addLog("WARN", "EdgeX", `Cancelling run ${activeRunId}...`);
       logApiSuccessDetails("TestPlans", "Cancel", response);
+      bufferMqttResultsRef.current = false;
+      bufferedMqttResultLinesRef.current = [];
       setRunState("idle");
       setActiveRunId(null);
+      setMqttCaptureEnabled(false);
       addLog("WARN", "EdgeX", "Run cancelled.");
     } catch (error) {
       setShowConsole(true);
@@ -1370,6 +1460,7 @@ export function useEditorController() {
         addLog("WARN", "EdgeX", `Run ${activeRunId} is no longer active (already completed/expired).`);
         setRunState("completed");
         setActiveRunId(null);
+        stopMqttCaptureAfter();
         return;
       }
 
@@ -1406,6 +1497,7 @@ export function useEditorController() {
           addLog("WARN", "EdgeX", `Run ${activeRunId} is no longer active (already completed/expired).`);
           setRunState("completed");
           setActiveRunId(null);
+          stopMqttCaptureAfter();
           return;
         }
 
@@ -1434,6 +1526,7 @@ export function useEditorController() {
           addLog("WARN", "EdgeX", `Run ${activeRunId} is no longer active (already completed/expired).`);
           setRunState("completed");
           setActiveRunId(null);
+          stopMqttCaptureAfter();
           return;
         }
 
@@ -1445,10 +1538,22 @@ export function useEditorController() {
 
   const handleReset = () => {
     runTimers.current.forEach(clearTimeout);
+    bufferMqttResultsRef.current = false;
+    bufferedMqttResultLinesRef.current = [];
     setRunState("idle");
     setActiveRunId(null);
-    setPlan(resetAll);
-    setLogs([{ id: logId.current++, timestamp: nowTs(), level: "INFO", source: "EdgeX", message: "Plan reset. Ready." }]);
+    setMqttCaptureEnabled(false);
+    setPlan([]);
+    setExpanded(new Set());
+    setSelectedId(null);
+    setRenaming(null);
+    setDraggedStepId(null);
+    setAddStepParentId(null);
+    setAddStepIdx(undefined);
+    setShowAddStep(false);
+    setSavedPlanSignature(null);
+    setIsSaved(false);
+    setLogs([{ id: logId.current++, timestamp: nowTs(), level: "INFO", source: "EdgeX", message: "Sequence cleared. Test plan kept." }]);
   };
 
 
