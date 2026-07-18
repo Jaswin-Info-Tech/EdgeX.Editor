@@ -50,6 +50,8 @@ export function PropertiesPanel({
   const errorsByTypeName = useAppSelector((state: any) => state.properties.errorsByTypeName);
 
   const getSchemaPropertyKey = (prop: any) => `${prop.name || prop.displayName} || ${prop.name}`;
+  const isNameSchemaProperty = (prop: any) =>
+    String(prop.name || prop.displayName || "").trim().toLowerCase() === "name";
 
   const isObjectLikeEditor = (prop: any) => {
     const type = normalizeEditorType(prop.editorType);
@@ -376,8 +378,7 @@ export function PropertiesPanel({
         prop.propertyType?.includes("OpenTap.Enabled") ||
         prop.fullTypeName?.includes("OpenTap.Enabled");
 
-      const isNameProp =
-        String(prop.name || prop.displayName || "").toLowerCase() === "name";
+      const isNameProp = isNameSchemaProperty(prop);
 
       if (isEnabledWrapper && value && typeof value === "object") {
         values[prop.name] = value.Value ?? "";
@@ -488,6 +489,10 @@ export function PropertiesPanel({
   const commitSchemaProperties = () => {
     if (!selectedStep) return;
     const meta = schemaRecords[0];
+    const nameProp = schemaProperties.find(isNameSchemaProperty);
+    const nextStepName = nameProp
+      ? String(schemaPropertyValues[nameProp.name] ?? "").trim()
+      : "";
 
     setPlan((prev: any) => updateIn(prev, selectedStep.id, (step: any) => {
       const existingProps = step.properties || [];
@@ -510,6 +515,7 @@ export function PropertiesPanel({
 
       return {
         ...step,
+        ...(nextStepName ? { name: nextStepName } : {}),
         properties: [...keepProps, ...newProps],
 
         stepTypeName: step.stepTypeName,
