@@ -1180,7 +1180,19 @@ export function useEditorController() {
 
   const commitRename = () => {
     if (renaming && renameVal.trim()) {
-      setPlan(prev => updateIn(prev, renaming, step => ({ ...step, name: renameVal.trim() })));
+      const nextName = renameVal.trim();
+      setPlan(prev => updateIn(prev, renaming, step => ({
+        ...step,
+        name: nextName,
+        properties: step.properties.map(prop => {
+          const isNameProperty =
+            String(prop.key ?? "").trim().toLowerCase() === "name" ||
+            String(prop.label ?? "").trim().toLowerCase() === "name" ||
+            String(prop.key ?? "").trim().toLowerCase().startsWith("name ||");
+
+          return isNameProperty ? { ...prop, value: nextName } : prop;
+        }),
+      })));
     }
     setRenaming(null);
   };
