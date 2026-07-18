@@ -1584,10 +1584,16 @@ export function useEditorController() {
       setIsSaved(true);
       return response;
     } catch (error) {
+      const backendMessage = error && typeof error === "object" && "response" in error
+        ? (error as { response?: { data?: { Message?: string } } }).response?.data?.Message
+        : undefined;
+      const displayMessage = backendMessage?.replace(/\s*\(Parameter 'Steps'\)\s*$/i, "").trim() || "Unable to save test plan.";
+
       console.error("Failed to compose test plan:", error);
       setShowConsole(true);
       addLog("ERROR", "TestPlans", "Failed to save test plan.");
       logApiErrorDetails("TestPlans", error, { method: "POST", url: "plugins/compose" });
+      toast.error(displayMessage);
     }
   };
 

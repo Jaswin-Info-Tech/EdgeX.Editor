@@ -22,6 +22,10 @@ export function flatAll(steps: TestStep[]): TestStep[] {
   return steps.flatMap(s => [s, ...(s.children ? flatAll(s.children) : [])]);
 }
 
+export function hasAnySteps(steps: TestStep[]): boolean {
+  return flatAll(steps).length > 0;
+}
+
 export function ensureUniqueStepIds(steps: TestStep[]): { steps: TestStep[]; changed: boolean } {
   const seen = new Set<string>();
   let changed = false;
