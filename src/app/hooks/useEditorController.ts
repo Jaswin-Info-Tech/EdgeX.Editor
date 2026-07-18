@@ -1180,23 +1180,47 @@ export function useEditorController() {
 
   const commitRename = () => {
     if (renaming && renameVal.trim()) {
-      setPlan(prev => updateIn(prev, renaming, step => ({ ...step, name: renameVal.trim() })));
+      const nextName = renameVal.trim();
+      setPlan(prev => updateIn(prev, renaming, step => ({
+        ...step,
+        name: nextName,
+        properties: step.properties.map(prop => {
+          const isNameProperty =
+            String(prop.key ?? "").trim().toLowerCase() === "name" ||
+            String(prop.label ?? "").trim().toLowerCase() === "name" ||
+            String(prop.key ?? "").trim().toLowerCase().startsWith("name ||");
+
+          return isNameProperty ? { ...prop, value: nextName } : prop;
+        }),
+      })));
     }
     setRenaming(null);
   };
 
   const updateProperty = (stepId: string, key: string, raw: string) => {
-    setPlan(prev => updateIn(prev, stepId, step => ({
-      ...step,
-      properties: step.properties.map(prop => {
+    setPlan(prev => updateIn(prev, stepId, step => {
+      let shouldRenameStep = false;
+
+      const properties = step.properties.map(prop => {
         if (prop.key !== key) return prop;
         if (prop.isEditable === false) return prop;
+
+        shouldRenameStep =
+          String(prop.key ?? "").trim().toLowerCase() === "name" ||
+          String(prop.label ?? "").trim().toLowerCase() === "name";
+
         if (prop.type === "number") return { ...prop, value: parseFloat(raw) || 0 };
         if (prop.type === "boolean") return { ...prop, value: raw === "true" };
         if (prop.type === "frequency") return { ...prop, value: parseFreq(raw) };
         return { ...prop, value: raw };
-      }),
-    })));
+      });
+
+      return {
+        ...step,
+        ...(shouldRenameStep && raw.trim() ? { name: raw.trim() } : {}),
+        properties,
+      };
+    }));
   };
 
   const getDefaultOutputPath = useCallback(
