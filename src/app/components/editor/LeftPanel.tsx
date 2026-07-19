@@ -103,7 +103,7 @@ interface LeftPanelProps {
   handleInstallPlugin: (id: string) => void;
   setShowPluginMgr: (value: boolean) => void;
   renaming: string | null;
-  renameRef: React.RefObject<HTMLInputElement>;
+  renameRef: React.RefObject<HTMLInputElement | null>;
   renameVal: string;
   setRenameVal: (value: string) => void;
   commitRename: () => void;
@@ -208,30 +208,30 @@ export function LeftPanel({
                   {hasPlan ? `${flatAll(plan).length} steps in navigator` : "No plan loaded"}
                 </div>
               </div>
-            {(() => {
-              const allIds = flatAll(plan).map((step) => step.id);
-              const isAllExpanded =
-                allIds.length > 0 && allIds.every((id) => expanded.has(id));
-              return (
-                <button
-                  onClick={() =>
-                    setExpanded(isAllExpanded ? new Set() : new Set(allIds))
-                  }
-                  title={isAllExpanded ? "Collapse all" : "Expand all"}
-                  className="flex h-7 w-7 items-center justify-center border border-transparent text-muted-foreground transition-colors hover:border-border hover:bg-secondary hover:text-foreground"
-                >
-                  <ChevronUp
-                    size={13}
-                    className="transition-transform duration-200"
-                    style={{
-                      transform: isAllExpanded
-                        ? "rotate(0deg)"
-                        : "rotate(180deg)",
-                    }}
-                  />
-                </button>
-              );
-            })()}
+              {(() => {
+                const allIds = flatAll(plan).map((step) => step.id);
+                const isAllExpanded =
+                  allIds.length > 0 && allIds.every((id) => expanded.has(id));
+                return (
+                  <button
+                    onClick={() =>
+                      setExpanded(isAllExpanded ? new Set() : new Set(allIds))
+                    }
+                    title={isAllExpanded ? "Collapse all" : "Expand all"}
+                    className="flex h-7 w-7 items-center justify-center border border-transparent text-muted-foreground transition-colors hover:border-border hover:bg-secondary hover:text-foreground"
+                  >
+                    <ChevronUp
+                      size={13}
+                      className="transition-transform duration-200"
+                      style={{
+                        transform: isAllExpanded
+                          ? "rotate(0deg)"
+                          : "rotate(180deg)",
+                      }}
+                    />
+                  </button>
+                );
+              })()}
             </div>
           </div>
           <div className="flex-1 overflow-y-auto bg-card/60">
@@ -256,8 +256,7 @@ export function LeftPanel({
                       selectedPathIds={selectedPathIds}
                       expanded={expanded}
                       renaming={renaming}
-                      renameRef={renameRef}
-                      renameVal={renameVal}
+                      renameRef={renameRef as React.RefObject<HTMLInputElement>} renameVal={renameVal}
                       setRenameVal={setRenameVal}
                       commitRename={commitRename}
                       setRenaming={setRenaming}
@@ -328,10 +327,10 @@ export function LeftPanel({
                       style={
                         libCat === category
                           ? {
-                              background: "rgba(34,62,84,0.10)",
-                              color: "#223e54",
-                              borderLeft: "2px solid #223e54",
-                            }
+                            background: "rgba(34,62,84,0.10)",
+                            color: "#223e54",
+                            borderLeft: "2px solid #223e54",
+                          }
                           : {}
                       }
                     >
@@ -408,68 +407,68 @@ export function LeftPanel({
                 .filter(Boolean)
                 .join("\n");
               return (
-              <div
-                key={rowKey}
-                draggable
-                onDragStart={(event) => {
-                  setDragLibItem(item);
-                  event.dataTransfer.effectAllowed = "copy";
-                  event.dataTransfer.setData(
-                    "application/x-edgex-step",
-                    String(item.id || item.name || "step"),
-                  );
-                }}
-                onDragEnd={() => {
-                  setDragLibItem(null);
-                  setDropIdx(null);
-                }}
-                onDoubleClick={() => {
-                  if (!hasPlan) {
-                    setShowNewPlan(true);
-                    return;
-                  }
-                  handleAddStep(
-                    item,
-                    selectedStep?.type === "sequence" ? selectedId : null,
-                  );
-                }}
-                title={hoverInfo}
-                className="group cursor-grab border-b border-l-2 border-l-transparent border-border/40 px-3 py-2 transition-colors hover:border-l-primary/60 hover:bg-secondary/40"
-              >
-                <div className="flex items-center gap-2.5">
-                  <div
-                    className="flex h-5 w-5 shrink-0 items-center justify-center rounded-sm border"
-                    style={{
-                      color: TYPE_STRIPE[iconType] || "#64748b",
-                      borderColor: `${TYPE_STRIPE[iconType] || "#64748b"}66`,
-                      background: `${TYPE_STRIPE[iconType] || "#64748b"}1a`,
-                    }}
-                  >
-                    <TypeIcon type={iconType} size={12} />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex min-w-0 items-center gap-1.5">
-                      <span className="truncate text-[12px] font-semibold text-foreground transition-colors group-hover:text-primary">
-                        {item.name}
-                      </span>
-                      <ChevronRight size={12} className="ml-auto shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
+                <div
+                  key={rowKey}
+                  draggable
+                  onDragStart={(event) => {
+                    setDragLibItem(item);
+                    event.dataTransfer.effectAllowed = "copy";
+                    event.dataTransfer.setData(
+                      "application/x-edgex-step",
+                      String(item.id || item.name || "step"),
+                    );
+                  }}
+                  onDragEnd={() => {
+                    setDragLibItem(null);
+                    setDropIdx(null);
+                  }}
+                  onDoubleClick={() => {
+                    if (!hasPlan) {
+                      setShowNewPlan(true);
+                      return;
+                    }
+                    handleAddStep(
+                      item,
+                      selectedStep?.type === "sequence" ? selectedId : null,
+                    );
+                  }}
+                  title={hoverInfo}
+                  className="group cursor-grab border-b border-l-2 border-l-transparent border-border/40 px-3 py-2 transition-colors hover:border-l-primary/60 hover:bg-secondary/40"
+                >
+                  <div className="flex items-center gap-2.5">
+                    <div
+                      className="flex h-5 w-5 shrink-0 items-center justify-center rounded-sm border"
+                      style={{
+                        color: TYPE_STRIPE[iconType] || "#64748b",
+                        borderColor: `${TYPE_STRIPE[iconType] || "#64748b"}66`,
+                        background: `${TYPE_STRIPE[iconType] || "#64748b"}1a`,
+                      }}
+                    >
+                      <TypeIcon type={iconType} size={12} />
                     </div>
-                    <div className="mt-1 hidden min-w-0 items-center gap-1 text-[10px] font-mono text-muted-foreground group-hover:flex">
-                      <span className="shrink-0 uppercase tracking-wide text-muted-foreground/80">Base</span>
-                      <span className="truncate">{item.baseType || "-"}</span>
-                      <span className="shrink-0 text-muted-foreground/50">|</span>
-                      <span className="shrink-0 uppercase tracking-wide text-muted-foreground/80">Asm</span>
-                      <span className="min-w-0 truncate">{item.assembly || "-"}</span>
-                      {item.pluginId && (
-                        <span className="ml-1 shrink-0 border border-primary/30 bg-primary/10 px-1 text-[9px] font-mono text-primary">
-                          plugin
+                    <div className="min-w-0 flex-1">
+                      <div className="flex min-w-0 items-center gap-1.5">
+                        <span className="truncate text-[12px] font-semibold text-foreground transition-colors group-hover:text-primary">
+                          {item.name}
                         </span>
-                      )}
+                        <ChevronRight size={12} className="ml-auto shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
+                      </div>
+                      <div className="mt-1 hidden min-w-0 items-center gap-1 text-[10px] font-mono text-muted-foreground group-hover:flex">
+                        <span className="shrink-0 uppercase tracking-wide text-muted-foreground/80">Base</span>
+                        <span className="truncate">{item.baseType || "-"}</span>
+                        <span className="shrink-0 text-muted-foreground/50">|</span>
+                        <span className="shrink-0 uppercase tracking-wide text-muted-foreground/80">Asm</span>
+                        <span className="min-w-0 truncate">{item.assembly || "-"}</span>
+                        {item.pluginId && (
+                          <span className="ml-1 shrink-0 border border-primary/30 bg-primary/10 px-1 text-[9px] font-mono text-primary">
+                            plugin
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            );
+              );
             })}
           </div>
           <div className="px-3 h-7 border-t border-border flex items-center gap-2 shrink-0 overflow-hidden">

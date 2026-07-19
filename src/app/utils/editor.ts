@@ -181,29 +181,7 @@ export function moveStepToPosition(
   newIdx: number
 ): TestStep[] {
   let movedStep: TestStep | null = null;
-  let oldParentId: string | null = null;
-  let oldIdx = -1;
 
-  const findLocation = (
-    list: TestStep[],
-    parentId: string | null = null,
-  ): boolean => {
-    for (let i = 0; i < list.length; i++) {
-      if (list[i].id === stepId) {
-        oldParentId = parentId;
-        oldIdx = i;
-        return true;
-      }
-
-      if (list[i].children && findLocation(list[i].children!, list[i].id)) {
-        return true;
-      }
-    }
-
-    return false;
-  };
-
-  findLocation(steps);
   // Remove the step from wherever it currently lives, tracking it
   const removeStep = (list: TestStep[]): TestStep[] =>
     list
@@ -222,13 +200,6 @@ export function moveStepToPosition(
 
   const withoutMoved = removeStep(steps);
   if (!movedStep) return steps; // not found, no-op
-  if (
-    oldParentId === newParentId &&
-    oldIdx !== -1 &&
-    oldIdx < newIdx
-  ) {
-    newIdx--;
-  }
 
   // Guard: don't allow dropping a sequence into its own descendant
   const isDescendant = (parentCandidateId: string | null, node: TestStep): boolean => {
@@ -236,9 +207,33 @@ export function moveStepToPosition(
     if (node.id === parentCandidateId) return true;
     return (node.children ?? []).some(child => isDescendant(parentCandidateId, child));
   };
-  // Guard against cycles: don't allow a step into its own subtree
-  if (movedStep && isDescendant(newParentId, movedStep)) {
+  if (isDescendant(newParentId, movedStep)) {
     return steps; // would create a cycle, reject
+  }
+
+  // Find the list (in the ORIGINAL, pre-removal tree) that newParentId's
+  // children live in, so we can tell whether the moved step's old location
+  // sat before the requested drop index within that same list.
+  const getListForParent = (list: TestStep[], parentId: string | null): TestStep[] | null => {
+    if (parentId === null) return list;
+    for (const s of list) {
+      if (s.id === parentId) return s.children ?? [];
+      if (s.children) {
+        const found = getListForParent(s.children, parentId);
+        if (found) return found;
+      }
+    }
+    return null;
+  };
+
+  const containsDescendant = (node: TestStep, targetId: string): boolean =>
+    (node.children ?? []).some(child => child.id === targetId || containsDescendant(child, targetId));
+
+  const targetList = getListForParent(steps, newParentId) ?? [];
+  const containingIdx = targetList.findIndex(s => s.id === stepId || containsDescendant(s, stepId));
+
+  if (containingIdx !== -1 && containingIdx < newIdx) {
+    newIdx--;
   }
 
   const insertAt = (list: TestStep[]): TestStep[] => {

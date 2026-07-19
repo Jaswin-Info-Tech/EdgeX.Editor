@@ -31,37 +31,14 @@ export const removePlugin = async (plugin: { pluginName: string; packageName?: s
 
 export const uploadPlugin = async (file: File) => {
   const formData = new FormData();
-  formData.append("file", file); 
+  formData.append("file", file);
   const response = await axiosClient.post("/plugins/upload", formData, {
     headers: { "Content-Type": "multipart/form-data" },
   });
   return response.data;
 };
 
-export const getStepSchema = async (stepTypeName: string) => {
-  const { data } = await axiosClient.get("/testplans/steps/schema", {
-    params: {
-      stepTypeName,
-    },
-  });
 
-  return data;
-};
-
-export const composeTestPlan = async (payload: any) => {
-  const { data } = await axiosClient.post("/testplans/compose", payload); 
-  return data;
-};
-export const createTestPlan = async (payload: any) => {
-  const { data } = await axiosClient.post("/testplans/create", payload); 
-  return data;
-};
-
-
-export const runTestPlan = async (payload: any) => {
-  const { data } = await axiosClient.post("/testplans/run", payload);
-  return data;
-};
 
 export const getRunStatus = async (runId: string) => {
   const { data } = await axiosClient.get(`/runs/${runId}`);
