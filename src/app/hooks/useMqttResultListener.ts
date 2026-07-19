@@ -74,10 +74,14 @@ export const useMqttResultListener = (
 
   const [config, setConfig] = useState<MqttResourceConfig | null>(null);
   const [configLoaded, setConfigLoaded] = useState(false);
+  const [isSubscribed, setIsSubscribed] = useState(false);
   const knownGoodUrlRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (!enabled) return;
+    if (!enabled) {
+      setIsSubscribed(false);
+      return;
+    }
     let cancelled = false;
 
     (async () => {
@@ -110,6 +114,7 @@ export const useMqttResultListener = (
   }, [enabled]);
 
   useEffect(() => {
+    setIsSubscribed(false);
     if (!enabled || !configLoaded || !config || !config.isEnabled) return;
 
     let cancelled = false;
@@ -184,15 +189,18 @@ export const useMqttResultListener = (
         onStatusRef.current?.("INFO", `Connected to MQTT (${brokerUrl})`);
 
         client.subscribe(config.topic, (error) => {
+          if (cancelled || activeClient !== client) return;
           if (error) {
-            onStatusRef.current?.("ERROR", `Subscribe failed: ${error.message}`);
+            onStatusRef.current?.("WARN", `MQTT subscribe skipped: ${error.message}`);
             return;
           }
+          setIsSubscribed(true);
           onStatusRef.current?.("INFO", `Subscribed to ${config.topic}`);
         });
       });
 
       client.on("message", (topic, payload) => {
+        if (cancelled || activeClient !== client) return;
         onMessageRef.current?.(topic, parsePayload(payload));
       });
 
@@ -205,8 +213,9 @@ export const useMqttResultListener = (
           tryNext(index + 1);
           return;
         }
-        if (settled && activeClient === client) {
+        if (!cancelled && settled && activeClient === client) {
           onStatusRef.current?.("INFO", `MQTT connection closed (${brokerUrl}).`);
+          setIsSubscribed(false);
           activeClient = null;
         }
       });
@@ -216,7 +225,10 @@ export const useMqttResultListener = (
 
     return () => {
       cancelled = true;
+      setIsSubscribed(false);
       activeClient?.end(true);
     };
   }, [enabled, config, configLoaded, options?.wsPort, options?.wsPath]);
+
+  return { isSubscribed };
 };
