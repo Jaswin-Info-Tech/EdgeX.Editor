@@ -43,6 +43,7 @@ export function PropertiesPanel({
   const dispatch = useAppDispatch();
   const [schemaPropertyValues, setSchemaPropertyValues] = useState<Record<string, any>>({});
   const [schemaCollapsed, setSchemaCollapsed] = useState(false);
+  const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
   const [schemaSearch, setSchemaSearch] = useState("");
   const [schemaSavedSnapshot, setSchemaSavedSnapshot] = useState("{}");
   const resolvedTypeNames = useAppSelector((state: any) => state.properties.resolvedTypeNames);
@@ -52,6 +53,9 @@ export function PropertiesPanel({
   const getSchemaPropertyKey = (prop: any) => `${prop.name || prop.displayName} || ${prop.name}`;
   const isNameSchemaProperty = (prop: any) =>
     String(prop.name || prop.displayName || "").trim().toLowerCase() === "name";
+  const isEnabledSchemaProperty = (prop: any) =>
+    normalizeEditorType(prop.editorType) === "checkbox" &&
+    String(prop.name || prop.displayName || "").trim().toLowerCase() === "enabled";
 
   const isObjectLikeEditor = (prop: any) => {
     const type = normalizeEditorType(prop.editorType);
@@ -358,6 +362,7 @@ export function PropertiesPanel({
 
   useEffect(() => {
     setSchemaCollapsed(false);
+    setCollapsedGroups({});
     setSchemaSearch("");
   }, [selectedStep?.id]);
 
@@ -396,6 +401,9 @@ export function PropertiesPanel({
 
         const hasRealValue = value != null && String(value).trim() !== "";
         values[prop.name] = hasRealValue ? value : (selectedStep.name ?? "");
+      } else if (isEnabledSchemaProperty(prop)) {
+        // New steps are enabled by default, but an explicitly saved false is preserved.
+        values[prop.name] = value ?? true;
       } else {
         values[prop.name] =
           value ?? (prop.editorType === "checkbox" ? false : "");
@@ -543,7 +551,17 @@ export function PropertiesPanel({
       new Set(
         (selectedStep.properties || []).map((p: any) => p.group as string),
       ),
-    ).filter((group): group is string => group !== "Schema Properties");
+    )
+      .filter((group): group is string => group !== "Schema Properties")
+      .sort((a, b) => {
+        const bottomOrder = ["read only", "properties"];
+        const aIndex = bottomOrder.indexOf(a.trim().toLowerCase());
+        const bIndex = bottomOrder.indexOf(b.trim().toLowerCase());
+        if (aIndex === -1 && bIndex === -1) return 0;
+        if (aIndex === -1) return -1;
+        if (bIndex === -1) return 1;
+        return aIndex - bIndex;
+      });
     const hasDisplayedProperties = groups.length > 0;
     const hasSchemaProperties = schemaProperties.length > 0;
     const showSchemaSection = hasSchemaProperties || Boolean(schemaError);
@@ -624,14 +642,67 @@ export function PropertiesPanel({
             </div>
           )}
 
-          {groups.map((group) => (
+          {showSchemaSection && (
+            <>
+              <button
+                type="button"
+                onClick={() => setSchemaCollapsed((prev) => !prev)}
+                className="flex w-full items-center justify-between gap-2 border-b border-border bg-muted/35 px-3 py-2 text-left"
+                aria-expanded={!schemaCollapsed}
+              >
+                <div className="flex items-center gap-2">
+                  <div className="w-[3px] h-3" style={{ background: stripe }} />
+                  <span className="text-[10px] font-mono font-bold text-muted-foreground uppercase tracking-widest">
+                    Schema Properties
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-mono text-muted-foreground">
+                    {hasSchemaProperties ? `${filteredSchemaProperties.length}/${schemaProperties.length} fields` : "No fields"}
+                  </span>
+                  {schemaCollapsed ? <ChevronRight size={12} /> : <ChevronDown size={12} />}
+                </div>
+              </button>
+
+              {!schemaCollapsed && hasSchemaProperties && (
+                <div className="border-b border-border px-3 py-2 bg-muted/10">
+                  <div className="flex h-8 items-center gap-2 border border-border bg-background px-2.5 focus-within:border-primary/70 focus-within:ring-2 focus-within:ring-primary/15">
+                    <Search size={12} className="shrink-0 text-muted-foreground" />
+                    <input value={schemaSearch} onChange={(e) => setSchemaSearch(e.target.value)} placeholder="Filter schema fields..." className="min-w-0 flex-1 bg-transparent text-[12px] font-mono text-foreground placeholder:text-muted-foreground outline-none" />
+                  </div>
+                </div>
+              )}
+
+              {!schemaCollapsed && (hasSchemaProperties ? (
+                filteredSchemaProperties.length > 0 ? filteredSchemaProperties.map((prop: any) =>
+                  renderEditor(prop, schemaPropertyValues, setSchemaPropertyValues, editorContext),
+                ) : <div className="border-b border-border px-3 py-3 text-[11px] font-mono text-muted-foreground">No schema fields match your filter.</div>
+              ) : (
+                <div className="border-b border-border px-3 py-4 text-[12px] text-muted-foreground font-mono">
+                  {schemaError ? <span className="flex items-start gap-2 text-destructive"><AlertTriangle size={14} className="mt-0.5 shrink-0" /><span>{`Unable to load schema: ${schemaError}`}</span></span> : "No configurable schema properties."}
+                </div>
+              ))}
+            </>
+          )}
+
+          {groups.map((group) => {
+            const isCollapsed = collapsedGroups[group] ?? true;
+            return (
             <div key={group}>
-              <div className="flex items-center gap-2 border-b border-border bg-muted/35 px-3 py-2">
-                <div className="w-[3px] h-3" style={{ background: stripe }} />
-                <span className="text-[10px] font-mono font-bold text-muted-foreground uppercase tracking-widest">
-                  {group}
-                </span>
-              </div>
+              <button
+                type="button"
+                onClick={() => setCollapsedGroups((prev) => ({ ...prev, [group]: !isCollapsed }))}
+                className="flex w-full items-center justify-between gap-2 border-b border-border bg-muted/35 px-3 py-2 text-left"
+                aria-expanded={!isCollapsed}
+              >
+                <div className="flex items-center gap-2">
+                  <div className="w-[3px] h-3" style={{ background: stripe }} />
+                  <span className="text-[10px] font-mono font-bold text-muted-foreground uppercase tracking-widest">{group}</span>
+                </div>
+                {isCollapsed ? <ChevronRight size={12} /> : <ChevronDown size={12} />}
+              </button>
+              {!isCollapsed && (
+              <>
               {(selectedStep.properties || [])
                 .filter((p: any) => p.group === group)
                 .map((prop: any) => {
@@ -733,83 +804,10 @@ export function PropertiesPanel({
                     </div>
                   );
                 })}
+              </>
+              )}
             </div>
-          ))}
-
-          {showSchemaSection && (
-            <>
-              <div className="flex items-center justify-between gap-2 border-b border-border bg-muted/35 px-3 py-2">
-                <div className="flex items-center gap-2">
-                  <div className="w-[3px] h-3" style={{ background: stripe }} />
-                  <span className="text-[10px] font-mono font-bold text-muted-foreground uppercase tracking-widest">
-                    Schema Properties
-                  </span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-[10px] font-mono text-muted-foreground">
-                    {hasSchemaProperties
-                      ? `${filteredSchemaProperties.length}/${schemaProperties.length} fields`
-                      : "No fields"}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setSchemaCollapsed((prev) => !prev)}
-                    className="flex h-6 w-6 items-center justify-center border border-border text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
-                    title={schemaCollapsed ? "Expand schema fields" : "Collapse schema fields"}
-                  >
-                    {schemaCollapsed ? <ChevronRight size={12} /> : <ChevronDown size={12} />}
-                  </button>
-                </div>
-              </div>
-
-              {!schemaCollapsed && hasSchemaProperties && (
-                <div className="border-b border-border px-3 py-2 bg-muted/10">
-                  <div className="flex h-8 items-center gap-2 border border-border bg-background px-2.5 focus-within:border-primary/70 focus-within:ring-2 focus-within:ring-primary/15">
-                    <Search size={12} className="shrink-0 text-muted-foreground" />
-                    <input
-                      value={schemaSearch}
-                      onChange={(e) => setSchemaSearch(e.target.value)}
-                      placeholder="Filter schema fields..."
-                      className="min-w-0 flex-1 bg-transparent text-[12px] font-mono text-foreground placeholder:text-muted-foreground outline-none"
-                    />
-                  </div>
-                </div>
-              )}
-
-              {schemaCollapsed ? (
-                <div className="border-b border-border px-3 py-3 text-[11px] font-mono text-muted-foreground">
-                  Schema fields are collapsed.
-                </div>
-              ) : hasSchemaProperties ? (
-                filteredSchemaProperties.length > 0 ? (
-                  filteredSchemaProperties.map((prop: any) =>
-                    renderEditor(
-                      prop,
-                      schemaPropertyValues,
-                      setSchemaPropertyValues,
-                      editorContext,
-                    ),
-                  )
-                ) : (
-                  <div className="border-b border-border px-3 py-3 text-[11px] font-mono text-muted-foreground">
-                    No schema fields match your filter.
-                  </div>
-                )
-              ) : (
-                <div className="border-b border-border px-3 py-4 text-[12px] text-muted-foreground font-mono">
-                  {schemaError ? (
-                    <span className="flex items-start gap-2 text-destructive">
-                      <AlertTriangle size={14} className="mt-0.5 shrink-0" />
-                      <span>{`Unable to load schema: ${schemaError}`}</span>
-                    </span>
-                  ) : (
-                    "No configurable schema properties."
-                  )}
-                </div>
-              )}
-
-            </>
-          )}
+          )})}
 
           {!hasDisplayedProperties && !showSchemaSection && (
             <div className="px-3 py-5 text-center text-[12px] font-mono text-muted-foreground">
