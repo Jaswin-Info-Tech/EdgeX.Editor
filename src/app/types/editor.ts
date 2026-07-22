@@ -5,6 +5,9 @@ export interface Property {
   key: string; label: string;
   type: "string" | "number" | "boolean" | "enum" | "frequency";
   value: string | number | boolean; unit?: string; options?: string[]; group: string; isEditable?: boolean;
+  backendName?: string;
+  backendValue?: unknown;
+  loadedDisplayValue?: string | number | boolean;
 }
 
 export interface TestStep {

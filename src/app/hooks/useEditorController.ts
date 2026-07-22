@@ -224,7 +224,18 @@ export function useEditorController() {
 
   const formatStepForSave = useCallback((step: TestStep): any => {
     const props = (step.properties || []).reduce((acc: Record<string, any>, prop: any) => {
-      acc[prop.label] = prop.value;
+      const schemaKey = String(prop.key ?? "").split("||")[0].trim();
+      const propertyName = String(
+        prop.backendName ??
+        (prop.group === "Schema Properties" ? prop.label : schemaKey || prop.label) ??
+        "",
+      ).trim();
+      if (!propertyName) return acc;
+
+      const isUnchangedLoadedValue =
+        Object.prototype.hasOwnProperty.call(prop, "backendValue") &&
+        Object.is(prop.value, prop.loadedDisplayValue);
+      acc[propertyName] = isUnchangedLoadedValue ? prop.backendValue : prop.value;
       return acc;
     }, {});
 
