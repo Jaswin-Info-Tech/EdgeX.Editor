@@ -41,6 +41,65 @@
   --sidebar-ring: #1f6feb;
 }
 
+/* Toasts follow the editor palette while keeping operation results obvious. */
+[data-sonner-toast].edgex-toast {
+  --normal-bg: var(--card);
+  --normal-border: var(--border);
+  --normal-text: var(--card-foreground);
+  border: 1px solid var(--border) !important;
+  border-radius: 10px !important;
+  background: var(--card) !important;
+  color: var(--card-foreground) !important;
+  width: max-content !important;
+  min-width: 260px;
+  max-width: calc(100vw - 32px) !important;
+  font-family: ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji" !important;
+  box-shadow: 0 12px 28px rgb(0 0 0 / 18%);
+}
+
+[data-sonner-toast].edgex-toast [data-content],
+[data-sonner-toast].edgex-toast [data-title],
+[data-sonner-toast].edgex-toast [data-description] {
+  max-width: calc(100vw - 96px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+[data-sonner-toast].edgex-toast [data-description] {
+  color: var(--muted-foreground) !important;
+}
+
+[data-sonner-toast].edgex-toast[data-type="success"] {
+  border-color: #16a34a !important;
+  background: color-mix(in srgb, #16a34a 14%, var(--card)) !important;
+  color: #15803d !important;
+}
+
+[data-sonner-toast].edgex-toast[data-type="error"] {
+  border-color: #dc2626 !important;
+  background: color-mix(in srgb, #dc2626 14%, var(--card)) !important;
+  color: #dc2626 !important;
+}
+
+[data-sonner-toast].edgex-toast[data-type="loading"] {
+  border-color: color-mix(in srgb, var(--primary) 55%, var(--border)) !important;
+}
+
+[data-sonner-toast].edgex-toast [data-close-button] {
+  border-color: var(--border) !important;
+  background: var(--card) !important;
+  color: var(--card-foreground) !important;
+}
+
+.dark [data-sonner-toast].edgex-toast[data-type="success"] {
+  color: #4ade80 !important;
+}
+
+.dark [data-sonner-toast].edgex-toast[data-type="error"] {
+  color: #f87171 !important;
+}
+
 .dark {
   --background: #0d1117;
   --foreground: #c9d1d9;

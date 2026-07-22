@@ -560,7 +560,7 @@ export function PluginManager({
                 </div>
               </div>
 
-              {isInstalledLoading ? (
+              {isInstalledLoading && installedPlugins.length === 0 ? (
                 <div className="py-12 text-center text-[12px] font-mono text-muted-foreground">Loading installed plugins...</div>
               ) : installed.length === 0 ? (
                 <div className="py-12 text-center text-[12px] font-mono text-muted-foreground">
@@ -587,12 +587,12 @@ export function PluginManager({
                           </div>
                         </div>
 
-                        <div className="mt-0.5 flex min-w-[170px] shrink-0 items-center justify-end gap-3">
-                          <span className="shrink-0 text-[11px] font-mono text-emerald-500">installed</span>
+                        <div className="mt-0.5 flex w-[184px] shrink-0 items-center justify-end gap-3">
+                          <span className="w-[64px] shrink-0 text-right text-[11px] font-mono text-emerald-500">installed</span>
                           <button
                             onClick={() => handleUninstall(p.id)}
                             disabled={uninstallingId === p.id}
-                            className="h-8 shrink-0 border border-border px-3 text-[11px] font-mono text-muted-foreground transition-colors hover:border-red-500/30 hover:text-red-500 disabled:cursor-not-allowed disabled:opacity-50"
+                            className="h-8 w-[92px] shrink-0 border border-border px-2 text-center text-[11px] font-mono text-muted-foreground transition-colors hover:border-red-500/30 hover:text-red-500 disabled:cursor-not-allowed disabled:opacity-50"
                           >
                             {uninstallingId === p.id ? "Removing..." : "Remove"}
                           </button>
@@ -676,14 +676,14 @@ export function PluginManager({
                             <span className="shrink-0 border border-border px-2 py-0.5 text-[11px] font-mono text-muted-foreground">v{p.version}</span>
                           </div>
                           <div className="mb-1 text-[12px] text-muted-foreground">{p.description || "No description"}</div>
-                          <div className="text-[11px] font-mono text-muted-foreground/70">by {p.author || "unknown"} · {p.steps?.length ?? 0} steps</div>
-                          {(p.steps ?? []).length > 0 && (
+                          {/* <div className="text-[11px] font-mono text-muted-foreground/70">by {p.author || "unknown"} · {p.steps?.length ?? 0} steps</div> */}
+                          {/* {(p.steps ?? []).length > 0 && (
                             <div className="mt-2 flex flex-wrap gap-1.5">
                               {(p.steps ?? []).slice(0, 6).map(s => (
                                 <span key={s.id} className="border border-border px-2 py-0.5 text-[11px] font-mono text-muted-foreground">{s.name}</span>
                               ))}
                             </div>
-                          )}
+                          )} */}
                         </div>
 
                         <div className="flex shrink-0 items-center gap-2">

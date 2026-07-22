@@ -1611,34 +1611,36 @@ export function useEditorController() {
 
   const handleUninstallPlugin = async (id: string) => {
     const plugin = installedPlugins.find(item => item.id === id);
+    if (!plugin) {
+      toast.error("Unable to find the selected plugin.");
+      return;
+    }
     const pluginName = plugin?.name ?? "Plugin";
     const uninstallName = plugin?.uninstallName ?? pluginName;
     const toastId = toast.loading(`Removing ${pluginName}...`);
     console.log("Uninstalling:", { id, pluginName, uninstallName, plugin });
     try {
+      setInstalledPlugins(prev => prev.map(item =>
+        item.id === id ? { ...item, state: "uninstalling" } : item
+      ));
       const result = await removePlugin({
         pluginName: uninstallName,
         packageName: plugin?.packageName,
         assembly: plugin?.assembly,
       });
       console.log("Uninstall API response:", result);
-      setInstalledPlugins(prev => prev.filter(item =>
-        item.id !== id &&
-        item.uninstallName !== uninstallName &&
-        item.packageName !== plugin?.packageName &&
-        item.pluginName !== plugin?.pluginName &&
-        item.assembly !== plugin?.assembly
-      ));
+      setInstalledPlugins(prev => prev.filter(item => {
+        const belongsToRemovedAssembly = Boolean(plugin.assembly) && item.assembly === plugin.assembly;
+        return item.id !== id && !belongsToRemovedAssembly;
+      }));
       addLog("INFO", "Plugins", `Removed: ${pluginName}`);
       toast.success(`${pluginName} removed successfully`, { id: toastId });
 
       refreshPluginData();
-      setTimeout(refreshPluginData, 1500);
-
-      setTimeout(() => {
-        window.location.reload();
-      }, 1500);
     } catch (err) {
+      setInstalledPlugins(prev => prev.map(item =>
+        item.id === id ? { ...item, state: "installed" } : item
+      ));
       console.error("Uninstall API error:", err);
       setShowConsole(true);
       addLog("ERROR", "Plugins", `Unable to uninstall: ${pluginName}`);

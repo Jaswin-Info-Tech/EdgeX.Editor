@@ -623,11 +623,11 @@ export function PropertiesPanel({
                     {stepInstrumentFamily} instrument required
                   </span>
                 )}
-                {selectedStep.description && (
+                {/* {selectedStep.description && (
                   <span className="text-[11px] text-muted-foreground">
                     · {selectedStep.description}
                   </span>
-                )}
+                )} */}
               </div>
             </div>
           </div>
