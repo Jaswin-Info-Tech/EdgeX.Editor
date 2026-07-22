@@ -821,7 +821,7 @@ export function EditorShell(props: EditorShellProps) {
     setHasSearchedTestPlans(true);
     setTestPlanSearchNonce((value) => value + 1);
   };
-  
+
   const handleImportRemoteTapPlan = async (payload: {
     sourceType: "ftp" | "sftp" | "rest";
     sourceUrl: string;
@@ -905,9 +905,15 @@ export function EditorShell(props: EditorShellProps) {
       typeof rawValue === "boolean" ||
       String(property.type ?? "").includes("Boolean");
     const isNumber = typeof rawValue === "number" && !hasEnum;
+    const isVerdict = String(property.type ?? "").toLowerCase() === "opentap.verdict";
+    const enumIndex = hasEnum && typeof rawValue === "number"
+      ? (isVerdict ? rawValue / 10 : rawValue)
+      : -1;
     const value =
       hasEnum && typeof rawValue === "number"
-        ? (enumValues[rawValue] ?? String(rawValue))
+        ? (Number.isInteger(enumIndex) && enumValues[enumIndex] !== undefined
+          ? enumValues[enumIndex]
+          : String(rawValue))
         : rawValue == null
           ? ""
           : Array.isArray(rawValue) || typeof rawValue === "object"
@@ -917,17 +923,14 @@ export function EditorShell(props: EditorShellProps) {
     return {
       key: String(property.name ?? property.displayName ?? ""),
       label: String(property.displayName ?? property.name ?? ""),
-      type: hasEnum
-        ? "enum"
-        : isBoolean
-          ? "boolean"
-          : isNumber
-            ? "number"
-            : "string",
+      type: hasEnum ? "enum" : isBoolean ? "boolean" : isNumber ? "number" : "string",
       value: value as Property["value"],
       options: hasEnum ? enumValues : undefined,
       isEditable: property.isEditable !== false,
       group: property.isEditable === false ? "Read Only" : "Properties",
+      backendName: String(property.name ?? property.displayName ?? ""),
+      backendValue: rawValue,
+      loadedDisplayValue: value as Property["value"],
     };
   };
 

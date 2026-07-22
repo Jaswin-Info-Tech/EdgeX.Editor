@@ -150,6 +150,27 @@ export function PropertiesPanel({
     return value == null ? "" : String(value);
   };
 
+  const getInstrumentSelectorValue = (value: any): string => {
+    if (value && typeof value === "object") {
+      return String(value.Name ?? value.name ?? "").trim();
+    }
+
+    const reference = String(value ?? "").trim();
+    if (!reference) return "";
+
+    const matchedResource = (resources ?? []).find((resource: any) => {
+      const name = String(resource?.name ?? "").trim();
+      const visaAddress = getResourceVisaAddress(resource).trim();
+      return reference === name ||
+        (Boolean(name && visaAddress) && reference === `${name} (${visaAddress})`);
+    });
+
+    if (matchedResource?.name) return String(matchedResource.name);
+
+    const formattedReference = reference.match(/^(.+?)\s+\((.+)\)$/);
+    return formattedReference?.[1]?.trim() || reference;
+  };
+
   const stepTypeName = useMemo(() => {
     if (!selectedStep) return null;
     const locked = resolvedTypeNames[selectedStep.id];
@@ -375,9 +396,15 @@ export function PropertiesPanel({
     schemaProperties.forEach((prop: any) => {
       const key = getSchemaPropertyKey(prop);
       const existing = selectedStep.properties?.find(
-        (item: any) => item.key === key,
+        (item: any) =>
+          item.key === key ||
+          item.backendName === prop.name ||
+          item.key === prop.name,
       );
-      const value = existing?.value;
+      const displayValue = existing?.value;
+      const backendValue = Object.prototype.hasOwnProperty.call(existing ?? {}, "backendValue")
+        ? existing.backendValue
+        : displayValue;
 
       const isEnabledWrapper =
         prop.propertyType?.includes("OpenTap.Enabled") ||
@@ -385,33 +412,29 @@ export function PropertiesPanel({
 
       const isNameProp = isNameSchemaProperty(prop);
 
-      if (isEnabledWrapper && value && typeof value === "object") {
-        values[prop.name] = value.Value ?? "";
-      } else if (
-        prop.editorType === "instrument-selector" &&
-        value &&
-        typeof value === "object"
-      ) {
-        values[prop.name] = value.Name ?? "";
+      if (isEnabledWrapper && backendValue && typeof backendValue === "object") {
+        values[prop.name] = backendValue.Value ?? "";
+      } else if (prop.editorType === "instrument-selector") {
+        values[prop.name] = getInstrumentSelectorValue(backendValue);
       } else if (prop.name === "CommandType") {
-        values[prop.name] = Array.isArray(value) ? value : [];
+        values[prop.name] = Array.isArray(backendValue) ? backendValue : [];
       } else if (isObjectLikeEditor(prop)) {
-        values[prop.name] = value ?? null;
+        values[prop.name] = backendValue ?? null;
       } else if (isNameProp) {
 
-        const hasRealValue = value != null && String(value).trim() !== "";
-        values[prop.name] = hasRealValue ? value : (selectedStep.name ?? "");
+        const hasRealValue = displayValue != null && String(displayValue).trim() !== "";
+        values[prop.name] = hasRealValue ? displayValue : (selectedStep.name ?? "");
       } else if (isEnabledSchemaProperty(prop)) {
         // New steps are enabled by default, but an explicitly saved false is preserved.
-        values[prop.name] = value ?? true;
+        values[prop.name] = displayValue ?? true;
       } else {
         values[prop.name] =
-          value ?? (prop.editorType === "checkbox" ? false : "");
+          displayValue ?? (prop.editorType === "checkbox" ? false : "");
       }
     });
     setSchemaPropertyValues(values);
     setSchemaSavedSnapshot(makeSchemaSnapshot(values, schemaProperties));
-  }, [selectedStep, schemaProperties]);
+  }, [selectedStep, schemaProperties, resources]);
 
   const hasUnsavedSchemaChanges = useMemo(() => {
     if (!schemaProperties.length) return false;
@@ -515,11 +538,21 @@ export function PropertiesPanel({
             type: prop.editorType === "checkbox" ? "boolean" : prop.editorType === "number" ? "number" : "string",
             value: typedValue,
             group: "Schema Properties",
+            backendName: String(prop.name || prop.displayName || ""),
           };
         })
         .filter((p: any) => p.value !== undefined);
 
-      const keepProps = existingProps.filter((item: any) => item.group !== "Schema Properties");
+      const savedPropertyNames = new Set(
+        newProps.map((item: any) => String(item.backendName || item.label || "").trim()),
+      );
+      const keepProps = existingProps.filter((item: any) => {
+        if (item.group === "Schema Properties") return false;
+        const itemName = String(
+          item.backendName || String(item.key || "").split("||")[0] || item.label || "",
+        ).trim();
+        return !savedPropertyNames.has(itemName);
+      });
 
       return {
         ...step,
