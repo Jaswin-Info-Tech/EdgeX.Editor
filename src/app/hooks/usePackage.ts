@@ -1,4 +1,3 @@
-// hooks/usePackages.js
 import { useQuery } from "@tanstack/react-query";
 import { getAvailablePackages, getInstalledPackages } from "../api/package";
 

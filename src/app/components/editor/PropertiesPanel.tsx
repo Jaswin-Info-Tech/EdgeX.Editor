@@ -4,7 +4,7 @@ import { useAppDispatch, useAppSelector } from "../../store/hooks";
 import { TYPE_STRIPE } from "../../constants/editor";
 import { flatAll, formatFreq, updateIn } from "../../utils/editor";
 import { StatusPill, Toggle, TypeIcon } from "./atoms";
-import { fetchStepSchema, lockResolvedTypeName } from "../../store/slices/propertiesSlice"; // 👈 update path to match your file
+import { fetchStepSchema, lockResolvedTypeName } from "../../store/slices/propertiesSlice";
 import {
   EditorContext,
   getSchemaRecords,
@@ -61,8 +61,6 @@ export function PropertiesPanel({
     const type = normalizeEditorType(prop.editorType);
     return type === "object" || type === "json";
   };
-  // console.log(plan);
-  // console.log(selectedStep);
   // helper: is this resource a DUT or connection? (exclude from instrument dropdown)
   const isConnectionOrDut = (type: string = "") =>
     /connection/i.test(type) || /dut/i.test(type);
@@ -633,11 +631,6 @@ export function PropertiesPanel({
                     · {selectedStep.description}
                   </span>
                 )}
-                {/* {selectedStep.description && (
-                  <span className="text-[11px] text-muted-foreground">
-                    · {selectedStep.description}
-                  </span>
-                )} */}
               </div>
             </div>
           </div>

@@ -1,4 +1,3 @@
-// hooks/usePackageUpload.js
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { postUploadPackages } from "../api/PackageUpload";
 

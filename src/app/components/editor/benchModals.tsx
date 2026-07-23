@@ -27,8 +27,8 @@ import {
   updateResource,
   type Resource,
   type ResourceSchemaProperty,
-} from "../../api/resources"; // adjust path
-import { renderEditor, type EditorContext } from "./PropertyEditors"; // adjust path
+} from "../../api/resources";
+import { renderEditor, type EditorContext } from "./PropertyEditors";
 
 const labelCls =
   "block text-[10px] font-mono font-semibold text-muted-foreground uppercase tracking-wider mb-1.5";

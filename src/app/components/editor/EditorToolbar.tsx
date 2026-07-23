@@ -91,7 +91,6 @@ export function EditorToolbar({
       <div className="ml-auto flex items-center gap-3 font-mono text-[12px] text-muted-foreground shrink-0">
         {hasPlan && (
           <>
-            {/* <span className="hidden md:block">{stats.total} steps</span> */}
             {stats.passed > 0 && <span className="text-emerald-500 font-semibold">{stats.passed} PASS</span>}
             {stats.failed > 0 && <span className="text-red-500 font-semibold">{stats.failed} FAIL</span>}
             {runState === "running" && <span className="text-yellow-500 font-semibold animate-pulse">RUNNING</span>}

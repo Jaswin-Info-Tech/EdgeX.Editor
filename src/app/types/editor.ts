@@ -24,7 +24,6 @@ export interface TestStep {
   typeName?: string;
   fullName?: string;
   className?: string;
-  // ✅ Add these
   assembly?: string;
   baseType?: string;
 }
