@@ -256,8 +256,8 @@ export function LeftPanel({
 
       {leftTab === "library" && (
         <>
-          <div className="flex items-center gap-2 px-2 py-2 border-b border-border shrink-0">
-            <div className="flex items-center gap-2 border border-border px-2.5 py-1.5 bg-background flex-1">
+          <div className="flex min-w-0 items-center gap-2 px-2 py-2 border-b border-border shrink-0">
+            <div className="flex min-w-0 flex-1 items-center gap-2 border border-border px-2.5 py-1.5 bg-background">
               <Search size={11} className="text-muted-foreground shrink-0" />
               <input
                 value={libSearch}
@@ -265,7 +265,7 @@ export function LeftPanel({
                   setLibSearch(e.target.value)
                 }
                 placeholder="Search step library..."
-                className="flex-1 bg-transparent text-[12px] font-mono text-foreground placeholder:text-muted-foreground outline-none"
+                className="min-w-0 flex-1 bg-transparent text-[12px] font-mono text-foreground placeholder:text-muted-foreground outline-none"
               />
               {libSearch && (
                 <button

@@ -124,4 +124,21 @@ describe("InstrumentsPanel", () => {
             screen.getByText("Signal Generator Resources")
         ).toBeInTheDocument();
     });
+
+    it("removes later breadcrumbs when navigating to a previous step", async () => {
+        const user = userEvent.setup();
+
+        render(<InstrumentsPanel {...defaultProps} />);
+
+        await user.click(screen.getByText("Signal Generator"));
+        expect(
+            screen.getByRole("button", { name: "Signal Generator Resources" })
+        ).toBeInTheDocument();
+
+        await user.click(screen.getByRole("button", { name: "Instrument Types" }));
+
+        expect(
+            screen.queryByRole("button", { name: "Signal Generator Resources" })
+        ).not.toBeInTheDocument();
+    });
 });

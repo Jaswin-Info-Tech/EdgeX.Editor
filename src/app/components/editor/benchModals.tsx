@@ -679,7 +679,7 @@ function GenericResourcePanel({
                 >
                   {config.itemLabelCapitalized} Types
                 </button>
-                {selectedItem && (
+                {selectedItem && activeBlade !== "types" && (
                   <>
                     <span className="text-muted-foreground">/</span>
                     <button

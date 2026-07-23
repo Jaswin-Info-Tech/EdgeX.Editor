@@ -96,8 +96,8 @@ export function NewPlanModal({ onClose, onCreate }: { onClose: () => void; onCre
   const canCreate = meta.name.trim().length > 0;
 
   return (
-    <div className="fixed inset-0 bg-black/75 flex items-center justify-center z-50">
-      <div className="bg-card border border-border w-[620px] max-w-[94vw] flex flex-col shadow-2xl">
+    <div className="fixed inset-0 bg-black/75 flex items-center justify-center z-50" onClick={onClose}>
+      <div className="bg-card border border-border w-[620px] max-w-[94vw] flex flex-col shadow-2xl" onClick={(event) => event.stopPropagation()}>
         <div className="flex items-center justify-between px-5 py-3 border-b border-border bg-muted/30">
           <div className="flex items-center gap-3 min-w-0">
             <div className="flex h-8 w-8 items-center justify-center border border-primary/30 bg-primary/10 text-primary shrink-0">
@@ -558,7 +558,7 @@ export function PluginManager({
                 </div>
               </div>
 
-              {isInstalledLoading && installedPlugins.length === 0 ? (
+              {isInstalledLoading ? (
                 <div className="py-12 text-center text-[12px] font-mono text-muted-foreground">Loading installed plugins...</div>
               ) : installed.length === 0 ? (
                 <div className="py-12 text-center text-[12px] font-mono text-muted-foreground">
