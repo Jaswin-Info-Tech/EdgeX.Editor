@@ -33,7 +33,71 @@ import {
 import { composeTestPlan,getStepSchema,runTestPlan } from "../api/testplans";
 
 const PLAN_SNAPSHOT_STORAGE_KEY = "edgex.editor.planSnapshot.v1";
+const THEME_STORAGE_KEY = "edgex.editor.theme";
 const DEFAULT_TEST_PLAN_ROOT = "D:\\plans";
+
+type StepRunUpdate = {
+  ids: string[];
+  names: string[];
+  paths: string[];
+  status: StepStatus;
+};
+
+const getStepRunStatus = (record: Record<string, any>): StepStatus | null => {
+  const verdict = record.verdict ?? record.Verdict ?? record.stepVerdict ?? record.StepVerdict ?? record.result;
+  const verdictText = String(verdict ?? "").trim().toLowerCase();
+  const statusText = [record.status, record.state, record.eventType, record.type, record.phase, record.level, record.severity, record.message]
+    .map((value) => String(value ?? "").trim().toLowerCase())
+    .filter(Boolean)
+    .join(" ");
+
+  if (verdictText === "10" || verdictText === "pass" || verdictText === "passed") return "passed";
+  if (verdictText === "30" || verdictText === "fail" || verdictText === "failed") return "failed";
+  if (verdictText === "40" || verdictText === "aborted" || verdictText === "abort") return "error";
+  if (verdictText === "50" || verdictText === "error") return "error";
+  if (statusText.includes("skip")) return "skipped";
+  if (statusText.includes("error") || statusText.includes("abort")) return "error";
+  if (statusText.includes("fail")) return "failed";
+  if (statusText.includes("pass") || statusText.includes("complete") || statusText.includes("finish")) return "passed";
+  if (statusText.includes("start") || statusText.includes("running") || statusText.includes("execut")) return "running";
+  return null;
+};
+
+const collectStepRunUpdates = (payload: unknown): StepRunUpdate[] => {
+  const updates: StepRunUpdate[] = [];
+  const visited = new Set<object>();
+
+  const visit = (value: unknown) => {
+    if (Array.isArray(value)) {
+      value.forEach(visit);
+      return;
+    }
+    if (!value || typeof value !== "object" || visited.has(value as object)) return;
+    visited.add(value as object);
+
+    const record = value as Record<string, any>;
+    const status = getStepRunStatus(record);
+    const ids = [record.stepId, record.StepId, record.testStepId, record.TestStepId, record.testStepRunId]
+      .map((item) => String(item ?? "").trim())
+      .filter(Boolean);
+    const names = [record.stepName, record.StepName, record.testStepName, record.TestStepName, record.name, record.Name, record.source]
+      .map((item) => String(item ?? "").trim())
+      .filter(Boolean);
+    const paths = [record.stepPath, record.StepPath, record.testStepPath, record.path, record.Path]
+      .map((item) => String(item ?? "").trim())
+      .filter(Boolean);
+
+    if (status && (ids.length > 0 || names.length > 0 || paths.length > 0)) {
+      updates.push({ ids, names, paths, status });
+    }
+
+    [record.steps, record.stepResults, record.testSteps, record.results, record.entries, record.items, record.data]
+      .forEach(visit);
+  };
+
+  visit(payload);
+  return updates;
+};
 
 type PersistedPlanSnapshot = {
   hasPlan: boolean;
@@ -97,7 +161,10 @@ export function useEditorController() {
   const [contextMenu, setContextMenu] = useState<CtxMenu | null>(null);
   const [addStepParentId, setAddStepParentId] = useState<string | null>(null);
   const [addStepIdx, setAddStepIdx] = useState<number | undefined>(undefined);
-  const [isDark, setIsDark] = useState(false);
+  const [isDark, setIsDark] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return window.localStorage.getItem(THEME_STORAGE_KEY) === "dark";
+  });
   const [isSaved, setIsSaved] = useState(false);
   const [savedPlanSignature, setSavedPlanSignature] = useState<string | null>(null);
   const [outputPath, setOutputPath] = useState<string | null>(null);
@@ -109,7 +176,7 @@ export function useEditorController() {
   const [leftOpen, setLeftOpen] = useState(true);
   const [rightOpen, setRightOpen] = useState(true);
 
-  const [leftW, setLeftW] = useState(isDesktop ? 232 : 200);
+  const [leftW, setLeftW] = useState(isDesktop ? 265 : 200);
   const [rightW, setRightW] = useState(isDesktop ? 280 : 248);
   const [consoleH, setConsoleH] = useState(176);
 
@@ -267,7 +334,10 @@ export function useEditorController() {
     [buildSaveSignature, outputPath, plan, planMeta],
   );
 
-  useEffect(() => { document.documentElement.classList.toggle("dark", isDark); }, [isDark]);
+  useEffect(() => {
+    document.documentElement.classList.toggle("dark", isDark);
+    window.localStorage.setItem(THEME_STORAGE_KEY, isDark ? "dark" : "light");
+  }, [isDark]);
   useEffect(() => { logEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [logs]);
   useEffect(() => { renameRef.current?.focus(); }, [renaming]);
   useEffect(() => {
@@ -455,6 +525,44 @@ export function useEditorController() {
     setLogs(prev => [...prev, { id: logId.current++, timestamp: nowTs(), level, source, message }]);
   }, []);
 
+  const applyStepRunUpdates = useCallback((payload: unknown) => {
+    const updates = collectStepRunUpdates(payload);
+    if (updates.length === 0) return;
+
+    const normalize = (value: unknown) => String(value ?? "").trim().toLowerCase();
+    setPlan((currentPlan) => {
+      let changed = false;
+
+      const applyToStep = (step: TestStep): TestStep => {
+        let nextStatus = step.status;
+        for (const update of updates) {
+          const idMatch = update.ids.length > 0 && update.ids.some((id) => normalize(id) === normalize(step.id));
+          const pathMatch = update.ids.length === 0 && update.paths.length > 0 && update.paths.some(
+            (path) => normalize(path) === normalize(step.description),
+          );
+          const stepNames = [step.name, step.stepTypeName, step.typeName, step.fullName, step.className]
+            .map(normalize)
+            .filter(Boolean);
+          const nameMatch = update.ids.length === 0 && update.paths.length === 0 && update.names.some(
+            (name) => stepNames.includes(normalize(name)),
+          );
+
+          if (idMatch || pathMatch || nameMatch) nextStatus = update.status;
+        }
+
+        const children = step.children?.map(applyToStep);
+        if (nextStatus !== step.status || children?.some((child, index) => child !== step.children?.[index])) {
+          changed = true;
+          return { ...step, status: nextStatus, children };
+        }
+        return step;
+      };
+
+      const nextPlan = currentPlan.map(applyToStep);
+      return changed ? nextPlan : currentPlan;
+    });
+  }, []);
+
   const formatMqttResultMessage = (data: any): string[] => {
     if (!data || typeof data !== "object" || data.type !== "result-table") {
       return [typeof data === "string" ? data : JSON.stringify(data)];
@@ -489,6 +597,7 @@ export function useEditorController() {
 
   const mqttListener = useMqttResultListener(
     (topic, data) => {
+      applyStepRunUpdates(data);
       const lines = formatMqttResultMessage(data);
       if (bufferMqttResultsRef.current) {
         bufferedMqttResultLinesRef.current.push(...lines);
@@ -811,6 +920,7 @@ export function useEditorController() {
 
       entries.forEach((entry: any) => {
         const rec = asRecord(entry);
+        applyStepRunUpdates(rec ?? entry);
         const message = rec
           ? stringify(rec.message ?? rec.text ?? rec.line ?? rec.log)
           : stringify(entry);
@@ -975,7 +1085,7 @@ export function useEditorController() {
         clearInterval(pollIntervalId);
       }
     };
-  }, [activeRunId, addLog, runState]);
+  }, [activeRunId, addLog, applyStepRunUpdates, runState]);
 
   useEffect(() => {
     if ((runState === "completed" || runState === "idle") && activeRunId) {
@@ -1048,6 +1158,7 @@ export function useEditorController() {
         if (cancelled) return;
 
         const payload = asRecord(response) ?? {};
+        applyStepRunUpdates(payload);
         const phase = getPhase(payload);
         const previous = lastPolledRunPhaseRef.current;
         if (phase !== previous) {
@@ -1095,7 +1206,7 @@ export function useEditorController() {
       cancelled = true;
       clearInterval(intervalId);
     };
-  }, [activeRunId, addLog, runState]);
+  }, [activeRunId, addLog, applyStepRunUpdates, runState]);
 
   const { data } = usePlugins();
 
@@ -1343,6 +1454,7 @@ export function useEditorController() {
         }
       };
       const payload = asRecord(runResponse);
+      applyStepRunUpdates(payload);
       const parameters = Array.isArray(payload?.parameters) ? payload.parameters : [];
       const findParam = (name: string) => {
         const match = parameters.find(
@@ -1611,34 +1723,36 @@ export function useEditorController() {
 
   const handleUninstallPlugin = async (id: string) => {
     const plugin = installedPlugins.find(item => item.id === id);
+    if (!plugin) {
+      toast.error("Unable to find the selected plugin.");
+      return;
+    }
     const pluginName = plugin?.name ?? "Plugin";
     const uninstallName = plugin?.uninstallName ?? pluginName;
     const toastId = toast.loading(`Removing ${pluginName}...`);
     console.log("Uninstalling:", { id, pluginName, uninstallName, plugin });
     try {
+      setInstalledPlugins(prev => prev.map(item =>
+        item.id === id ? { ...item, state: "uninstalling" } : item
+      ));
       const result = await removePlugin({
         pluginName: uninstallName,
         packageName: plugin?.packageName,
         assembly: plugin?.assembly,
       });
       console.log("Uninstall API response:", result);
-      setInstalledPlugins(prev => prev.filter(item =>
-        item.id !== id &&
-        item.uninstallName !== uninstallName &&
-        item.packageName !== plugin?.packageName &&
-        item.pluginName !== plugin?.pluginName &&
-        item.assembly !== plugin?.assembly
-      ));
+      setInstalledPlugins(prev => prev.filter(item => {
+        const belongsToRemovedAssembly = Boolean(plugin.assembly) && item.assembly === plugin.assembly;
+        return item.id !== id && !belongsToRemovedAssembly;
+      }));
       addLog("INFO", "Plugins", `Removed: ${pluginName}`);
       toast.success(`${pluginName} removed successfully`, { id: toastId });
 
       refreshPluginData();
-      setTimeout(refreshPluginData, 1500);
-
-      setTimeout(() => {
-        window.location.reload();
-      }, 1500);
     } catch (err) {
+      setInstalledPlugins(prev => prev.map(item =>
+        item.id === id ? { ...item, state: "installed" } : item
+      ));
       console.error("Uninstall API error:", err);
       setShowConsole(true);
       addLog("ERROR", "Plugins", `Unable to uninstall: ${pluginName}`);

@@ -1,4 +1,4 @@
-import { ActivitySquare, FilePlus, FolderOpen, FolderPlus, Package, Pause, Play, RotateCcw, Save, Square } from "lucide-react";
+import { ActivitySquare, FilePlus, FolderPlus, Package, Pause, Play, RotateCcw, Save, Square } from "lucide-react";
 import { ToolBtn } from "./atoms";
 
 interface EditorToolbarProps {
@@ -52,7 +52,6 @@ export function EditorToolbar({
     <div className="flex items-center bg-card border-b border-border h-10 px-2 shrink-0 gap-1">
       <div className="flex items-center gap-0.5">
         <ToolBtn onClick={() => setShowNewPlan(true)} title="New Test Plan (Ctrl+N)"><FilePlus size={14} />{!isTablet && "New"}</ToolBtn>
-       {/* <ToolBtn onClick={() => { }} disabled title="Open (Ctrl+O)"><FolderOpen size={14} />{!isTablet && "Open"}</ToolBtn> */}
         <ToolBtn onClick={handleSave} title="Save (Ctrl+S)"><Save size={14} />{!isTablet && "Save"}</ToolBtn>
       </div>
 

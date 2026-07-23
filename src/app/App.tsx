@@ -10,7 +10,11 @@ export default function App() {
   return (
     <>
       <EditorShell {...editor} />
-      <Toaster position="top-right" richColors closeButton />
+      <Toaster
+        position="top-right"
+        closeButton
+        toastOptions={{ className: "edgex-toast" }}
+      />
     </>
   );
 }

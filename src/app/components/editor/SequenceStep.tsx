@@ -186,13 +186,16 @@ export function SequenceStep(props: SequenceStepProps) {
               onLibraryDropOnStep(e, step.id, e.clientY, rowRef.current);
             }
           }}
-          className={`relative flex items-stretch border-b border-border cursor-pointer group transition-colors
+          data-step-status={step.status}
+          className={`relative flex items-stretch border-b border-border cursor-pointer group transition-colors duration-300
             ${isSel ? "bg-primary/8" : "hover:bg-secondary/60"}
             ${isReorderDropInto ? "bg-primary/15 ring-1 ring-inset ring-primary" : ""}
             ${isBeingDragged ? "opacity-30" : ""}
-            ${step.status === "running" ? "bg-yellow-500/5" : ""}
-            ${step.status === "passed" ? "bg-emerald-500/5" : ""}
-            ${step.status === "failed" ? "bg-red-500/5" : ""}
+            ${step.status === "running" ? "bg-yellow-500/15" : ""}
+            ${step.status === "passed" ? "bg-emerald-500/15" : ""}
+            ${step.status === "failed" ? "bg-red-500/15" : ""}
+            ${step.status === "error" ? "bg-red-600/15" : ""}
+            ${step.status === "skipped" ? "bg-muted/60" : ""}
             ${!step.enabled ? "opacity-40" : ""}`}
         >
           {isReorderDropBefore && (
@@ -213,16 +216,20 @@ export function SequenceStep(props: SequenceStepProps) {
             </div>
           )}
           <div
-            className="w-[3px] shrink-0 transition-colors"
+            className={`w-[3px] shrink-0 transition-colors duration-300 ${step.status === "running" ? "animate-pulse" : ""}`}
             style={{
               background:
-                isSel || step.status === "running"
-                  ? stripe
+                step.status === "running"
+                  ? "#eab308"
                   : step.status === "passed"
                     ? "#10b981"
                     : step.status === "failed"
                       ? "#ef4444"
-                      : stripe + "60",
+                      : step.status === "error"
+                        ? "#dc2626"
+                        : isSel
+                          ? stripe
+                          : stripe + "60",
             }}
           />
 
@@ -301,8 +308,9 @@ export function SequenceStep(props: SequenceStepProps) {
 
             {/* Type label */}
             <span
-              className="text-[10px] font-mono border px-1.5 py-0 shrink-0"
+              className="max-w-[96px] shrink truncate border px-1.5 py-0 text-[10px] font-mono"
               style={{ color: stripe, borderColor: stripe + "50" }}
+              title={TYPE_LABEL[step.type] || "Unknown type"}
             >
               {TYPE_LABEL[step.type] || "—"}
             </span>

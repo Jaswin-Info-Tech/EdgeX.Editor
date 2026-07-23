@@ -87,15 +87,9 @@ export function TestPlansPanel({
   const [isSubmittingTransfer, setIsSubmittingTransfer] = useState(false);
   const [transferError, setTransferError] = useState("");
   const [transferSuccess, setTransferSuccess] = useState("");
-  const [transferDensity, setTransferDensity] = useState<"comfortable" | "compact">("comfortable");
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<FieldErrorKey, string>>>({});
 
   const activeModeMeta = SOURCE_MODE_META[sourceMode];
-  const isCompact = transferDensity === "compact";
-  const fieldHeightClass = isCompact ? "h-7" : "h-8";
-  const fieldTextClass = isCompact ? "text-[11px]" : "text-[12px]";
-  const formGapClass = isCompact ? "space-y-2" : "space-y-3";
-  const helpTextClass = isCompact ? "text-[10px]" : "text-[11px]";
 
   const filteredLabel = hasSearched && query.trim().length > 0
     ? `${testPlans.length} matching test plans`
@@ -295,9 +289,8 @@ export function TestPlansPanel({
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-[2px]"
-      onClick={onClose}
     >
-      <div className="flex h-[640px] max-h-[90vh] w-[980px] max-w-[96vw] flex-col overflow-hidden border border-border/80 bg-card shadow-[0_28px_64px_rgba(0,0,0,0.45)]" onClick={(e) => e.stopPropagation()}>
+      <div className="flex h-[640px] max-h-[90vh] w-[980px] max-w-[96vw] flex-col overflow-hidden border border-border/80 bg-card shadow-[0_28px_64px_rgba(0,0,0,0.45)]">
         <div className="flex items-center justify-between border-b border-border px-4 py-2.5 bg-gradient-to-r from-muted/70 via-muted/30 to-card">
           <div className="flex min-w-0 items-center gap-3">
             <div className="flex h-8 w-8 shrink-0 items-center justify-center border border-primary/35 bg-primary/10 text-primary shadow-sm">
@@ -348,15 +341,6 @@ export function TestPlansPanel({
             ))}
               </div>
             </div>
-            {sourceMode !== "browse" && (
-              <button
-                onClick={() => setTransferDensity((prev) => (prev === "comfortable" ? "compact" : "comfortable"))}
-                className="h-8 border border-border bg-background px-2.5 text-[11px] font-mono text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground"
-                title="Toggle compact transfer form"
-              >
-                {isCompact ? "Comfortable" : "Compact"}
-              </button>
-            )}
             </div>
 
           {sourceMode === "browse" && (
@@ -501,9 +485,9 @@ export function TestPlansPanel({
                     Upload a local .TapPlan file and store it on your API server.
                   </div>
                 </div>
-                <div className={`${formGapClass} px-4 py-3`}>
+                <div className="space-y-3 px-4 py-3">
                   <div>
-                    <div className={`${helpTextClass} mb-1 font-mono text-muted-foreground`}>TapPlan File</div>
+                    <div className="mb-1 text-[11px] font-mono text-muted-foreground">TapPlan File</div>
                     <input
                       type="file"
                       accept=".tapplan"
@@ -511,20 +495,20 @@ export function TestPlansPanel({
                         setUploadFile(e.target.files?.[0] ?? null);
                         clearFieldError("uploadFile");
                       }}
-                      className={`w-full border bg-background px-2 py-1.5 ${fieldTextClass} text-foreground file:mr-2 file:border-0 file:bg-primary file:px-2 file:py-1 file:text-[11px] file:font-mono file:font-semibold file:text-primary-foreground ${fieldErrors.uploadFile ? "border-red-500/60" : "border-border"}`}
+                      className={`w-full border bg-background px-2 py-1.5 text-[12px] text-foreground file:mr-2 file:border-0 file:bg-primary file:px-2 file:py-1 file:text-[11px] file:font-mono file:font-semibold file:text-primary-foreground ${fieldErrors.uploadFile ? "border-red-500/60" : "border-border"}`}
                     />
-                    <div className={`mt-1 ${helpTextClass} font-mono ${fieldErrors.uploadFile ? "text-red-400" : "text-muted-foreground"}`}>
+                    <div className={`mt-1 text-[11px] font-mono ${fieldErrors.uploadFile ? "text-red-400" : "text-muted-foreground"}`}>
                       {fieldErrors.uploadFile || (uploadFile ? `Selected: ${uploadFile.name}` : "Only .tapplan files are accepted.")}
                     </div>
                   </div>
                   <div>
-                    <div className={`${helpTextClass} mb-1 font-mono text-muted-foreground`}>Destination Path (optional)</div>
+                    <div className="mb-1 text-[11px] font-mono text-muted-foreground">Destination Path (optional)</div>
                     <input
                       type="text"
                       value={uploadDestination}
                       onChange={(e) => setUploadDestination(e.target.value)}
                       placeholder="D:\\plans"
-                      className={`${fieldHeightClass} w-full border border-border bg-background px-2 ${fieldTextClass} font-mono text-foreground`}
+                      className="h-8 w-full border border-border bg-background px-2 text-[12px] font-mono text-foreground"
                     />
                   </div>
                   <div className="flex items-center justify-end gap-2">
@@ -560,10 +544,10 @@ export function TestPlansPanel({
                     Ask your API server to fetch remote plans, then save them locally for browsing.
                   </div>
                 </div>
-                <div className={`${formGapClass} px-4 py-3`}>
+                <div className="space-y-3 px-4 py-3">
                   <div className="grid gap-3 md:grid-cols-2">
                     <div>
-                      <div className={`${helpTextClass} mb-1 font-mono text-muted-foreground`}>Source Type</div>
+                      <div className="mb-1 text-[11px] font-mono text-muted-foreground">Source Type</div>
                       <select
                         value={remoteSourceType}
                         onChange={(e) => {
@@ -571,7 +555,7 @@ export function TestPlansPanel({
                           clearFieldError("remoteUrl");
                           clearFieldError("remoteHeaders");
                         }}
-                        className={`${fieldHeightClass} w-full border border-border bg-background px-2 ${fieldTextClass} font-mono text-foreground`}
+                        className="h-8 w-full border border-border bg-background px-2 text-[12px] font-mono text-foreground"
                       >
                         <option value="rest">REST API</option>
                         <option value="ftp">FTP / FTPS</option>
@@ -579,19 +563,19 @@ export function TestPlansPanel({
                       </select>
                     </div>
                     <div>
-                      <div className={`${helpTextClass} mb-1 font-mono text-muted-foreground`}>Destination Path (optional)</div>
+                      <div className="mb-1 text-[11px] font-mono text-muted-foreground">Destination Path (optional)</div>
                       <input
                         type="text"
                         value={remoteDestination}
                         onChange={(e) => setRemoteDestination(e.target.value)}
                         placeholder="D:\\plans"
-                        className={`${fieldHeightClass} w-full border border-border bg-background px-2 ${fieldTextClass} font-mono text-foreground`}
+                        className="h-8 w-full border border-border bg-background px-2 text-[12px] font-mono text-foreground"
                       />
                     </div>
                   </div>
 
                   <div>
-                    <div className={`${helpTextClass} mb-1 font-mono text-muted-foreground`}>Source URL</div>
+                    <div className="mb-1 text-[11px] font-mono text-muted-foreground">Source URL</div>
                     <input
                       type="text"
                       value={remoteUrl}
@@ -600,9 +584,9 @@ export function TestPlansPanel({
                         clearFieldError("remoteUrl");
                       }}
                       placeholder={remoteSourceType === "ftp" ? "ftp://host/path/plan.tapplan" : remoteSourceType === "sftp" ? "sftp://host/path/plan.tapplan" : "https://server/api/testplans"}
-                      className={`${fieldHeightClass} w-full border bg-background px-2 ${fieldTextClass} font-mono text-foreground ${fieldErrors.remoteUrl ? "border-red-500/60" : "border-border"}`}
+                      className={`h-8 w-full border bg-background px-2 text-[12px] font-mono text-foreground ${fieldErrors.remoteUrl ? "border-red-500/60" : "border-border"}`}
                     />
-                    <div className={`mt-1 ${helpTextClass} font-mono ${fieldErrors.remoteUrl ? "text-red-400" : "text-muted-foreground"}`}>
+                    <div className={`mt-1 text-[11px] font-mono ${fieldErrors.remoteUrl ? "text-red-400" : "text-muted-foreground"}`}>
                       {fieldErrors.remoteUrl || (remoteSourceType === "ftp"
                         ? "Example: ftp://host/path/TestPlan.tapplan"
                         : remoteSourceType === "sftp"
@@ -636,25 +620,25 @@ export function TestPlansPanel({
                     <>
                       <div className="grid gap-3 md:grid-cols-2">
                         <div>
-                          <div className={`${helpTextClass} mb-1 font-mono text-muted-foreground`}>HTTP Method</div>
+                          <div className="mb-1 text-[11px] font-mono text-muted-foreground">HTTP Method</div>
                           <select
                             value={remoteMethod}
                             onChange={(e) => setRemoteMethod((e.target.value as "GET" | "POST"))}
-                            className={`${fieldHeightClass} w-full border border-border bg-background px-2 ${fieldTextClass} font-mono text-foreground`}
+                            className="h-8 w-full border border-border bg-background px-2 text-[12px] font-mono text-foreground"
                           >
                             <option value="GET">GET</option>
                             <option value="POST">POST</option>
                           </select>
                         </div>
                         <div>
-                          <div className={`${helpTextClass} mb-1 font-mono text-muted-foreground`}>Headers (JSON)</div>
+                          <div className="mb-1 text-[11px] font-mono text-muted-foreground">Headers (JSON)</div>
                           <textarea
                             value={remoteHeadersText}
                             onChange={(e) => {
                               setRemoteHeadersText(e.target.value);
                               clearFieldError("remoteHeaders");
                             }}
-                            rows={isCompact ? 3 : 4}
+                            rows={4}
                             className={`w-full border bg-background px-2 py-1.5 text-[11px] font-mono text-foreground ${fieldErrors.remoteHeaders ? "border-red-500/60" : "border-border"}`}
                           />
                           <div className={`mt-1 text-[10px] font-mono ${fieldErrors.remoteHeaders ? "text-red-400" : "text-muted-foreground"}`}>
@@ -664,11 +648,11 @@ export function TestPlansPanel({
                       </div>
                       {remoteMethod === "POST" && (
                         <div>
-                          <div className={`${helpTextClass} mb-1 font-mono text-muted-foreground`}>Request Body (optional JSON/text)</div>
+                          <div className="mb-1 text-[11px] font-mono text-muted-foreground">Request Body (optional JSON/text)</div>
                           <textarea
                             value={remoteBody}
                             onChange={(e) => setRemoteBody(e.target.value)}
-                            rows={isCompact ? 4 : 5}
+                            rows={5}
                             className="w-full border border-border bg-background px-2 py-1.5 text-[11px] font-mono text-foreground"
                           />
                           <div className="mt-1 text-[10px] font-mono text-muted-foreground">Plain text or JSON payload</div>

@@ -191,7 +191,7 @@ export const useMqttResultListener = (
         client.subscribe(config.topic, (error) => {
           if (cancelled || activeClient !== client) return;
           if (error) {
-            onStatusRef.current?.("WARN", `MQTT subscribe skipped: ${error.message}`);
+            onStatusRef.current?.("ERROR", `Subscribe failed: ${error.message}`);
             return;
           }
           setIsSubscribed(true);
@@ -200,7 +200,7 @@ export const useMqttResultListener = (
       });
 
       client.on("message", (topic, payload) => {
-        if (cancelled || activeClient !== client) return;
+        if (cancelled) return;
         onMessageRef.current?.(topic, parsePayload(payload));
       });
 

@@ -31,7 +31,10 @@ export function PropertiesDock({
 
     return (
       <div className="absolute inset-0 z-40" onClick={() => setRightOpen(false)}>
-        <div className="absolute right-0 top-0 bottom-0 w-72 bg-card border-l border-border flex flex-col shadow-2xl z-50" onClick={e => e.stopPropagation()}>
+        <div
+          className="absolute right-0 top-0 bottom-0 w-72 bg-card border-l border-border flex flex-col shadow-2xl z-50"
+          onClick={(event) => event.stopPropagation()}
+        >
           <PanelHeader icon={<SlidersHorizontal size={13} />} label="Properties">
             <button onClick={() => setRightOpen(false)} className="text-muted-foreground hover:text-foreground"><X size={13} /></button>
           </PanelHeader>

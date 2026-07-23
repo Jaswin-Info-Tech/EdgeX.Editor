@@ -4,13 +4,12 @@ import {
   ChevronRight,
   Database,
   Filter,
-  FolderPlus,
   List,
   Search,
   X,
   ChevronUp,
 } from "lucide-react";
-import type { InstrumentItem, LibraryItem } from "../../types/editor";
+import type { InstrumentItem } from "../../types/editor";
 import { flatAll } from "../../utils/editor";
 import { TYPE_STRIPE } from "../../constants/editor";
 import { TypeIcon } from "./atoms";
@@ -54,26 +53,9 @@ function inferLibraryIconType(item: any): string {
   return explicitType || "flow";
 }
 
-function instrumentToLibraryItem(instrument: InstrumentItem): LibraryItem {
-  return {
-    id: `instrument:${instrument.name}:${instrument.assembly}`,
-    name: instrument.name,
-    category: "Instruments",
-    type: "instrument",
-    description: `Instrument from ${instrument.assembly}`,
-    baseType: instrument.baseType,
-    assembly: instrument.assembly,
-    defaultProps: [
-      { key: "instrumentName", label: "Instrument Name", type: "string", value: instrument.name, group: "Instrument" },
-      { key: "baseType", label: "Base Type", type: "string", value: instrument.baseType, group: "Instrument" },
-      { key: "assembly", label: "Assembly", type: "string", value: instrument.assembly, group: "Instrument" },
-    ],
-  };
-}
-
 interface LeftPanelProps {
-  leftTab: "plan" | "library" | "instruments";
-  setLeftTab: (value: "plan" | "library" | "instruments") => void;
+  leftTab: "plan" | "library";
+  setLeftTab: (value: "plan" | "library") => void;
   plan: any[];
   hasPlan: boolean;
   expanded: Set<string>;
@@ -274,8 +256,8 @@ export function LeftPanel({
 
       {leftTab === "library" && (
         <>
-          <div className="flex items-center gap-2 px-2 py-2 border-b border-border shrink-0">
-            <div className="flex items-center gap-2 border border-border px-2.5 py-1.5 bg-background flex-1">
+          <div className="flex min-w-0 items-center gap-2 px-2 py-2 border-b border-border shrink-0">
+            <div className="flex min-w-0 flex-1 items-center gap-2 border border-border px-2.5 py-1.5 bg-background">
               <Search size={11} className="text-muted-foreground shrink-0" />
               <input
                 value={libSearch}
@@ -283,7 +265,7 @@ export function LeftPanel({
                   setLibSearch(e.target.value)
                 }
                 placeholder="Search step library..."
-                className="flex-1 bg-transparent text-[12px] font-mono text-foreground placeholder:text-muted-foreground outline-none"
+                className="min-w-0 flex-1 bg-transparent text-[12px] font-mono text-foreground placeholder:text-muted-foreground outline-none"
               />
               {libSearch && (
                 <button
@@ -324,27 +306,19 @@ export function LeftPanel({
                         setLibFilterOpen(false);
                       }}
                       className="w-full text-left px-3 py-1.5 text-[12px] font-mono flex items-center justify-between transition-colors"
-                      style={
-                        libCat === category
-                          ? {
-                            background: "rgba(34,62,84,0.10)",
-                            color: "#223e54",
-                            borderLeft: "2px solid #223e54",
-                          }
-                          : {}
-                      }
+                      style={libCat === category ? { borderLeft: "2px solid var(--primary)" } : {}}
                     >
                       <span
                         className={
                           libCat === category
-                            ? "font-semibold"
+                            ? "font-semibold text-primary"
                             : "text-muted-foreground"
                         }
                       >
                         {category}
                       </span>
                       {libCat === category && (
-                        <Check size={11} style={{ color: "#223e54" }} />
+                        <Check size={11} className="text-primary" />
                       )}
                     </button>
                   ))}
@@ -368,12 +342,8 @@ export function LeftPanel({
           {libCat !== "All" && (
             <div
               className="px-3 py-1.5 border-b border-border flex items-center gap-2 shrink-0"
-              style={{ background: "rgba(34,62,84,0.05)" }}
             >
-              <span
-                className="text-[11px] font-mono"
-                style={{ color: "#223e54" }}
-              >
+              <span className="text-[11px] font-mono text-primary">
                 Filter: {libCat}
               </span>
               <button

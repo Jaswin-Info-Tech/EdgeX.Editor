@@ -607,10 +607,15 @@ export function PropertiesPanel({
         <div className="min-h-0 flex-1 overflow-y-auto">
           <div className="border-b border-border bg-gradient-to-r from-muted/30 via-muted/10 to-card" style={{ borderLeft: `3px solid ${stripe}` }}>
             <div className="px-3 py-3.5">
-              <div className="mb-1.5 flex items-center gap-2">
+              <div className="mb-1.5 flex min-w-0 items-center gap-2">
                 <TypeIcon type={selectedStep.type} size={14} />
-                <span className="text-[13px] font-semibold text-foreground font-mono leading-tight">
-                  {selectedStep.name}
+                <span className="relative min-w-0 flex-1">
+                  <span
+                    className="block truncate text-[13px] font-semibold text-foreground font-mono leading-tight"
+                    title={selectedStep.name}
+                  >
+                    {selectedStep.name}
+                  </span>
                 </span>
               </div>
               <div className="flex flex-wrap items-center gap-2">
@@ -628,6 +633,11 @@ export function PropertiesPanel({
                     · {selectedStep.description}
                   </span>
                 )}
+                {/* {selectedStep.description && (
+                  <span className="text-[11px] text-muted-foreground">
+                    · {selectedStep.description}
+                  </span>
+                )} */}
               </div>
             </div>
           </div>
@@ -682,6 +692,7 @@ export function PropertiesPanel({
                 onClick={() => setSchemaCollapsed((prev) => !prev)}
                 className="flex w-full items-center justify-between gap-2 border-b border-border bg-muted/35 px-3 py-2 text-left"
                 aria-expanded={!schemaCollapsed}
+                title={schemaCollapsed ? "Expand schema fields" : "Collapse schema fields"}
               >
                 <div className="flex items-center gap-2">
                   <div className="w-[3px] h-3" style={{ background: stripe }} />
@@ -715,11 +726,16 @@ export function PropertiesPanel({
                   {schemaError ? <span className="flex items-start gap-2 text-destructive"><AlertTriangle size={14} className="mt-0.5 shrink-0" /><span>{`Unable to load schema: ${schemaError}`}</span></span> : "No configurable schema properties."}
                 </div>
               ))}
+              {schemaCollapsed && (
+                <div className="border-b border-border px-3 py-3 text-[11px] font-mono text-muted-foreground">
+                  Schema fields are collapsed.
+                </div>
+              )}
             </>
           )}
 
           {groups.map((group) => {
-            const isCollapsed = collapsedGroups[group] ?? true;
+            const isCollapsed = collapsedGroups[group] ?? false;
             return (
             <div key={group}>
               <button
