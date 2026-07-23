@@ -67,11 +67,9 @@ export function ResourcesPanel({
     <>
       <div
         className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-[1px]"
-        onClick={closePanel}
       >
         <div
           className="flex h-[620px] max-h-[88vh] w-[980px] max-w-[95vw] flex-col overflow-hidden border border-border bg-card shadow-2xl"
-          onClick={(e) => e.stopPropagation()}
         >
           <div className="flex h-14 items-center justify-between border-b border-border bg-muted/30 px-5">
             <div className="min-w-0">
@@ -204,11 +202,9 @@ export function ResourcesPanel({
       {showCreateResource && (
         <div
           className="fixed inset-0 z-[60] flex items-center justify-center bg-black/75 backdrop-blur-[1px]"
-          onClick={onCloseCreate}
         >
           <div
             className="flex h-[620px] max-h-[88vh] w-[980px] max-w-[95vw] flex-col overflow-hidden border border-border bg-card shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
           >
             <div className="flex h-14 items-center justify-between border-b border-border bg-muted/30 px-5">
               <span className="text-[15px] font-semibold text-foreground">

@@ -112,7 +112,7 @@
   --secondary: #21262d;
   --secondary-foreground: #adbac7;
   --muted: #161b22;
-  --muted-foreground: #6e7681;
+  --muted-foreground: #8b949e;
   --accent: #00b4d8;
   --accent-foreground: #0d1117;
   --destructive: #da3633;
@@ -134,7 +134,7 @@
   --sidebar-primary: #1f6feb;
   --sidebar-primary-foreground: #ffffff;
   --sidebar-accent: #21262d;
-  --sidebar-accent-foreground: #adbac7;
+  --sidebar-accent-foreground: #b6c2cf;
   --sidebar-border: #30363d;
   --sidebar-ring: #1f6feb;
 }

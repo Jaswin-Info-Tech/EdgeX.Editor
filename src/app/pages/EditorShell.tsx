@@ -1224,11 +1224,9 @@ export function EditorShell(props: EditorShellProps) {
           {isTablet && leftOpen && (
             <div
               className="absolute inset-0 z-40"
-              onClick={() => setLeftOpen(false)}
             >
               <div
                 className="absolute left-0 top-0 bottom-0 w-64 bg-card border-r border-border flex flex-col shadow-2xl z-50"
-                onClick={(e) => e.stopPropagation()}
               >
                 {leftPanel}
               </div>

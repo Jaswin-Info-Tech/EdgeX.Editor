@@ -301,8 +301,9 @@ export function SequenceStep(props: SequenceStepProps) {
 
             {/* Type label */}
             <span
-              className="text-[10px] font-mono border px-1.5 py-0 shrink-0"
+              className="max-w-[96px] shrink truncate border px-1.5 py-0 text-[10px] font-mono"
               style={{ color: stripe, borderColor: stripe + "50" }}
+              title={TYPE_LABEL[step.type] || "Unknown type"}
             >
               {TYPE_LABEL[step.type] || "—"}
             </span>

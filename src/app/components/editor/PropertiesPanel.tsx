@@ -607,10 +607,15 @@ export function PropertiesPanel({
         <div className="min-h-0 flex-1 overflow-y-auto">
           <div className="border-b border-border bg-gradient-to-r from-muted/30 via-muted/10 to-card" style={{ borderLeft: `3px solid ${stripe}` }}>
             <div className="px-3 py-3.5">
-              <div className="mb-1.5 flex items-center gap-2">
+              <div className="mb-1.5 flex min-w-0 items-center gap-2">
                 <TypeIcon type={selectedStep.type} size={14} />
-                <span className="text-[13px] font-semibold text-foreground font-mono leading-tight">
-                  {selectedStep.name}
+                <span className="group/name relative min-w-0 flex-1">
+                  <span className="block truncate text-[13px] font-semibold text-foreground font-mono leading-tight">
+                    {selectedStep.name}
+                  </span>
+                  <span className="pointer-events-none absolute left-0 top-full z-50 mt-1 hidden max-w-[320px] border border-border bg-popover px-2 py-1 text-[11px] font-mono text-popover-foreground shadow-lg group-hover/name:block">
+                    {selectedStep.name}
+                  </span>
                 </span>
               </div>
               <div className="flex flex-wrap items-center gap-2">

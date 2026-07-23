@@ -433,13 +433,9 @@ export function ServerSettingsModal({
   return (
     <div
       className="fixed inset-0 z-[80] flex items-center justify-center bg-black/60"
-      onClick={() => {
-        if (!forceSetup) onClose();
-      }}
     >
       <div
         className="flex h-[620px] max-h-[92vh] w-[900px] max-w-[96vw] flex-col overflow-hidden border border-border bg-card shadow-2xl"
-        onClick={(event) => event.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b border-border bg-muted/30 px-4 py-3">
           <div className="flex min-w-0 items-center gap-2.5">

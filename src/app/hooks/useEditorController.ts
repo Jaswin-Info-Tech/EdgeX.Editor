@@ -33,6 +33,7 @@ import {
 import { composeTestPlan,getStepSchema,runTestPlan } from "../api/testplans";
 
 const PLAN_SNAPSHOT_STORAGE_KEY = "edgex.editor.planSnapshot.v1";
+const THEME_STORAGE_KEY = "edgex.editor.theme";
 const DEFAULT_TEST_PLAN_ROOT = "D:\\plans";
 
 type PersistedPlanSnapshot = {
@@ -97,7 +98,10 @@ export function useEditorController() {
   const [contextMenu, setContextMenu] = useState<CtxMenu | null>(null);
   const [addStepParentId, setAddStepParentId] = useState<string | null>(null);
   const [addStepIdx, setAddStepIdx] = useState<number | undefined>(undefined);
-  const [isDark, setIsDark] = useState(false);
+  const [isDark, setIsDark] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return window.localStorage.getItem(THEME_STORAGE_KEY) === "dark";
+  });
   const [isSaved, setIsSaved] = useState(false);
   const [savedPlanSignature, setSavedPlanSignature] = useState<string | null>(null);
   const [outputPath, setOutputPath] = useState<string | null>(null);
@@ -109,7 +113,7 @@ export function useEditorController() {
   const [leftOpen, setLeftOpen] = useState(true);
   const [rightOpen, setRightOpen] = useState(true);
 
-  const [leftW, setLeftW] = useState(isDesktop ? 232 : 200);
+  const [leftW, setLeftW] = useState(isDesktop ? 265 : 200);
   const [rightW, setRightW] = useState(isDesktop ? 280 : 248);
   const [consoleH, setConsoleH] = useState(176);
 
@@ -267,7 +271,10 @@ export function useEditorController() {
     [buildSaveSignature, outputPath, plan, planMeta],
   );
 
-  useEffect(() => { document.documentElement.classList.toggle("dark", isDark); }, [isDark]);
+  useEffect(() => {
+    document.documentElement.classList.toggle("dark", isDark);
+    window.localStorage.setItem(THEME_STORAGE_KEY, isDark ? "dark" : "light");
+  }, [isDark]);
   useEffect(() => { logEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [logs]);
   useEffect(() => { renameRef.current?.focus(); }, [renaming]);
   useEffect(() => {

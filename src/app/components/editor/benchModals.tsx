@@ -642,11 +642,9 @@ function GenericResourcePanel({
   return (
     <div
       className="fixed inset-0 z-50 flex items-stretch justify-end bg-black/40"
-      onClick={closePanel}
     >
       <div
         className="flex h-full w-[1080px] max-w-[96vw] flex-col overflow-hidden border-l border-border bg-card shadow-2xl"
-        onClick={(e) => e.stopPropagation()}
       >
         <div className="flex h-12 items-center justify-between border-b border-border bg-card px-4">
           <div className="flex min-w-0 items-center gap-3">
@@ -1163,11 +1161,9 @@ function GenericResourcePanel({
       {resourcePendingDelete && (
         <div
           className="fixed inset-0 z-[70] flex items-center justify-center bg-black/75 backdrop-blur-[1px]"
-          onClick={cancelDelete}
         >
           <div
             className="w-[420px] max-w-[92vw] border border-border bg-card shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
           >
             <div className="flex h-11 items-center justify-between border-b border-border bg-muted/30 px-4">
               <span className="text-[14px] font-semibold text-foreground">
