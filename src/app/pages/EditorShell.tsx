@@ -332,14 +332,7 @@ export function EditorShell(props: EditorShellProps) {
   };
 
   const handleConfirmRun = () => {
-    setShowRunConfirm(false);
-    setPendingRunStepId(null);
     handleRun();
-  };
-
-  const handleCancelRunConfirm = () => {
-    setShowRunConfirm(false);
-    setPendingRunStepId(null);
   };
 
   const pendingRunStep = pendingRunStepId
@@ -1310,12 +1303,7 @@ export function EditorShell(props: EditorShellProps) {
 
       <AlertDialog
         open={showRunConfirm}
-        onOpenChange={(open) => {
-          if (!open) {
-            setPendingRunStepId(null);
-          }
-          setShowRunConfirm(open);
-        }}
+        onOpenChange={setShowRunConfirm}
       >
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -1323,7 +1311,7 @@ export function EditorShell(props: EditorShellProps) {
             <AlertDialogDescription>{runDialogDescription}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={handleCancelRunConfirm}>{runDialogCancelLabel}</AlertDialogCancel>
+            <AlertDialogCancel>{runDialogCancelLabel}</AlertDialogCancel>
             <AlertDialogAction onClick={handleConfirmRun}>{runDialogConfirmLabel}</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
