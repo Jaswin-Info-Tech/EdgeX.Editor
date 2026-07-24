@@ -423,8 +423,7 @@ export function PropertiesPanel({
         const hasRealValue = displayValue != null && String(displayValue).trim() !== "";
         values[prop.name] = hasRealValue ? displayValue : (selectedStep.name ?? "");
       } else if (isEnabledSchemaProperty(prop)) {
-        // New steps are enabled by default, but an explicitly saved false is preserved.
-        values[prop.name] = displayValue ?? true;
+        values[prop.name] = selectedStep.enabled !== false;
       } else {
         values[prop.name] =
           displayValue ?? (prop.editorType === "checkbox" ? false : "");
@@ -519,9 +518,13 @@ export function PropertiesPanel({
     if (!selectedStep) return;
     const meta = schemaRecords[0];
     const nameProp = schemaProperties.find(isNameSchemaProperty);
+    const enabledProp = schemaProperties.find(isEnabledSchemaProperty);
     const nextStepName = nameProp
       ? String(schemaPropertyValues[nameProp.name] ?? "").trim()
       : "";
+    const nextStepEnabled = enabledProp
+      ? Boolean(schemaPropertyValues[enabledProp.name])
+      : selectedStep.enabled !== false;
 
     setPlan((prev: any) => updateIn(prev, selectedStep.id, (step: any) => {
       const existingProps = step.properties || [];
@@ -555,6 +558,7 @@ export function PropertiesPanel({
       return {
         ...step,
         ...(nextStepName ? { name: nextStepName } : {}),
+        enabled: nextStepEnabled,
         properties: [...keepProps, ...newProps],
 
         stepTypeName: step.stepTypeName,
@@ -624,6 +628,11 @@ export function PropertiesPanel({
                 {stepInstrumentFamily && (
                   <span className="border border-border bg-background px-1.5 py-0.5 text-[10px] font-mono text-muted-foreground uppercase">
                     {stepInstrumentFamily} instrument required
+                  </span>
+                )}
+                {selectedStep.description && (
+                  <span className="text-[11px] text-muted-foreground">
+                    · {selectedStep.description}
                   </span>
                 )}
               </div>

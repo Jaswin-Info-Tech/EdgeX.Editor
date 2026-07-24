@@ -3,7 +3,7 @@ import type { DragEvent } from "react";
 import { toast } from "sonner";
 import { useDragResize } from "../components/editor/resizable";
 import type { CtxMenu, LibraryItem, LogEntry, PlanMeta, Plugin, RunState, StepStatus, TestStep } from "../types/editor";
-import { addToParent, deleteIn, ensureUniqueStepIds, flatAll, makeSequence, makeStep, moveIn, nowTs, parseFreq, resetAll, setStatusIn, uid, updateIn, toArray } from "../utils/editor";
+import { addToParent, deleteIn, ensureUniqueStepIds, flatAll, makeSequence, makeStep, moveIn, nowTs, parseFreq, resetAll, setStatusIn, setStepEnabled, uid, updateIn, toArray } from "../utils/editor";
 import { removePlugin, uploadPlugin } from "../api/plugin";
 import { installPackage, uninstallPackage } from "../api/package";
 import { useAvailablePackages } from "./usePackage";
@@ -1314,7 +1314,7 @@ export function useEditorController() {
       setRenaming(stepId);
       setRenameVal(step.name);
     } else if (action === "toggle") {
-      setPlan(prev => updateIn(prev, stepId, item => ({ ...item, enabled: !item.enabled })));
+      setPlan(prev => updateIn(prev, stepId, item => setStepEnabled(item, !item.enabled)));
     } else if (action === "add_after") {
       setAddStepParentId(null);
       setShowAddStep(true);
@@ -1348,14 +1348,22 @@ export function useEditorController() {
   const updateProperty = (stepId: string, key: string, raw: string) => {
     setPlan(prev => updateIn(prev, stepId, step => {
       let shouldRenameStep = false;
+      let nextEnabled = step.enabled;
 
       const properties = step.properties.map(prop => {
         if (prop.key !== key) return prop;
         if (prop.isEditable === false) return prop;
 
-        shouldRenameStep =
-          String(prop.key ?? "").trim().toLowerCase() === "name" ||
-          String(prop.label ?? "").trim().toLowerCase() === "name";
+        const propertyName = String(
+          prop.backendName ||
+          prop.label ||
+          String(prop.key ?? "").split("||")[0],
+        ).trim().toLowerCase();
+        shouldRenameStep = propertyName === "name";
+
+        if (propertyName === "enabled") {
+          nextEnabled = raw === "true";
+        }
 
         if (prop.type === "number") return { ...prop, value: parseFloat(raw) || 0 };
         if (prop.type === "boolean") return { ...prop, value: raw === "true" };
@@ -1366,6 +1374,7 @@ export function useEditorController() {
       return {
         ...step,
         ...(shouldRenameStep && raw.trim() ? { name: raw.trim() } : {}),
+        enabled: nextEnabled,
         properties,
       };
     }));
@@ -1817,6 +1826,8 @@ export function useEditorController() {
       overwrite: true,
       steps: normalizedSteps,
     };
+
+console.log("Saving test plan to:", jsonData);
 
     try {
       const response = await composeTestPlan(jsonData);
