@@ -12,6 +12,16 @@ import {
   ResultListenersPanel,
   TraceListenersPanel,
 } from "../components/editor/benchModals";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "../components/ui/alert-dialog";
 import { LeftPanel } from "../components/editor/LeftPanel";
 import { MenuBar } from "../components/editor/MenuBar";
 import { ModalsHost } from "../components/editor/ModalsHost";
@@ -282,6 +292,115 @@ export function EditorShell(props: EditorShellProps) {
     setDraggedStepId,
     handleStepReorder,
   } = props;
+
+  const [showRunConfirm, setShowRunConfirm] = useState(false);
+  const [pendingRunStepId, setPendingRunStepId] = useState<string | null>(null);
+
+  const isDialogStep = (step: TestStep | null | undefined) => {
+    if (!step) return false;
+
+    const rawTypeText = [
+      step.type,
+      step.stepTypeName,
+      step.typeName,
+      step.fullName,
+      step.className,
+      step.name,
+    ]
+      .filter(Boolean)
+      .join(" ")
+      .toLowerCase();
+
+    const propertyKeys = (step.properties || [])
+      .map((prop: any) => String(prop.key ?? prop.label ?? prop.backendName ?? "").toLowerCase());
+
+    const hasDialogProps = propertyKeys.some(key =>
+      key.includes("title") || key.includes("message") || key.includes("button") || key.includes("prompt") || key.includes("dialog"),
+    );
+
+    return rawTypeText.includes("dialog") || hasDialogProps;
+  };
+
+  const handleRunRequested = () => {
+    if (runState === "running" || plan.length === 0 || !isSaved) return;
+    if (selectedStep && isDialogStep(selectedStep)) {
+      setPendingRunStepId(selectedStep.id);
+      setShowRunConfirm(true);
+      return;
+    }
+    handleRun();
+  };
+
+  const handleConfirmRun = () => {
+    setShowRunConfirm(false);
+    setPendingRunStepId(null);
+    handleRun();
+  };
+
+  const handleCancelRunConfirm = () => {
+    setShowRunConfirm(false);
+    setPendingRunStepId(null);
+  };
+
+  const pendingRunStep = pendingRunStepId
+    ? flatAll(plan).find(step => step.id === pendingRunStepId)
+    : null;
+
+  const getDialogPropertyValue = (
+    step: TestStep | null | undefined,
+    names: string[],
+  ): string | undefined => {
+    if (!step?.properties?.length) return undefined;
+
+    const normalizedNames = names.map((name) => name.toLowerCase());
+    const match = step.properties.find((prop: any) => {
+      const key = String(prop.key ?? prop.label ?? prop.backendName ?? "").toLowerCase();
+      return normalizedNames.some((name) => key.includes(name));
+    });
+
+    if (match?.value == null) return undefined;
+    return String(match.value);
+  };
+
+  const dialogTitle =
+    getDialogPropertyValue(pendingRunStep, ["title"]) ??
+    pendingRunStep?.name ??
+    "Confirm dialog step";
+
+  const dialogMessage =
+    getDialogPropertyValue(pendingRunStep, ["message", "text", "prompt"]) ??
+    "This selected step is a dialog step. Do you want to run it now?";
+
+  const dialogButtonsValue =
+    getDialogPropertyValue(pendingRunStep, ["buttons", "button"])?.trim() ??
+    "YesNo";
+
+  const parseDialogButtons = (value: string) => {
+    const normalized = value.trim();
+    if (/yes\s*no/i.test(normalized) || /^yesno$/i.test(normalized)) {
+      return { confirm: "Yes", cancel: "No" };
+    }
+    if (/ok\s*cancel/i.test(normalized) || /^okcancel$/i.test(normalized)) {
+      return { confirm: "OK", cancel: "Cancel" };
+    }
+    if (/accept\s*decline/i.test(normalized) || /^acceptdecline$/i.test(normalized)) {
+      return { confirm: "Accept", cancel: "Decline" };
+    }
+    const parts = normalized.split(/[,;/|]+/).map((part) => part.trim()).filter(Boolean);
+    if (parts.length >= 2) {
+      return { confirm: parts[0], cancel: parts[1] };
+    }
+
+    return { confirm: normalized || "Yes", cancel: "No" };
+  };
+
+  const dialogButtons = parseDialogButtons(dialogButtonsValue);
+
+  const runDialogTitle = dialogTitle;
+  const runDialogDescription = dialogMessage;
+  const runDialogConfirmLabel = dialogButtons.confirm;
+  const runDialogCancelLabel = dialogButtons.cancel;
+
   const [libCat, setLibCat] = useState("All");
   const [instrumentSearch, setInstrumentSearch] = useState("");
   const [showInstrumentsPanel, setShowInstrumentsPanel] = useState(false);
@@ -1181,13 +1300,34 @@ export function EditorShell(props: EditorShellProps) {
         activeServerHealth={activeServerHealth}
         onOpenServerSettings={() => setShowServerSettings(true)}
         handleSave={handleSaveAndMarkClean}
-        handleRun={handleRun}
+        handleRun={handleRunRequested}
         handleStop={handleStop}
         handlePause={handlePause}
         handleReset={handleReset}
         handleExportPlan={handleExportPlan}
         handleImportPlan={handleImportPlan}
       />
+
+      <AlertDialog
+        open={showRunConfirm}
+        onOpenChange={(open) => {
+          if (!open) {
+            setPendingRunStepId(null);
+          }
+          setShowRunConfirm(open);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{runDialogTitle}</AlertDialogTitle>
+            <AlertDialogDescription>{runDialogDescription}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={handleCancelRunConfirm}>{runDialogCancelLabel}</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmRun}>{runDialogConfirmLabel}</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <EditorToolbar
         isTablet={isTablet}
@@ -1206,7 +1346,7 @@ export function EditorShell(props: EditorShellProps) {
         setAddStepIdx={setAddStepIdx}
         setShowAddStep={setShowAddStep}
         handleSave={handleSaveAndMarkClean}
-        handleRun={handleRun}
+        handleRun={handleRunRequested}
         handlePause={handlePause}
         handleStop={handleStop}
         handleReset={handleReset}
