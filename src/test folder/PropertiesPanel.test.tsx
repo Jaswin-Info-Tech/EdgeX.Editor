@@ -325,6 +325,23 @@ describe('PropertiesPanel — schema properties', () => {
     expect(savedProps.find((p: any) => p.label === 'Voltage')?.value).toBe(5)
   })
 
+  it('saves the Enabled schema property to the step enabled flag', async () => {
+    const user = userEvent.setup()
+    const setPlan = vi.fn()
+    getSchemaRecords.mockReturnValue([{
+      properties: [{ name: 'Enabled', displayName: 'Enabled', editorType: 'checkbox' }],
+    }])
+
+    render(<PropertiesPanel {...baseProps} selectedStep={schemaStep} setPlan={setPlan} />)
+
+    await user.clear(screen.getByLabelText('Enabled'))
+    await user.click(screen.getByRole('button', { name: /save properties/i }))
+
+    const updaterFn = setPlan.mock.calls[setPlan.mock.calls.length - 1][0]
+    const result = updaterFn([schemaStep])
+    expect(result[0].enabled).toBe(false)
+  })
+
   it('shows a schema-load error and keeps Save Properties disabled', () => {
     mockState.properties.errorsByTypeName = { 'Vendor.Steps.ReadVoltage': 'network timeout' }
     getSchemaRecords.mockReturnValue([])
