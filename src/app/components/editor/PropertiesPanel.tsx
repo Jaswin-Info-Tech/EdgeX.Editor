@@ -4,7 +4,7 @@ import { useAppDispatch, useAppSelector } from "../../store/hooks";
 import { TYPE_STRIPE } from "../../constants/editor";
 import { flatAll, formatFreq, updateIn } from "../../utils/editor";
 import { StatusPill, Toggle, TypeIcon } from "./atoms";
-import { fetchStepSchema, lockResolvedTypeName } from "../../store/slices/propertiesSlice"; // 👈 update path to match your file
+import { fetchStepSchema, lockResolvedTypeName } from "../../store/slices/propertiesSlice";
 import {
   EditorContext,
   getSchemaRecords,
@@ -61,8 +61,6 @@ export function PropertiesPanel({
     const type = normalizeEditorType(prop.editorType);
     return type === "object" || type === "json";
   };
-  // console.log(plan);
-  // console.log(selectedStep);
   // helper: is this resource a DUT or connection? (exclude from instrument dropdown)
   const isConnectionOrDut = (type: string = "") =>
     /connection/i.test(type) || /dut/i.test(type);
@@ -425,8 +423,7 @@ export function PropertiesPanel({
         const hasRealValue = displayValue != null && String(displayValue).trim() !== "";
         values[prop.name] = hasRealValue ? displayValue : (selectedStep.name ?? "");
       } else if (isEnabledSchemaProperty(prop)) {
-        // New steps are enabled by default, but an explicitly saved false is preserved.
-        values[prop.name] = displayValue ?? true;
+        values[prop.name] = selectedStep.enabled !== false;
       } else {
         values[prop.name] =
           displayValue ?? (prop.editorType === "checkbox" ? false : "");
@@ -521,9 +518,13 @@ export function PropertiesPanel({
     if (!selectedStep) return;
     const meta = schemaRecords[0];
     const nameProp = schemaProperties.find(isNameSchemaProperty);
+    const enabledProp = schemaProperties.find(isEnabledSchemaProperty);
     const nextStepName = nameProp
       ? String(schemaPropertyValues[nameProp.name] ?? "").trim()
       : "";
+    const nextStepEnabled = enabledProp
+      ? Boolean(schemaPropertyValues[enabledProp.name])
+      : selectedStep.enabled !== false;
 
     setPlan((prev: any) => updateIn(prev, selectedStep.id, (step: any) => {
       const existingProps = step.properties || [];
@@ -557,6 +558,7 @@ export function PropertiesPanel({
       return {
         ...step,
         ...(nextStepName ? { name: nextStepName } : {}),
+        enabled: nextStepEnabled,
         properties: [...keepProps, ...newProps],
 
         stepTypeName: step.stepTypeName,
@@ -633,11 +635,6 @@ export function PropertiesPanel({
                     · {selectedStep.description}
                   </span>
                 )}
-                {/* {selectedStep.description && (
-                  <span className="text-[11px] text-muted-foreground">
-                    · {selectedStep.description}
-                  </span>
-                )} */}
               </div>
             </div>
           </div>

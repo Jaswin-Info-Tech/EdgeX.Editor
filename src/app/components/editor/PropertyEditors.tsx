@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { Dispatch, ReactNode, SetStateAction } from "react";
+import type { Dispatch, InputHTMLAttributes, ReactNode, SetStateAction } from "react";
 import { Toggle } from "./atoms";
 
 // ─── Shared styles ────────────────────────────────────────────────────────────
@@ -441,8 +441,7 @@ export function FolderEditor({ prop, value, onChange }: EditorProps) {
           Browse
           <input
             type="file"
-            // @ts-ignore – non-standard but widely supported
-            webkitdirectory="true"
+            {...({ webkitdirectory: "true" } as InputHTMLAttributes<HTMLInputElement>)}
             className="hidden"
             onChange={e => {
               const f = e.target.files?.[0];

@@ -26,6 +26,31 @@ export function hasAnySteps(steps: TestStep[]): boolean {
   return flatAll(steps).length > 0;
 }
 
+export function setStepEnabled(step: TestStep, enabled: boolean): TestStep {
+  const properties = (step.properties ?? []).map((property) => {
+    const propertyName = String(
+      property.backendName ||
+      property.label ||
+      String(property.key || "").split("||")[0],
+    ).trim();
+
+    if (propertyName.toLowerCase() !== "enabled") return property;
+
+    return {
+      ...property,
+      value: enabled,
+      ...(Object.prototype.hasOwnProperty.call(property, "backendValue")
+        ? { backendValue: enabled }
+        : {}),
+      ...(Object.prototype.hasOwnProperty.call(property, "loadedDisplayValue")
+        ? { loadedDisplayValue: enabled }
+        : {}),
+    };
+  });
+
+  return { ...step, enabled, properties };
+}
+
 export function ensureUniqueStepIds(steps: TestStep[]): { steps: TestStep[]; changed: boolean } {
   const seen = new Set<string>();
   let changed = false;

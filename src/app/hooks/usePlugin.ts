@@ -1,4 +1,3 @@
-// hooks/useUsers.js
 import { useQuery } from "@tanstack/react-query";
 import {
   getInstalledPlugins,

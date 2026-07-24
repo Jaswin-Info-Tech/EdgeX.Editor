@@ -67,9 +67,7 @@ export function ModalsHost({
   contextMenu,
   setContextMenu,
   handleContextAction,
-}: ModalsHostProps)
-{
-  // console.log(plugins,"kkkkkk") 
+}: ModalsHostProps) {
   return (
     <>
       {showNewPlan && (

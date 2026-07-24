@@ -644,7 +644,6 @@ export function EditorShell(props: EditorShellProps) {
     return () => {
       cancelled = true;
     };
-    // - }, []);
   }, [fetchResourcePlans]);
 
   const closeCreateResourceModal = () => {

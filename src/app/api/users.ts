@@ -1,4 +1,3 @@
-// api/users.js
 
 import axiosClient from "./client";
 

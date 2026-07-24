@@ -2,9 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { DragEvent } from "react";
 import { toast } from "sonner";
 import { useDragResize } from "../components/editor/resizable";
-// import { BASE_LIBRARY } from "../data/library";
 import type { CtxMenu, LibraryItem, LogEntry, PlanMeta, Plugin, RunState, StepStatus, TestStep } from "../types/editor";
-import { addToParent, deleteIn, ensureUniqueStepIds, flatAll, makeSequence, makeStep, moveIn, nowTs, parseFreq, resetAll, setStatusIn, uid, updateIn, toArray } from "../utils/editor";
+import { addToParent, deleteIn, ensureUniqueStepIds, flatAll, makeSequence, makeStep, moveIn, nowTs, parseFreq, resetAll, setStatusIn, setStepEnabled, uid, updateIn, toArray } from "../utils/editor";
 import { removePlugin, uploadPlugin } from "../api/plugin";
 import { installPackage, uninstallPackage } from "../api/package";
 import { useAvailablePackages } from "./usePackage";
@@ -568,12 +567,10 @@ export function useEditorController() {
       return [typeof data === "string" ? data : JSON.stringify(data)];
     }
 
-    // const tableName = String(data.table ?? "Result");
     const columns = Array.isArray(data.columns) ? data.columns : [];
 
     const lines: string[] = [];
     columns.forEach((col: any) => {
-      const colName = String(col?.name ?? "Value");
       const values = Array.isArray(col?.values) ? col.values : [col?.values];
 
       values.forEach((rawValue: any) => {
@@ -581,14 +578,12 @@ export function useEditorController() {
         if (typeof rawValue === "string") {
           try {
             const parsed = JSON.parse(rawValue);
-            // lines.push(`${tableName}.${colName}:`);
             lines.push(JSON.stringify(parsed, null, 2));
             return;
           } catch {
             // not JSON, fall through to plain display
           }
         }
-        // lines.push(`${tableName}.${colName} = ${rawValue}`);
       });
     });
 
@@ -1319,7 +1314,7 @@ export function useEditorController() {
       setRenaming(stepId);
       setRenameVal(step.name);
     } else if (action === "toggle") {
-      setPlan(prev => updateIn(prev, stepId, item => ({ ...item, enabled: !item.enabled })));
+      setPlan(prev => updateIn(prev, stepId, item => setStepEnabled(item, !item.enabled)));
     } else if (action === "add_after") {
       setAddStepParentId(null);
       setShowAddStep(true);
@@ -1353,14 +1348,22 @@ export function useEditorController() {
   const updateProperty = (stepId: string, key: string, raw: string) => {
     setPlan(prev => updateIn(prev, stepId, step => {
       let shouldRenameStep = false;
+      let nextEnabled = step.enabled;
 
       const properties = step.properties.map(prop => {
         if (prop.key !== key) return prop;
         if (prop.isEditable === false) return prop;
 
-        shouldRenameStep =
-          String(prop.key ?? "").trim().toLowerCase() === "name" ||
-          String(prop.label ?? "").trim().toLowerCase() === "name";
+        const propertyName = String(
+          prop.backendName ||
+          prop.label ||
+          String(prop.key ?? "").split("||")[0],
+        ).trim().toLowerCase();
+        shouldRenameStep = propertyName === "name";
+
+        if (propertyName === "enabled") {
+          nextEnabled = raw === "true";
+        }
 
         if (prop.type === "number") return { ...prop, value: parseFloat(raw) || 0 };
         if (prop.type === "boolean") return { ...prop, value: raw === "true" };
@@ -1371,6 +1374,7 @@ export function useEditorController() {
       return {
         ...step,
         ...(shouldRenameStep && raw.trim() ? { name: raw.trim() } : {}),
+        enabled: nextEnabled,
         properties,
       };
     }));
@@ -1534,7 +1538,6 @@ export function useEditorController() {
     } catch (error) {
       bufferMqttResultsRef.current = false;
       flushBufferedMqttResults();
-      console.error("Failed to run test plan:", error);
       setShowConsole(true);
       addLog("ERROR", "TestPlans", "Failed to start test plan run.");
       logApiErrorDetails("TestPlans", error, { method: "POST", url: "testplans/run" });
@@ -1683,7 +1686,6 @@ export function useEditorController() {
     setPlan(prev => moveStepToPosition(prev, stepId, newParentId, newIdx));
     if (newParentId) setExpanded(prev => new Set([...prev, newParentId]));
     setDraggedStepId(null);
-    //addLog("INFO", "Plan", `Reordered step`);
   };
 
   const refreshPluginData = useCallback(() => {
@@ -1730,17 +1732,15 @@ export function useEditorController() {
     const pluginName = plugin?.name ?? "Plugin";
     const uninstallName = plugin?.uninstallName ?? pluginName;
     const toastId = toast.loading(`Removing ${pluginName}...`);
-    console.log("Uninstalling:", { id, pluginName, uninstallName, plugin });
     try {
       setInstalledPlugins(prev => prev.map(item =>
         item.id === id ? { ...item, state: "uninstalling" } : item
       ));
-      const result = await removePlugin({
+      await removePlugin({
         pluginName: uninstallName,
         packageName: plugin?.packageName,
         assembly: plugin?.assembly,
       });
-      console.log("Uninstall API response:", result);
       setInstalledPlugins(prev => prev.filter(item => {
         const belongsToRemovedAssembly = Boolean(plugin.assembly) && item.assembly === plugin.assembly;
         return item.id !== id && !belongsToRemovedAssembly;
@@ -1753,7 +1753,6 @@ export function useEditorController() {
       setInstalledPlugins(prev => prev.map(item =>
         item.id === id ? { ...item, state: "installed" } : item
       ));
-      console.error("Uninstall API error:", err);
       setShowConsole(true);
       addLog("ERROR", "Plugins", `Unable to uninstall: ${pluginName}`);
       logApiErrorDetails("Plugins", err, { method: "POST", url: "plugins/remove" });
@@ -1827,7 +1826,8 @@ export function useEditorController() {
       overwrite: true,
       steps: normalizedSteps,
     };
-    console.log(JSON.stringify(jsonData, null, 2));
+
+console.log("Saving test plan to:", jsonData);
 
     try {
       const response = await composeTestPlan(jsonData);
@@ -1842,7 +1842,6 @@ export function useEditorController() {
         : undefined;
       const displayMessage = backendMessage?.replace(/\s*\(Parameter 'Steps'\)\s*$/i, "").trim() || "Unable to save test plan.";
 
-      console.error("Failed to compose test plan:", error);
       setShowConsole(true);
       addLog("ERROR", "TestPlans", "Failed to save test plan.");
       logApiErrorDetails("TestPlans", error, { method: "POST", url: "plugins/compose" });
@@ -1861,7 +1860,6 @@ export function useEditorController() {
       },
     };
 
-    console.log(JSON.stringify(exportData, null, 2));
 
     const blob = new Blob(
       [JSON.stringify(exportData, null, 2)],

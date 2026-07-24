@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import type { TestStep } from "../../types/editor";
 import { TYPE_LABEL, TYPE_STRIPE } from "../../constants/editor";
-import { deleteIn, formatFreq, moveIn, updateIn, addToParent, uid } from "../../utils/editor";
+import { deleteIn, formatFreq, moveIn, updateIn, addToParent, setStepEnabled, uid } from "../../utils/editor";
 import { StatusIcon, StatusPill, TypeIcon } from "./atoms";
 
 function canAcceptChildSteps(step: TestStep) {
@@ -401,10 +401,7 @@ export function SequenceStep(props: SequenceStepProps) {
               onClick={(e) => {
                 e.stopPropagation();
                 setPlan((prev: any) =>
-                  updateIn(prev, step.id, (s) => ({
-                    ...s,
-                    enabled: !s.enabled,
-                  })),
+                  updateIn(prev, step.id, (s) => setStepEnabled(s, !s.enabled)),
                 );
               }}
               className="p-1 text-muted-foreground hover:text-foreground hover:bg-secondary"
