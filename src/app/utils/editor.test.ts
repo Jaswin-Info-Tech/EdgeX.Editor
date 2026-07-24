@@ -27,8 +27,36 @@ import {
   nowTs,
   toArray,
   moveStepToPosition,
+  setStepEnabled,
 } from "./editor";
 import type { LibraryItem, TestStep } from "../types/editor";
+
+describe("setStepEnabled", () => {
+  it("keeps the step flag and Enabled property synchronized", () => {
+    const step = {
+      id: "step-1",
+      name: "Step",
+      type: "action",
+      status: "pending",
+      enabled: true,
+      properties: [
+        {
+          key: "Enabled || Enabled",
+          label: "Enabled",
+          type: "boolean",
+          value: true,
+          group: "General",
+        },
+      ],
+    } satisfies TestStep;
+
+    const disabledStep = setStepEnabled(step, false);
+
+    expect(disabledStep.enabled).toBe(false);
+    expect(disabledStep.properties[0].value).toBe(false);
+    expect(step.enabled).toBe(true);
+  });
+});
 
 // ---------------------------------------------------------------------------
 // Fixtures / helpers
