@@ -289,6 +289,17 @@ export function useEditorController() {
   };
 
   const formatStepForSave = useCallback((step: TestStep): any => {
+    const runtimePropertyNames = new Set([
+      "childteststeps",
+      "enabledchildsteps",
+      "parent",
+      "results",
+      "planrun",
+      "steprun",
+      "rules",
+      "error",
+    ]);
+
     const props = (step.properties || []).reduce((acc: Record<string, any>, prop: any) => {
       const schemaKey = String(prop.key ?? "").split("||")[0].trim();
       const propertyName = String(
@@ -297,6 +308,7 @@ export function useEditorController() {
         "",
       ).trim();
       if (!propertyName) return acc;
+      if (runtimePropertyNames.has(propertyName.toLowerCase())) return acc;
 
       const isUnchangedLoadedValue =
         Object.prototype.hasOwnProperty.call(prop, "backendValue") &&
@@ -304,6 +316,10 @@ export function useEditorController() {
       acc[propertyName] = isUnchangedLoadedValue ? prop.backendValue : prop.value;
       return acc;
     }, {});
+
+    // The tree toggle is authoritative. Keeping this synchronized is especially
+    // important for nested steps because OpenTAP evaluates Enabled on each child.
+    props.Enabled = step.enabled !== false;
 
     const stepTypeName = resolveCanonicalStepTypeName(step);
 
