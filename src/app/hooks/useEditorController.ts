@@ -1497,11 +1497,12 @@ export function useEditorController() {
         duration !== "-" &&
         duration.trim() !== "" &&
         !/^0+(?::0+)*(\.0+)?$/.test(duration.trim());
+      const isNotSetVerdict = verdict.toLowerCase() === "notset";
       const shouldTrackAsActive =
         !failedToStart &&
         hasRunId &&
         !hasExplicitCompleteState &&
-        (hasExplicitActiveState || !hasCompletedDuration || !statusText);
+        (hasExplicitActiveState || (isNotSetVerdict && !hasCompletedDuration));
 
       if (shouldTrackAsActive) {
         setActiveRunId(runId);
