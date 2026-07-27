@@ -1027,7 +1027,6 @@ export function useEditorController() {
 
           const statusRecord = asRecord(statusPayload) ?? {};
           const statusText = String(statusRecord.status ?? statusRecord.state ?? statusRecord.runState ?? "").toLowerCase();
-          const verdictText = String(statusRecord.verdict ?? "").toLowerCase();
           const completedFlag =
             statusRecord.completed === true ||
             statusRecord.isCompleted === true ||
@@ -1043,8 +1042,7 @@ export function useEditorController() {
             statusText.includes("cancel") ||
             statusText.includes("aborted") ||
             statusText.includes("failed") ||
-            statusText.includes("error") ||
-            (verdictText && verdictText !== "0" && verdictText !== "notset")
+            statusText.includes("error")
           ) {
             markRunLogsClosed("stream status sync");
             return;
@@ -1116,7 +1114,6 @@ export function useEditorController() {
 
     const getPhase = (payload: Record<string, unknown>) => {
       const statusText = String(payload.status ?? payload.state ?? payload.runState ?? "").toLowerCase();
-      const verdictText = String(payload.verdict ?? "").toLowerCase();
       const completedFlag =
         payload.completed === true ||
         payload.isCompleted === true ||
@@ -1135,10 +1132,6 @@ export function useEditorController() {
         statusText.includes("failed") ||
         statusText.includes("error")
       ) {
-        return "completed" as const;
-      }
-
-      if (verdictText && verdictText !== "0" && verdictText !== "notset") {
         return "completed" as const;
       }
 
@@ -1504,11 +1497,11 @@ export function useEditorController() {
         duration !== "-" &&
         duration.trim() !== "" &&
         !/^0+(?::0+)*(\.0+)?$/.test(duration.trim());
-      const isNotSetVerdict = verdict.toLowerCase() === "notset";
       const shouldTrackAsActive =
         !failedToStart &&
         hasRunId &&
-        (hasExplicitActiveState || (isNotSetVerdict && !hasCompletedDuration && !hasExplicitCompleteState));
+        !hasExplicitCompleteState &&
+        (hasExplicitActiveState || !hasCompletedDuration || !statusText);
 
       if (shouldTrackAsActive) {
         setActiveRunId(runId);
