@@ -910,20 +910,48 @@ export function useEditorController() {
       return "INFO";
     };
 
-    const extractLogEntries = (payload: unknown): any[] => {
-      if (Array.isArray(payload)) return payload;
-      const rec = asRecord(payload);
-      if (!rec) return [];
+    const extractLogEntries = (payload: unknown): unknown[] => {
+      const entries: unknown[] = [];
+      const visited = new Set<object>();
+      const collectionKeys = [
+        "logs", "Logs", "entries", "Entries", "items", "Items", "data", "Data",
+        "events", "Events", "logEntries", "LogEntries", "stepLogs", "StepLogs", "runLogs", "RunLogs",
+        "steps", "Steps", "stepResults", "StepResults", "results", "Results",
+      ];
 
-      if (Array.isArray(rec.logs)) return rec.logs as any[];
-      if (Array.isArray(rec.entries)) return rec.entries as any[];
-      if (Array.isArray(rec.items)) return rec.items as any[];
-      if (Array.isArray(rec.data)) return rec.data as any[];
+      const visit = (value: unknown) => {
+        if (Array.isArray(value)) {
+          value.forEach(visit);
+          return;
+        }
 
-      return [rec];
+        const record = asRecord(value);
+        if (!record) {
+          if (value != null) entries.push(value);
+          return;
+        }
+        if (visited.has(record)) return;
+        visited.add(record);
+
+        const collections = collectionKeys
+          .map((key) => record[key])
+          .filter((collection) => Array.isArray(collection) || asRecord(collection));
+
+        collections.forEach(visit);
+
+        // A step status wrapper often contains nested logs but no message of its own.
+        // Preserve records that do carry a message, and retain unknown event shapes as
+        // JSON so that no backend log event is silently lost.
+        const hasMessage = ["message", "Message", "text", "Text", "line", "Line", "log", "Log"]
+          .some((key) => record[key] != null && stringify(record[key]) !== "");
+        if (hasMessage || collections.length === 0) entries.push(record);
+      };
+
+      visit(payload);
+      return entries;
     };
 
-    const appendEntries = (payload: unknown) => {
+    const appendEntries = (payload: unknown, deduplicate = true) => {
       const entries = extractLogEntries(payload);
       if (entries.length === 0) return;
 
@@ -933,23 +961,29 @@ export function useEditorController() {
         const rec = asRecord(entry);
         applyStepRunUpdates(rec ?? entry);
         const message = rec
-          ? stringify(rec.message ?? rec.text ?? rec.line ?? rec.log)
+          ? stringify(rec.message ?? rec.Message ?? rec.text ?? rec.Text ?? rec.line ?? rec.Line ?? rec.log ?? rec.Log)
+            || stringify(rec)
           : stringify(entry);
         if (!message) return;
 
         const source = rec
-          ? stringify(rec.source ?? rec.logger ?? rec.category ?? rec.component)
+          ? stringify(rec.source ?? rec.Source ?? rec.logger ?? rec.Logger ?? rec.category ?? rec.Category ?? rec.component ?? rec.Component)
           : "Run";
         const level = rec
-          ? mapLogLevel(rec.level ?? rec.severity ?? rec.type)
+          ? mapLogLevel(rec.level ?? rec.Level ?? rec.severity ?? rec.Severity ?? rec.type ?? rec.Type)
           : "INFO";
         const externalId = rec
-          ? stringify(rec.id ?? rec.sequence ?? rec.index)
+          ? stringify(rec.id ?? rec.Id ?? rec.sequence ?? rec.Sequence ?? rec.index ?? rec.Index)
           : "";
-        const key = externalId || `${source}|${level}|${message}`;
+        const eventTime = rec
+          ? stringify(rec.timestamp ?? rec.Timestamp ?? rec.timestampUtc ?? rec.TimestampUtc ?? rec.createdAt ?? rec.CreatedAt)
+          : "";
+        const key = externalId || (eventTime ? `${eventTime}|${source}|${level}|${message}` : `${source}|${level}|${message}`);
 
-        if (seenRunLogKeysRef.current.has(key)) return;
-        seenRunLogKeysRef.current.add(key);
+        if (deduplicate) {
+          if (seenRunLogKeysRef.current.has(key)) return;
+          seenRunLogKeysRef.current.add(key);
+        }
 
         nextLogs.push({
           id: logId.current++,
@@ -1024,9 +1058,11 @@ export function useEditorController() {
         if (cancelled) return;
         if (!event.data) return;
         try {
-          appendEntries(JSON.parse(event.data));
+          // Stream events are already individual deliveries. Do not collapse identical
+          // messages: repeated step output is still meaningful output.
+          appendEntries(JSON.parse(event.data), false);
         } catch {
-          appendEntries({ message: event.data, source: "RunStream", level: "INFO" });
+          appendEntries({ message: event.data, source: "RunStream", level: "INFO" }, false);
         }
       };
 

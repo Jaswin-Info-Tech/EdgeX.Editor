@@ -311,14 +311,8 @@ export function EditorShell(props: EditorShellProps) {
       .join(" ")
       .toLowerCase();
 
-    const propertyKeys = (step.properties || [])
-      .map((prop: any) => String(prop.key ?? prop.label ?? prop.backendName ?? "").toLowerCase());
-
-    const hasDialogProps = propertyKeys.some(key =>
-      key.includes("title") || key.includes("message") || key.includes("button") || key.includes("prompt") || key.includes("dialog"),
-    );
-
-    return rawTypeText.includes("dialog") || hasDialogProps;
+    // Only treat as dialog step if the type explicitly indicates it's a dialog
+    return rawTypeText.includes("dialog");
   };
 
   const handleRunRequested = () => {
