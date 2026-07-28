@@ -56,6 +56,34 @@ export function PropertiesPanel({
   const isEnabledSchemaProperty = (prop: any) =>
     normalizeEditorType(prop.editorType) === "checkbox" &&
     String(prop.name || prop.displayName || "").trim().toLowerCase() === "enabled";
+  const isEnabledWrapperProperty = (prop: any) =>
+    [prop.type, prop.propertyType, prop.fullTypeName].some((typeName) =>
+      String(typeName ?? "").includes("OpenTap.Enabled"),
+    );
+  const getEnabledWrapperValue = (value: any) => {
+    if (value && typeof value === "object") {
+      return {
+        Value: value.Value ?? value.value ?? "",
+        IsEnabled: Boolean(value.IsEnabled ?? value.isEnabled),
+      };
+    }
+
+    const displayValue = String(value ?? "");
+    const displayMatch = displayValue.match(
+      /^\(([\s\S]*)\)\s+\((disabled|enabled|true|false)\)$/i,
+    );
+    if (displayMatch) {
+      return {
+        Value: displayMatch[1],
+        IsEnabled: /^(?:enabled|true)$/i.test(displayMatch[2]),
+      };
+    }
+
+    return {
+      Value: displayValue,
+      IsEnabled: displayValue.trim() !== "",
+    };
+  };
 
   const isObjectLikeEditor = (prop: any) => {
     const type = normalizeEditorType(prop.editorType);
@@ -404,14 +432,12 @@ export function PropertiesPanel({
         ? existing.backendValue
         : displayValue;
 
-      const isEnabledWrapper =
-        prop.propertyType?.includes("OpenTap.Enabled") ||
-        prop.fullTypeName?.includes("OpenTap.Enabled");
+      const isEnabledWrapper = isEnabledWrapperProperty(prop);
 
       const isNameProp = isNameSchemaProperty(prop);
 
-      if (isEnabledWrapper && backendValue && typeof backendValue === "object") {
-        values[prop.name] = backendValue.Value ?? "";
+      if (isEnabledWrapper) {
+        values[prop.name] = getEnabledWrapperValue(backendValue);
       } else if (prop.editorType === "instrument-selector") {
         values[prop.name] = getInstrumentSelectorValue(backendValue);
       } else if (prop.name === "CommandType") {
@@ -452,14 +478,23 @@ export function PropertiesPanel({
       return {};
     }
 
-    const isEnabledWrapper =
-      prop.propertyType?.includes("OpenTap.Enabled") ||
-      prop.fullTypeName?.includes("OpenTap.Enabled");
+    const isEnabledWrapper = isEnabledWrapperProperty(prop);
 
     if (isEnabledWrapper) {
-      if (value == null || String(value).trim() === "") return null;
+      if (value && typeof value === "object" && !Array.isArray(value)) {
+        return {
+          Value: value.Value ?? value.value ?? "",
+          IsEnabled: Boolean(value.IsEnabled ?? value.isEnabled),
+        };
+      }
+      if (value == null || String(value).trim() === "") {
+        return {
+          Value: ".*",
+          IsEnabled: false,
+        };
+      }
       return {
-        IsEnabled: value !== "" && value != null,
+        IsEnabled: true,
         Value: value ?? "",
       };
     }

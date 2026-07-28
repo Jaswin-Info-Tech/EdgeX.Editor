@@ -64,8 +64,18 @@ const renderEditor = vi.fn((prop: any, values: Record<string, any>, setValues: a
     <input
       id={prop.name}
       aria-label={prop.displayName || prop.name}
-      value={values[prop.name] ?? ''}
-      onChange={(e) => setValues((prev: any) => ({ ...prev, [prop.name]: e.target.value }))}
+      value={
+        prop.editorType === 'object' && values[prop.name] && typeof values[prop.name] === 'object'
+          ? JSON.stringify(values[prop.name])
+          : values[prop.name] ?? ''
+      }
+      onChange={(e) => {
+        let value: any = e.target.value
+        if (prop.editorType === 'object') {
+          try { value = JSON.parse(value) } catch { /* keep text while editing invalid JSON */ }
+        }
+        setValues((prev: any) => ({ ...prev, [prop.name]: value }))
+      }}
     />
   </div>
 ))
@@ -323,6 +333,50 @@ describe('PropertiesPanel — schema properties', () => {
     const result = updaterFn([schemaStep])
     const savedProps = result[0].properties
     expect(savedProps.find((p: any) => p.label === 'Voltage')?.value).toBe(5)
+  })
+
+  it('saves OpenTap.Enabled string properties as Value/IsEnabled objects when type is supplied in schema.type', async () => {
+    const user = userEvent.setup()
+    const setPlan = vi.fn()
+    const regexStep = {
+      ...schemaStep,
+      properties: [{
+        key: 'RegularExpressionPattern || RegularExpressionPattern',
+        label: 'RegularExpressionPattern',
+        backendName: 'RegularExpressionPattern',
+        value: '(.*) (disabled)',
+      }],
+    }
+    getSchemaRecords.mockReturnValue([{
+      properties: [{
+        name: 'RegularExpressionPattern',
+        displayName: 'Regular Expression',
+        type: 'OpenTap.Enabled`1[[System.String, System.Private.CoreLib]]',
+        editorType: 'object',
+      }],
+    }])
+
+    render(<PropertiesPanel {...baseProps} selectedStep={regexStep} setPlan={setPlan} />)
+
+    const input = screen.getByLabelText('Regular Expression')
+    expect(input).toHaveValue(JSON.stringify({ Value: '.*', IsEnabled: false }))
+    await user.clear(input)
+    fireEvent.change(input, {
+      target: {
+        value: JSON.stringify({ Value: '^\\s*1\\s*$', IsEnabled: true }),
+      },
+    })
+    await user.click(screen.getByRole('button', { name: /save properties/i }))
+
+    const updaterFn = setPlan.mock.calls[setPlan.mock.calls.length - 1][0]
+    const result = updaterFn([regexStep])
+    const saved = result[0].properties.find(
+      (property: any) => property.backendName === 'RegularExpressionPattern',
+    )
+    expect(saved.value).toEqual({
+      Value: '^\\s*1\\s*$',
+      IsEnabled: true,
+    })
   })
 
   it('saves the Enabled schema property to the step enabled flag', async () => {
