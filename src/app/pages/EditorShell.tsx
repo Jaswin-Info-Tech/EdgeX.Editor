@@ -40,7 +40,7 @@ import {
 } from "../config/serverSettings";
 import { useTestPlans } from "../hooks/usePlugin";
 import type { Property, TestStep } from "../types/editor";
-import { flatAll } from "../utils/editor";
+import { flatAll, normalizeOpenTapEnabledValue } from "../utils/editor";
 import { toast } from "sonner";
 
 interface EditorShellProps {
@@ -1004,7 +1004,7 @@ export function EditorShell(props: EditorShellProps) {
     const enumValues = Array.isArray(property.enumValues)
       ? property.enumValues.map(String)
       : [];
-    const rawValue = property.value;
+    const rawValue = normalizeOpenTapEnabledValue(property.type, property.value);
     const hasEnum = enumValues.length > 0;
     const isBoolean =
       typeof rawValue === "boolean" ||
