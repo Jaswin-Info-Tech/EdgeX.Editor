@@ -315,10 +315,18 @@ export function EditorShell(props: EditorShellProps) {
     return rawTypeText.includes("dialog");
   };
 
-  const handleRunRequested = () => {
+ const handleRunRequested = () => {
     if (runState === "running" || plan.length === 0 || !isSaved) return;
-    if (selectedStep && isDialogStep(selectedStep)) {
+    if (selectedStep && isDialogStep(selectedStep) && selectedStep.enabled !== false) {
       setPendingRunStepId(selectedStep.id);
+      setShowRunConfirm(true);
+      return;
+    }
+
+  
+    const enabledDialogStep = flatAll(plan).find((s: TestStep) => isDialogStep(s) && s.enabled !== false);
+    if (!isDialogStep(selectedStep) && enabledDialogStep) {
+      setPendingRunStepId(enabledDialogStep.id);
       setShowRunConfirm(true);
       return;
     }
