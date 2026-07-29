@@ -115,7 +115,31 @@ if (!global.URL) {
 (global as any).URL.revokeObjectURL = vi.fn();
 
 // Import the hook AFTER all mocks are defined
-import { useEditorController } from "../app/hooks/useEditorController";
+import {
+  formatMqttResultMessage,
+  useEditorController,
+} from "../app/hooks/useEditorController";
+
+describe("formatMqttResultMessage", () => {
+  it("shows ordinary string and numeric result-table values with their names", () => {
+    expect(formatMqttResultMessage({
+      type: "result-table",
+      name: "ACLR Raw Results",
+      columns: [
+        { name: "Value", values: ["-23.27,-23.24,0.032"] },
+        { name: "Passed", values: [true] },
+      ],
+    })).toEqual([
+      "ACLR Raw Results | Value: -23.27,-23.24,0.032",
+      "ACLR Raw Results | Passed: true",
+    ]);
+  });
+
+  it("keeps empty result-table payloads visible for diagnostics", () => {
+    const payload = { type: "result-table", columns: [] };
+    expect(formatMqttResultMessage(payload)).toEqual([JSON.stringify(payload)]);
+  });
+});
 
 describe("useEditorController", () => {
   beforeEach(() => {

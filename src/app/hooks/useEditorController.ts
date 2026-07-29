@@ -42,6 +42,49 @@ type StepRunUpdate = {
   status: StepStatus;
 };
 
+export const formatMqttResultMessage = (data: any): string[] => {
+  if (!data || typeof data !== "object" || data.type !== "result-table") {
+    return [typeof data === "string" ? data : JSON.stringify(data)];
+  }
+
+  const columns = Array.isArray(data.columns) ? data.columns : [];
+  const tableName = String(
+    data.name ?? data.tableName ?? data.resultName ?? data.title ?? "",
+  ).trim();
+  const lines: string[] = [];
+
+  columns.forEach((column: any, columnIndex: number) => {
+    const columnName = String(
+      column?.name ?? column?.columnName ?? column?.title ?? `Column ${columnIndex + 1}`,
+    ).trim();
+    const values = Array.isArray(column?.values) ? column.values : [column?.values];
+
+    values.forEach((rawValue: any, valueIndex: number) => {
+      if (rawValue === undefined) return;
+
+      let displayValue: string;
+      if (typeof rawValue === "string") {
+        try {
+          const parsed = JSON.parse(rawValue);
+          displayValue = JSON.stringify(parsed, null, 2);
+        } catch {
+          displayValue = rawValue;
+        }
+      } else if (rawValue && typeof rawValue === "object") {
+        displayValue = JSON.stringify(rawValue, null, 2);
+      } else {
+        displayValue = String(rawValue ?? "");
+      }
+
+      const indexedName = values.length > 1 ? `${columnName}[${valueIndex}]` : columnName;
+      lines.push(`${tableName ? `${tableName} | ` : ""}${indexedName}: ${displayValue}`);
+    });
+  });
+
+  // Preserve visibility of malformed/empty result-table messages for diagnostics.
+  return lines.length > 0 ? lines : [JSON.stringify(data)];
+};
+
 const getStepRunStatus = (record: Record<string, any>): StepStatus | null => {
   const verdict = record.verdict ?? record.Verdict ?? record.stepVerdict ?? record.StepVerdict ?? record.result;
   const verdictText = String(verdict ?? "").trim().toLowerCase();
@@ -577,34 +620,6 @@ export function useEditorController() {
       return changed ? nextPlan : currentPlan;
     });
   }, []);
-
-  const formatMqttResultMessage = (data: any): string[] => {
-    if (!data || typeof data !== "object" || data.type !== "result-table") {
-      return [typeof data === "string" ? data : JSON.stringify(data)];
-    }
-
-    const columns = Array.isArray(data.columns) ? data.columns : [];
-
-    const lines: string[] = [];
-    columns.forEach((col: any) => {
-      const values = Array.isArray(col?.values) ? col.values : [col?.values];
-
-      values.forEach((rawValue: any) => {
-        // Try to parse stringified JSON bodies (e.g. REST.Body) for pretty display
-        if (typeof rawValue === "string") {
-          try {
-            const parsed = JSON.parse(rawValue);
-            lines.push(JSON.stringify(parsed, null, 2));
-            return;
-          } catch {
-            // not JSON, fall through to plain display
-          }
-        }
-      });
-    });
-
-    return lines;
-  };
 
   const mqttListener = useMqttResultListener(
     (topic, data) => {
