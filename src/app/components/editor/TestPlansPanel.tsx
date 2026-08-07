@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, CheckCircle2, ChevronRight, ClipboardList, Clock3, Info, Loader2, Search, Server, Upload, X } from "lucide-react";
+import { AlertTriangle, CheckCircle2, ClipboardList, Clock3, CopyPlus, Info, Loader2, Pencil, Search, Server, Upload, X } from "lucide-react";
 import { toast } from "sonner";
 
 interface TestPlansPanelProps {
@@ -15,6 +15,7 @@ interface TestPlansPanelProps {
   pendingTestPlan: any | null;
   onSearch: () => void;
   onOpen: (testPlan: any) => void;
+  onDuplicate: (testPlan: any) => Promise<void>;
   onClose: () => void;
   onCancelUnsavedWarning: () => void;
   onSaveUnsavedChanges: () => Promise<void>;
@@ -44,6 +45,7 @@ export function TestPlansPanel({
   pendingTestPlan,
   onSearch,
   onOpen,
+  onDuplicate,
   onClose,
   onCancelUnsavedWarning,
   onSaveUnsavedChanges,
@@ -88,6 +90,7 @@ export function TestPlansPanel({
   const [transferError, setTransferError] = useState("");
   const [transferSuccess, setTransferSuccess] = useState("");
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<FieldErrorKey, string>>>({});
+  const [actionPath, setActionPath] = useState<string | null>(null);
 
   const activeModeMeta = SOURCE_MODE_META[sourceMode];
 
@@ -140,6 +143,17 @@ export function TestPlansPanel({
   const handleSearch = () => {
     rememberPath(query);
     onSearch();
+  };
+
+  const handleDuplicate = async (plan: any) => {
+    setActionPath(plan.path);
+    try {
+      await onDuplicate(plan);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Unable to duplicate test plan.");
+    } finally {
+      setActionPath(null);
+    }
   };
 
   const resetTransferBanner = () => {
@@ -769,21 +783,26 @@ export function TestPlansPanel({
             </div>
           ) : (
             <>
-              <div className="sticky top-0 z-50 grid grid-cols-[minmax(0,1fr)_88px_180px_26px] items-center gap-2 border-b border-border bg-background px-4 py-1.5 text-[10px] font-mono uppercase tracking-[0.12em] text-muted-foreground">
+              <div className="sticky top-0 z-50 grid grid-cols-[minmax(0,1fr)_84px_190px_68px] items-center gap-2 border-b border-border bg-background px-4 py-1.5 text-[10px] font-mono uppercase tracking-[0.12em] text-muted-foreground">
                 <span>Name / Path</span>
                 <span className="text-right">Steps</span>
                 <span>Last Modified</span>
-                <span />
+                <span className="text-center">Actions</span>
               </div>
               {testPlans.map((plan: any, index: number) => {
                 const isOpening = openingPath === plan.path;
                 return (
-                  <button
+                  <div
                     key={`${plan.path}:${index}`}
                     onClick={() => onOpen(plan)}
-                    disabled={!!openingPath}
+                    onKeyDown={(event) => {
+                      if ((event.key === "Enter" || event.key === " ") && !openingPath) onOpen(plan);
+                    }}
+                    role="button"
+                    tabIndex={0}
+                    aria-disabled={!!openingPath}
                     title={String(plan.path ?? "").replace(/\\/g, "\\\\")}
-                    className="group relative grid w-full grid-cols-[minmax(0,1fr)_88px_180px_26px] items-center gap-2 border-b border-border border-l-2 border-l-transparent px-4 py-2 text-left transition-colors hover:border-l-primary/60 hover:bg-secondary/40 focus:bg-primary/10 focus:outline-none disabled:cursor-wait disabled:opacity-60"
+                    className="group relative grid min-h-[56px] w-full grid-cols-[minmax(0,1fr)_84px_190px_68px] items-center gap-2 border-b border-border border-l-2 border-l-transparent px-4 py-2 text-left transition-colors hover:border-l-primary/60 hover:bg-secondary/40 focus:bg-primary/10 focus:outline-none aria-disabled:cursor-wait aria-disabled:opacity-60"
                   >
                     <div className="min-w-0">
                       <div className="truncate text-[13px] font-semibold text-foreground transition-colors group-hover:text-primary">
@@ -802,7 +821,28 @@ export function TestPlansPanel({
                       {formatTimestamp(plan.lastModified)}
                     </span>
 
-                    <ChevronRight size={14} className="shrink-0 text-muted-foreground opacity-0 transition-all group-hover:translate-x-0.5 group-hover:opacity-100" />
+                    <div className="flex h-7 items-center justify-end gap-1 border-l border-border/70 pl-2">
+                      <button
+                        type="button"
+                        title="Edit test plan (coming soon)"
+                        aria-label={`Edit ${plan.name}`}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                        }}
+                        className="flex h-6 w-6 shrink-0 items-center justify-center border border-transparent text-muted-foreground transition-colors hover:border-border hover:bg-secondary hover:text-foreground disabled:opacity-50"
+                      ><Pencil size={13} /></button>
+                      <button
+                        type="button"
+                        title="Duplicate test plan"
+                        aria-label={`Duplicate ${plan.name}`}
+                        disabled={actionPath === plan.path}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          void handleDuplicate(plan);
+                        }}
+                        className="flex h-6 w-6 shrink-0 items-center justify-center border border-transparent text-muted-foreground transition-colors hover:border-border hover:bg-secondary hover:text-foreground disabled:opacity-50"
+                      >{actionPath === plan.path ? <Loader2 size={13} className="animate-spin" /> : <CopyPlus size={13} />}</button>
+                    </div>
 
                     {isOpening && (
                       <div className="absolute inset-0 flex items-center justify-center bg-card/85 backdrop-blur-[1px]">
@@ -812,7 +852,7 @@ export function TestPlansPanel({
                         </span>
                       </div>
                     )}
-                  </button>
+                  </div>
                 );
               })}
             </>

@@ -29,7 +29,7 @@ import {
   resumeRun,
 } from "../api/plugin";
 
-import { composeTestPlan,getStepSchema,runTestPlan } from "../api/testplans";
+import { composeTestPlan, getStepSchema, runTestPlan } from "../api/testplans";
 
 const PLAN_SNAPSHOT_STORAGE_KEY = "edgex.editor.planSnapshot.v1";
 const THEME_STORAGE_KEY = "edgex.editor.theme";
@@ -43,46 +43,30 @@ type StepRunUpdate = {
 };
 
 export const formatMqttResultMessage = (data: any): string[] => {
-  if (!data || typeof data !== "object" || data.type !== "result-table") {
-    return [typeof data === "string" ? data : JSON.stringify(data)];
+  // OpenTAP publishes its raw measurements as result-table objects. Calculators
+  // consume those objects and publish the final formatted table. Show only the
+  // raw values here, without creating another table in the controller.
+  if (data && typeof data === "object" && data.type === "result-table") {
+    const tableName = String(
+      data.table ?? data.Table ?? data.name ?? data.Name ??
+      data.tableName ?? data.TableName ?? data.resultName ?? data.ResultName ?? "Result",
+    ).trim() || "Result";
+    const columns = Array.isArray(data.columns)
+      ? data.columns
+      : Array.isArray(data.Columns)
+        ? data.Columns
+        : [];
+
+    return columns.flatMap((column: any) => {
+      const values = column?.values ?? column?.Values;
+      return (Array.isArray(values) ? values : [values])
+        .filter((value: any) => value !== undefined)
+        .map((value: any) => `${tableName}: ${String(value ?? "")}`);
+    });
   }
 
-  const columns = Array.isArray(data.columns) ? data.columns : [];
-  const tableName = String(
-    data.name ?? data.tableName ?? data.resultName ?? data.title ?? "",
-  ).trim();
-  const lines: string[] = [];
-
-  columns.forEach((column: any, columnIndex: number) => {
-    const columnName = String(
-      column?.name ?? column?.columnName ?? column?.title ?? `Column ${columnIndex + 1}`,
-    ).trim();
-    const values = Array.isArray(column?.values) ? column.values : [column?.values];
-
-    values.forEach((rawValue: any, valueIndex: number) => {
-      if (rawValue === undefined) return;
-
-      let displayValue: string;
-      if (typeof rawValue === "string") {
-        try {
-          const parsed = JSON.parse(rawValue);
-          displayValue = JSON.stringify(parsed, null, 2);
-        } catch {
-          displayValue = rawValue;
-        }
-      } else if (rawValue && typeof rawValue === "object") {
-        displayValue = JSON.stringify(rawValue, null, 2);
-      } else {
-        displayValue = String(rawValue ?? "");
-      }
-
-      const indexedName = values.length > 1 ? `${columnName}[${valueIndex}]` : columnName;
-      lines.push(`${tableName ? `${tableName} | ` : ""}${indexedName}: ${displayValue}`);
-    });
-  });
-
-  // Preserve visibility of malformed/empty result-table messages for diagnostics.
-  return lines.length > 0 ? lines : [JSON.stringify(data)];
+  // Python calculators own all table formatting. Preserve their text exactly.
+  return [typeof data === "string" ? data : JSON.stringify(data)];
 };
 
 const getStepRunStatus = (record: Record<string, any>): StepStatus | null => {
@@ -977,7 +961,7 @@ export function useEditorController() {
         applyStepRunUpdates(rec ?? entry);
         const message = rec
           ? stringify(rec.message ?? rec.Message ?? rec.text ?? rec.Text ?? rec.line ?? rec.Line ?? rec.log ?? rec.Log)
-            || stringify(rec)
+          || stringify(rec)
           : stringify(entry);
         if (!message) return;
 
@@ -1888,7 +1872,7 @@ export function useEditorController() {
       steps: normalizedSteps,
     };
 
-console.log("Saving test plan to:", jsonData);
+    console.log("Saving test plan to:", jsonData);
 
     try {
       const response = await composeTestPlan(jsonData);
