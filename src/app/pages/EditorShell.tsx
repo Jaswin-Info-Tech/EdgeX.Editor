@@ -66,6 +66,11 @@ interface EditorShellProps {
   dragOverSequenceId: string | null;
   setDragOverSequenceId: any;
   handleSeqDrop: any;
+  undoPlanChange: () => void;
+  redoPlanChange: () => void;
+  canUndoPlan: boolean;
+  canRedoPlan: boolean;
+  resetPlanHistory: (plan?: TestStep[]) => void;
   setPlan: any;
   setPlanMeta: any;
   setHasPlan: any;
@@ -194,6 +199,11 @@ export function EditorShell(props: EditorShellProps) {
     dragOverSequenceId,
     setDragOverSequenceId,
     handleSeqDrop,
+    undoPlanChange,
+    redoPlanChange,
+    canUndoPlan,
+    canRedoPlan,
+    resetPlanHistory,
     setPlan,
     setPlanMeta,
     setHasPlan,
@@ -1164,7 +1174,7 @@ export function EditorShell(props: EditorShellProps) {
       };
 
       setPlanMeta(meta);
-      setPlan(steps);
+      resetPlanHistory(steps);
       setOutputPath(path);
       setSavedPlanSignature(getPlanSignature(steps, meta));
       setShowUnsavedPlanWarning(false);
@@ -1522,7 +1532,11 @@ export function EditorShell(props: EditorShellProps) {
             setShowAddStep={setShowAddStep}
             sequenceStepProps={sequenceStepProps}
             draggedStepId={draggedStepId}
-            handleStepReorder={handleStepReorder}
+      handleStepReorder={handleStepReorder}
+      onUndo={undoPlanChange}
+      onRedo={redoPlanChange}
+      canUndo={canUndoPlan}
+      canRedo={canRedoPlan}
           />
 
           {rightOpen ? (

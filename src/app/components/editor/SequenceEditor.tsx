@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { DragEvent } from "react";
-import { FilePlus, GripVertical, Layers, Plus } from "lucide-react";
+import { FilePlus, GripVertical, Layers, Plus, Redo2, Undo2 } from "lucide-react";
 import { SequenceStep } from "./SequenceStep";
 import { flatAll } from "../../utils/editor";
 
@@ -31,6 +31,10 @@ interface SequenceEditorProps {
     newParentId: string | null,
     newIdx: number,
   ) => void;
+  onUndo: () => void;
+  onRedo: () => void;
+  canUndo: boolean;
+  canRedo: boolean;
 }
 
 interface DropTarget {
@@ -179,6 +183,10 @@ export function SequenceEditor({
   sequenceStepProps,
   draggedStepId,
   handleStepReorder,
+  onUndo,
+  onRedo,
+  canUndo,
+  canRedo,
 }: SequenceEditorProps) {
   const targetParentId = null;
   const targetIdx = plan.length;
@@ -454,8 +462,30 @@ export function SequenceEditor({
             </span>
           </>
         )}
+        <div className="ml-auto flex items-center gap-1 border-l border-border/70 pl-2">
+          <button
+            type="button"
+            onClick={onUndo}
+            disabled={!canUndo}
+            title="Undo (Ctrl+Z)"
+            aria-label="Undo"
+            className="flex h-6 w-6 items-center justify-center border border-transparent text-muted-foreground transition-colors hover:border-border hover:bg-secondary hover:text-foreground disabled:cursor-not-allowed disabled:opacity-35"
+          >
+            <Undo2 size={13} />
+          </button>
+          <button
+            type="button"
+            onClick={onRedo}
+            disabled={!canRedo}
+            title="Redo (Ctrl+Shift+Z or Ctrl+Y)"
+            aria-label="Redo"
+            className="flex h-6 w-6 items-center justify-center border border-transparent text-muted-foreground transition-colors hover:border-border hover:bg-secondary hover:text-foreground disabled:cursor-not-allowed disabled:opacity-35"
+          >
+            <Redo2 size={13} />
+          </button>
+        </div>
         {dragLibItem && (
-          <span className="ml-auto text-[11px] font-mono text-primary animate-pulse">
+          <span className="text-[11px] font-mono text-primary animate-pulse">
             Drop to add: {dragLibItem.name}
           </span>
         )}

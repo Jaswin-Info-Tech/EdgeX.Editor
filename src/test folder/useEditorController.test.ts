@@ -1,6 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { renderHook, act } from "@testing-library/react";
 
+const stableEmptyData = vi.hoisted(() => [] as any[]);
+
 // Mock dependencies BEFORE importing the hook  
 vi.mock("../app/hooks/useWindowWidth", () => ({
   useWindowWidth: vi.fn(() => 1280),
@@ -12,37 +14,37 @@ vi.mock("../app/hooks/useDebounce", () => ({
 
 vi.mock("../app/hooks/usePlugin", () => ({
   useInstalledPlugins: vi.fn(() => ({
-    data: [],
+    data: stableEmptyData,
     refetch: vi.fn(),
     isFetching: false,
   })),
   useDuts: vi.fn(() => ({
-    data: [],
+    data: stableEmptyData,
     refetch: vi.fn(),
     isFetching: false,
   })),
   useConnections: vi.fn(() => ({
-    data: [],
+    data: stableEmptyData,
     refetch: vi.fn(),
     isFetching: false,
   })),
   useInstruments: vi.fn(() => ({
-    data: [],
+    data: stableEmptyData,
     refetch: vi.fn(),
     isFetching: false,
   })),
   usePlugins: vi.fn(() => ({
-    data: [],
+    data: stableEmptyData,
     refetch: vi.fn(),
     isFetching: false,
   })),
   useResultListeners: vi.fn(() => ({
-    data: [],
+    data: stableEmptyData,
     refetch: vi.fn(),
     isFetching: false,
   })),
   useTraceListeners: vi.fn(() => ({
-    data: [],
+    data: stableEmptyData,
     refetch: vi.fn(),
     isFetching: false,
   })),
@@ -72,7 +74,7 @@ vi.mock("../api/testplans", () => ({
 
 vi.mock("../app/hooks/usePackage", () => ({
   useAvailablePackages: vi.fn(() => ({
-    data: [],
+    data: stableEmptyData,
     refetch: vi.fn(),
     isFetching: false,
   })),
@@ -168,6 +170,60 @@ describe("useEditorController", () => {
     // The actual hook is complex and depends on many external services
     expect(useEditorController).toBeDefined();
     expect(typeof useEditorController).toBe("function");
+  });
+
+  it("treats a loaded plan as a baseline and undoes only later edits", () => {
+    vi.useRealTimers();
+    const { result } = renderHook(() => useEditorController());
+    const step = (id: string) => ({
+      id,
+      name: id,
+      type: "measure",
+      status: "pending",
+      enabled: true,
+      properties: [],
+    });
+
+    act(() => result.current.resetPlanHistory([step("saved-1"), step("saved-2")]));
+    expect(result.current.canUndoPlan).toBe(false);
+
+    act(() => result.current.setPlan((plan: any[]) => [...plan, step("new-3")]));
+    expect(result.current.canUndoPlan).toBe(true);
+
+    act(() => result.current.undoPlanChange());
+    expect(result.current.plan.map((item: any) => item.id)).toEqual(["saved-1", "saved-2"]);
+    expect(result.current.canUndoPlan).toBe(false);
+
+    act(() => result.current.redoPlanChange());
+    expect(result.current.plan.map((item: any) => item.id)).toEqual(["saved-1", "saved-2", "new-3"]);
+  });
+
+  it("does not allow undoing a plan restored after refresh", () => {
+    vi.useRealTimers();
+    const restoredPlan = [
+      { id: "saved-1", name: "One", type: "measure", status: "pending", enabled: true, properties: [] },
+      { id: "saved-2", name: "Two", type: "measure", status: "pending", enabled: true, properties: [] },
+    ];
+    const restoredSnapshot = JSON.stringify({
+      hasPlan: true,
+      plan: restoredPlan,
+      planMeta: { name: "Saved", description: "", author: "", version: "1.0.0" },
+      selectedId: null,
+      expandedIds: [],
+      leftTab: "plan",
+      savedPlanSignature: null,
+      outputPath: "D:\\Saved.TapPlan",
+    });
+    vi.mocked(global.localStorage.getItem).mockImplementation((key) =>
+      key === "edgex.editor.planSnapshot.v1" ? restoredSnapshot : null,
+    );
+
+    const { result } = renderHook(() => useEditorController());
+    expect(result.current.plan.map((item: any) => item.id)).toEqual(["saved-1", "saved-2"]);
+    expect(result.current.canUndoPlan).toBe(false);
+
+    act(() => result.current.undoPlanChange());
+    expect(result.current.plan.map((item: any) => item.id)).toEqual(["saved-1", "saved-2"]);
   });
 
   it("localStorage mock should be functional", () => {
