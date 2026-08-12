@@ -136,6 +136,71 @@ type PersistedPlanSnapshot = {
   outputPath: string | null;
 };
 
+const isPersistedLeftTab = (
+  value: unknown,
+): value is PersistedPlanSnapshot["leftTab"] =>
+  value === "plan" ||
+  value === "library" ||
+  value === "plugins" ||
+  value === "instruments";
+
+const readPersistedPlanSnapshot = (): PersistedPlanSnapshot | null => {
+  if (typeof window === "undefined") return null;
+
+  try {
+    const rawSnapshot = window.localStorage.getItem(PLAN_SNAPSHOT_STORAGE_KEY);
+    if (!rawSnapshot) return null;
+
+    const parsed = JSON.parse(rawSnapshot) as Partial<PersistedPlanSnapshot>;
+    if (!parsed || parsed.hasPlan !== true || !Array.isArray(parsed.plan)) {
+      return null;
+    }
+
+    const restoredPlan = ensureUniqueStepIds(parsed.plan).steps;
+    const restoredMeta = parsed.planMeta;
+    if (!restoredMeta || typeof restoredMeta !== "object") return null;
+
+    const validIds = new Set(flatAll(restoredPlan).map((step) => step.id));
+    const restoredSelectedId = String(parsed.selectedId ?? "");
+    const expandedIds = Array.isArray(parsed.expandedIds)
+      ? parsed.expandedIds.filter(
+          (id): id is string => typeof id === "string" && validIds.has(id),
+        )
+      : [];
+
+    return {
+      hasPlan: true,
+      plan: restoredPlan,
+      planMeta: {
+        name: String(restoredMeta.name ?? "Untitled Test Plan"),
+        description: String(restoredMeta.description ?? ""),
+        author: String(restoredMeta.author ?? ""),
+        version: String(restoredMeta.version ?? "1.0.0"),
+        dutName: String(restoredMeta.dutName ?? ""),
+        dutSerial: String(restoredMeta.dutSerial ?? ""),
+        dutModel: String(restoredMeta.dutModel ?? ""),
+        dutFirmware: String(restoredMeta.dutFirmware ?? ""),
+      },
+      selectedId:
+        restoredSelectedId && validIds.has(restoredSelectedId)
+          ? restoredSelectedId
+          : null,
+      expandedIds,
+      leftTab: isPersistedLeftTab(parsed.leftTab) ? parsed.leftTab : "library",
+      savedPlanSignature:
+        typeof parsed.savedPlanSignature === "string"
+          ? parsed.savedPlanSignature
+          : null,
+      outputPath:
+        typeof parsed.outputPath === "string" && parsed.outputPath.trim()
+          ? parsed.outputPath
+          : null,
+    };
+  } catch {
+    return null;
+  }
+};
+
 const joinOutputPath = (folderPath: string, planName: string) => {
   const separator = folderPath.includes("/") && !folderPath.includes("\\") ? "/" : "\\";
   const normalizedFolder = folderPath.trim().replace(/[\\/]+$/, "");
@@ -148,6 +213,7 @@ const joinOutputPath = (folderPath: string, planName: string) => {
 
 
 export function useEditorController() {
+  const [initialSnapshot] = useState(() => readPersistedPlanSnapshot());
   const winW = useWindowWidth();
   const isDesktop = winW >= 1280;
   const isTablet = winW >= 768 && winW < 1024;
@@ -166,17 +232,37 @@ export function useEditorController() {
     refetch: refetchAvailablePackages,
     isFetching: isAvailablePackagesFetching,
   } = useAvailablePackages(debouncedBrowseSearch);
-  const [plan, setPlanState] = useState<TestStep[]>([]);
-  const currentPlanRef = useRef<TestStep[]>([]);
+  const [plan, setPlanState] = useState<TestStep[]>(
+    () => initialSnapshot?.plan ?? [],
+  );
+  const currentPlanRef = useRef<TestStep[]>(initialSnapshot?.plan ?? []);
   const undoStackRef = useRef<TestStep[][]>([]);
   const redoStackRef = useRef<TestStep[][]>([]);
-  const lastHistoryPlanRef = useRef<TestStep[]>([]);
+  const lastHistoryPlanRef = useRef<TestStep[]>(initialSnapshot?.plan ?? []);
   const [historyVersion, setHistoryVersion] = useState(0);
-  const [planMeta, setPlanMeta] = useState<PlanMeta>({ name: "Untitled Test Plan", description: "", author: "", version: "1.0.0", dutName: "", dutSerial: "", dutModel: "", dutFirmware: "" });
-  const [hasPlan, setHasPlan] = useState(false);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [expanded, setExpanded] = useState<Set<string>>(new Set());
-  const [leftTab, setLeftTab] = useState<"plan" | "library" | "plugins" | "instruments">("library");
+  const [planMeta, setPlanMeta] = useState<PlanMeta>(
+    () =>
+      initialSnapshot?.planMeta ?? {
+        name: "Untitled Test Plan",
+        description: "",
+        author: "",
+        version: "1.0.0",
+        dutName: "",
+        dutSerial: "",
+        dutModel: "",
+        dutFirmware: "",
+      },
+  );
+  const [hasPlan, setHasPlan] = useState(() => initialSnapshot?.hasPlan ?? false);
+  const [selectedId, setSelectedId] = useState<string | null>(
+    () => initialSnapshot?.selectedId ?? null,
+  );
+  const [expanded, setExpanded] = useState<Set<string>>(
+    () => new Set(initialSnapshot?.expandedIds ?? []),
+  );
+  const [leftTab, setLeftTab] = useState<"plan" | "library" | "plugins" | "instruments">(
+    () => initialSnapshot?.leftTab ?? "library",
+  );
   const [runState, setRunState] = useState<RunState>("idle");
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [showConsole, setShowConsole] = useState(true);
@@ -197,8 +283,12 @@ export function useEditorController() {
     return window.localStorage.getItem(THEME_STORAGE_KEY) === "dark";
   });
   const [isSaved, setIsSaved] = useState(false);
-  const [savedPlanSignature, setSavedPlanSignature] = useState<string | null>(null);
-  const [outputPath, setOutputPath] = useState<string | null>(null);
+  const [savedPlanSignature, setSavedPlanSignature] = useState<string | null>(
+    () => initialSnapshot?.savedPlanSignature ?? null,
+  );
+  const [outputPath, setOutputPath] = useState<string | null>(
+    () => initialSnapshot?.outputPath ?? null,
+  );
   const [showSaveDestination, setShowSaveDestination] = useState(false);
   const [activeRunId, setActiveRunId] = useState<string | null>(null);
   const [mqttCaptureEnabled, setMqttCaptureEnabled] = useState(false);
@@ -470,63 +560,6 @@ export function useEditorController() {
       return result.changed ? result.steps : currentPlan;
     });
   }, [plan]);
-  useEffect(() => {
-    try {
-      const rawSnapshot = localStorage.getItem(PLAN_SNAPSHOT_STORAGE_KEY);
-      if (!rawSnapshot) return;
-
-      const parsed = JSON.parse(rawSnapshot) as Partial<PersistedPlanSnapshot>;
-      if (!parsed || parsed.hasPlan !== true || !Array.isArray(parsed.plan)) return;
-
-      const restoredPlan = ensureUniqueStepIds(parsed.plan).steps;
-      const restoredMeta = parsed.planMeta;
-      if (!restoredMeta || typeof restoredMeta !== "object") return;
-
-      resetPlanHistory(restoredPlan);
-      setPlanMeta({
-        name: String(restoredMeta.name ?? "Untitled Test Plan"),
-        description: String(restoredMeta.description ?? ""),
-        author: String(restoredMeta.author ?? ""),
-        version: String(restoredMeta.version ?? "1.0.0"),
-        dutName: String(restoredMeta.dutName ?? ""),
-        dutSerial: String(restoredMeta.dutSerial ?? ""),
-        dutModel: String(restoredMeta.dutModel ?? ""),
-        dutFirmware: String(restoredMeta.dutFirmware ?? ""),
-      });
-      setHasPlan(true);
-
-      const validIds = new Set(flatAll(restoredPlan).map((step) => step.id));
-      const restoredSelectedId = String(parsed.selectedId ?? "");
-      setSelectedId(restoredSelectedId && validIds.has(restoredSelectedId) ? restoredSelectedId : null);
-
-      const expandedIds = Array.isArray(parsed.expandedIds)
-        ? parsed.expandedIds.filter((id): id is string => typeof id === "string" && validIds.has(id))
-        : [];
-      setExpanded(new Set(expandedIds));
-
-      const restoredLeftTab = parsed.leftTab;
-      if (restoredLeftTab === "plan" || restoredLeftTab === "library" || restoredLeftTab === "plugins" || restoredLeftTab === "instruments") {
-        setLeftTab(restoredLeftTab);
-      }
-
-      setOutputPath(typeof parsed.outputPath === "string" && parsed.outputPath.trim() ? parsed.outputPath : null);
-      setSavedPlanSignature(typeof parsed.savedPlanSignature === "string" ? parsed.savedPlanSignature : null);
-      setRunState("idle");
-      setActiveRunId(null);
-      setLogs((prev) => [
-        ...prev,
-        {
-          id: logId.current++,
-          timestamp: nowTs(),
-          level: "INFO",
-          source: "TestPlans",
-          message: "Restored previous plan from browser session.",
-        },
-      ]);
-    } catch {
-      // Ignore restore failures and fall back to default empty state.
-    }
-  }, []);
   useEffect(() => {
     if (!hasPlan || !savedPlanSignature) {
       setIsSaved(false);
