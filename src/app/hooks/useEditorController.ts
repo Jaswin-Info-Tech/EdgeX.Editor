@@ -240,6 +240,7 @@ export function useEditorController() {
   const redoStackRef = useRef<TestStep[][]>([]);
   const lastHistoryPlanRef = useRef<TestStep[]>(initialSnapshot?.plan ?? []);
   const [historyVersion, setHistoryVersion] = useState(0);
+  const [propertiesPanelResetKey, setPropertiesPanelResetKey] = useState(0);
   const [planMeta, setPlanMeta] = useState<PlanMeta>(
     () =>
       initialSnapshot?.planMeta ?? {
@@ -385,6 +386,7 @@ export function useEditorController() {
     lastHistoryPlanRef.current = clonePlanSnapshot(nextPlan);
     setPlanState(clonePlanSnapshot(nextPlan));
     setHistoryVersion((value) => value + 1);
+    setPropertiesPanelResetKey((value) => value + 1);
   }, []);
 
   useEffect(() => {
@@ -2191,6 +2193,7 @@ export function useEditorController() {
     resetPlanHistory,
     canUndoPlan: historyVersion >= 0 && undoStackRef.current.length > 0,
     canRedoPlan: historyVersion >= 0 && redoStackRef.current.length > 0,
+    propertiesPanelResetKey,
     setPlan,
     setPlanMeta,
     setHasPlan,

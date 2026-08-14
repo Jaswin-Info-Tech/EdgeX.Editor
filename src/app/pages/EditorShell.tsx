@@ -70,6 +70,7 @@ interface EditorShellProps {
   redoPlanChange: () => void;
   canUndoPlan: boolean;
   canRedoPlan: boolean;
+  propertiesPanelResetKey: number;
   resetPlanHistory: (plan?: TestStep[]) => void;
   setPlan: any;
   setPlanMeta: any;
@@ -203,6 +204,7 @@ export function EditorShell(props: EditorShellProps) {
     redoPlanChange,
     canUndoPlan,
     canRedoPlan,
+    propertiesPanelResetKey,
     resetPlanHistory,
     setPlan,
     setPlanMeta,
@@ -1291,6 +1293,7 @@ export function EditorShell(props: EditorShellProps) {
       instruments={instruments}
       resources={resourcePlans}
       testSteps={displayLibrary}
+      resetKey={propertiesPanelResetKey}
       setPlan={setPlan}
       setSelectedId={setSelectedId}
       setAddStepParentId={setAddStepParentId}
