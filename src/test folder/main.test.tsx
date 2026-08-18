@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import React from "react";
 
 // Mock App
-vi.mock("./app/App.tsx", () => ({
+vi.mock("../app/App.tsx", () => ({
   default: () => <div data-testid="app">Mock App</div>,
 }));
 
@@ -38,12 +38,12 @@ vi.mock("@tanstack/react-query", async () => {
 });
 
 // Mock query client
-vi.mock("./app/api/queryClient.ts", () => ({
+vi.mock("../app/api/queryClient.ts", () => ({
   queryClient: {},
 }));
 
 // Mock redux store
-vi.mock("./app/store/index.ts", () => ({
+vi.mock("../app/store/index.ts", () => ({
   store: {},
 }));
 

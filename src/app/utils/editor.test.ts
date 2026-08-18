@@ -28,6 +28,8 @@ import {
   toArray,
   moveStepToPosition,
   setStepEnabled,
+  normalizeOpenTapEnabledValue,
+
 } from "./editor";
 import type { LibraryItem, TestStep } from "../types/editor";
 
@@ -55,6 +57,39 @@ describe("setStepEnabled", () => {
     expect(disabledStep.enabled).toBe(false);
     expect(disabledStep.properties[0].value).toBe(false);
     expect(step.enabled).toBe(true);
+  });
+});
+
+
+describe("normalizeOpenTapEnabledValue", () => {
+  const enabledStringType = "OpenTap.Enabled`1[[System.String, System.Private.CoreLib]]";
+
+  it("preserves an enabled expression returned as display text", () => {
+    expect(normalizeOpenTapEnabledValue(enabledStringType, "^\\s*1\\s*$")).toEqual({
+      Value: "^\\s*1\\s*$",
+      IsEnabled: true,
+    });
+  });
+
+  it("preserves a disabled expression returned with the disabled suffix", () => {
+    expect(normalizeOpenTapEnabledValue(enabledStringType, ".* (disabled)")).toEqual({
+      Value: ".*",
+      IsEnabled: false,
+    });
+  });
+
+  it("normalizes an existing wrapper object", () => {
+    expect(normalizeOpenTapEnabledValue(enabledStringType, {
+      Value: "result",
+      IsEnabled: true,
+    })).toEqual({
+      Value: "result",
+      IsEnabled: true,
+    });
+  });
+
+  it("does not alter ordinary property values", () => {
+    expect(normalizeOpenTapEnabledValue("System.String", "text")).toBe("text");
   });
 });
 

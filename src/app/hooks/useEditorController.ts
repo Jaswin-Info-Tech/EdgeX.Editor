@@ -29,7 +29,7 @@ import {
   resumeRun,
 } from "../api/plugin";
 
-import { composeTestPlan,getStepSchema,runTestPlan } from "../api/testplans";
+import { composeTestPlan, getStepSchema, runTestPlan } from "../api/testplans";
 
 const PLAN_SNAPSHOT_STORAGE_KEY = "edgex.editor.planSnapshot.v1";
 const THEME_STORAGE_KEY = "edgex.editor.theme";
@@ -40,6 +40,33 @@ type StepRunUpdate = {
   names: string[];
   paths: string[];
   status: StepStatus;
+};
+
+export const formatMqttResultMessage = (data: any): string[] => {
+  // OpenTAP publishes its raw measurements as result-table objects. Calculators
+  // consume those objects and publish the final formatted table. Show only the
+  // raw values here, without creating another table in the controller.
+  if (data && typeof data === "object" && data.type === "result-table") {
+    const tableName = String(
+      data.table ?? data.Table ?? data.name ?? data.Name ??
+      data.tableName ?? data.TableName ?? data.resultName ?? data.ResultName ?? "Result",
+    ).trim() || "Result";
+    const columns = Array.isArray(data.columns)
+      ? data.columns
+      : Array.isArray(data.Columns)
+        ? data.Columns
+        : [];
+
+    return columns.flatMap((column: any) => {
+      const values = column?.values ?? column?.Values;
+      return (Array.isArray(values) ? values : [values])
+        .filter((value: any) => value !== undefined)
+        .map((value: any) => `${tableName}: ${String(value ?? "")}`);
+    });
+  }
+
+  // Python calculators own all table formatting. Preserve their text exactly.
+  return [typeof data === "string" ? data : JSON.stringify(data)];
 };
 
 const getStepRunStatus = (record: Record<string, any>): StepStatus | null => {
@@ -109,6 +136,71 @@ type PersistedPlanSnapshot = {
   outputPath: string | null;
 };
 
+const isPersistedLeftTab = (
+  value: unknown,
+): value is PersistedPlanSnapshot["leftTab"] =>
+  value === "plan" ||
+  value === "library" ||
+  value === "plugins" ||
+  value === "instruments";
+
+const readPersistedPlanSnapshot = (): PersistedPlanSnapshot | null => {
+  if (typeof window === "undefined") return null;
+
+  try {
+    const rawSnapshot = window.localStorage.getItem(PLAN_SNAPSHOT_STORAGE_KEY);
+    if (!rawSnapshot) return null;
+
+    const parsed = JSON.parse(rawSnapshot) as Partial<PersistedPlanSnapshot>;
+    if (!parsed || parsed.hasPlan !== true || !Array.isArray(parsed.plan)) {
+      return null;
+    }
+
+    const restoredPlan = ensureUniqueStepIds(parsed.plan).steps;
+    const restoredMeta = parsed.planMeta;
+    if (!restoredMeta || typeof restoredMeta !== "object") return null;
+
+    const validIds = new Set(flatAll(restoredPlan).map((step) => step.id));
+    const restoredSelectedId = String(parsed.selectedId ?? "");
+    const expandedIds = Array.isArray(parsed.expandedIds)
+      ? parsed.expandedIds.filter(
+          (id): id is string => typeof id === "string" && validIds.has(id),
+        )
+      : [];
+
+    return {
+      hasPlan: true,
+      plan: restoredPlan,
+      planMeta: {
+        name: String(restoredMeta.name ?? "Untitled Test Plan"),
+        description: String(restoredMeta.description ?? ""),
+        author: String(restoredMeta.author ?? ""),
+        version: String(restoredMeta.version ?? "1.0.0"),
+        dutName: String(restoredMeta.dutName ?? ""),
+        dutSerial: String(restoredMeta.dutSerial ?? ""),
+        dutModel: String(restoredMeta.dutModel ?? ""),
+        dutFirmware: String(restoredMeta.dutFirmware ?? ""),
+      },
+      selectedId:
+        restoredSelectedId && validIds.has(restoredSelectedId)
+          ? restoredSelectedId
+          : null,
+      expandedIds,
+      leftTab: isPersistedLeftTab(parsed.leftTab) ? parsed.leftTab : "library",
+      savedPlanSignature:
+        typeof parsed.savedPlanSignature === "string"
+          ? parsed.savedPlanSignature
+          : null,
+      outputPath:
+        typeof parsed.outputPath === "string" && parsed.outputPath.trim()
+          ? parsed.outputPath
+          : null,
+    };
+  } catch {
+    return null;
+  }
+};
+
 const joinOutputPath = (folderPath: string, planName: string) => {
   const separator = folderPath.includes("/") && !folderPath.includes("\\") ? "/" : "\\";
   const normalizedFolder = folderPath.trim().replace(/[\\/]+$/, "");
@@ -121,6 +213,7 @@ const joinOutputPath = (folderPath: string, planName: string) => {
 
 
 export function useEditorController() {
+  const [initialSnapshot] = useState(() => readPersistedPlanSnapshot());
   const winW = useWindowWidth();
   const isDesktop = winW >= 1280;
   const isTablet = winW >= 768 && winW < 1024;
@@ -139,12 +232,38 @@ export function useEditorController() {
     refetch: refetchAvailablePackages,
     isFetching: isAvailablePackagesFetching,
   } = useAvailablePackages(debouncedBrowseSearch);
-  const [plan, setPlan] = useState<TestStep[]>([]);
-  const [planMeta, setPlanMeta] = useState<PlanMeta>({ name: "Untitled Test Plan", description: "", author: "", version: "1.0.0", dutName: "", dutSerial: "", dutModel: "", dutFirmware: "" });
-  const [hasPlan, setHasPlan] = useState(false);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [expanded, setExpanded] = useState<Set<string>>(new Set());
-  const [leftTab, setLeftTab] = useState<"plan" | "library" | "plugins" | "instruments">("library");
+  const [plan, setPlanState] = useState<TestStep[]>(
+    () => initialSnapshot?.plan ?? [],
+  );
+  const currentPlanRef = useRef<TestStep[]>(initialSnapshot?.plan ?? []);
+  const undoStackRef = useRef<TestStep[][]>([]);
+  const redoStackRef = useRef<TestStep[][]>([]);
+  const lastHistoryPlanRef = useRef<TestStep[]>(initialSnapshot?.plan ?? []);
+  const [historyVersion, setHistoryVersion] = useState(0);
+  const [propertiesPanelResetKey, setPropertiesPanelResetKey] = useState(0);
+  const [planMeta, setPlanMeta] = useState<PlanMeta>(
+    () =>
+      initialSnapshot?.planMeta ?? {
+        name: "Untitled Test Plan",
+        description: "",
+        author: "",
+        version: "1.0.0",
+        dutName: "",
+        dutSerial: "",
+        dutModel: "",
+        dutFirmware: "",
+      },
+  );
+  const [hasPlan, setHasPlan] = useState(() => initialSnapshot?.hasPlan ?? false);
+  const [selectedId, setSelectedId] = useState<string | null>(
+    () => initialSnapshot?.selectedId ?? null,
+  );
+  const [expanded, setExpanded] = useState<Set<string>>(
+    () => new Set(initialSnapshot?.expandedIds ?? []),
+  );
+  const [leftTab, setLeftTab] = useState<"plan" | "library" | "plugins" | "instruments">(
+    () => initialSnapshot?.leftTab ?? "library",
+  );
   const [runState, setRunState] = useState<RunState>("idle");
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [showConsole, setShowConsole] = useState(true);
@@ -165,8 +284,12 @@ export function useEditorController() {
     return window.localStorage.getItem(THEME_STORAGE_KEY) === "dark";
   });
   const [isSaved, setIsSaved] = useState(false);
-  const [savedPlanSignature, setSavedPlanSignature] = useState<string | null>(null);
-  const [outputPath, setOutputPath] = useState<string | null>(null);
+  const [savedPlanSignature, setSavedPlanSignature] = useState<string | null>(
+    () => initialSnapshot?.savedPlanSignature ?? null,
+  );
+  const [outputPath, setOutputPath] = useState<string | null>(
+    () => initialSnapshot?.outputPath ?? null,
+  );
   const [showSaveDestination, setShowSaveDestination] = useState(false);
   const [activeRunId, setActiveRunId] = useState<string | null>(null);
   const [mqttCaptureEnabled, setMqttCaptureEnabled] = useState(false);
@@ -206,6 +329,84 @@ export function useEditorController() {
   const mqttSubscribedRef = useRef(false);
   const bufferMqttResultsRef = useRef(false);
   const bufferedMqttResultLinesRef = useRef<string[]>([]);
+
+  const clonePlanSnapshot = (value: TestStep[]) => structuredClone(value);
+  const persistentPlanSignature = (value: TestStep[]) => JSON.stringify(value, (key, entry) =>
+    key === "status" ? undefined : entry,
+  );
+
+  const setPlan = useCallback((action: TestStep[] | ((previous: TestStep[]) => TestStep[])) => {
+    const previous = currentPlanRef.current;
+    const next = typeof action === "function" ? action(previous) : action;
+    if (next === previous) return;
+    if (persistentPlanSignature(previous) !== persistentPlanSignature(next)) {
+      undoStackRef.current.push(clonePlanSnapshot(previous));
+      if (undoStackRef.current.length > 100) undoStackRef.current.shift();
+      redoStackRef.current = [];
+      setHistoryVersion((value) => value + 1);
+    }
+    currentPlanRef.current = clonePlanSnapshot(next);
+    lastHistoryPlanRef.current = clonePlanSnapshot(next);
+    setPlanState(next);
+  }, []);
+
+  const setPlanWithoutHistory = useCallback((action: TestStep[] | ((previous: TestStep[]) => TestStep[])) => {
+    const previous = currentPlanRef.current;
+    const next = typeof action === "function" ? action(previous) : action;
+    if (next === previous) return;
+    currentPlanRef.current = clonePlanSnapshot(next);
+    lastHistoryPlanRef.current = clonePlanSnapshot(next);
+    setPlanState(next);
+  }, []);
+
+  const undoPlanChange = useCallback(() => {
+    const previous = undoStackRef.current.pop();
+    if (!previous) return;
+    redoStackRef.current.push(clonePlanSnapshot(lastHistoryPlanRef.current));
+    currentPlanRef.current = clonePlanSnapshot(previous);
+    lastHistoryPlanRef.current = clonePlanSnapshot(previous);
+    setPlanState(clonePlanSnapshot(previous));
+    setHistoryVersion((value) => value + 1);
+  }, []);
+
+  const redoPlanChange = useCallback(() => {
+    const next = redoStackRef.current.pop();
+    if (!next) return;
+    undoStackRef.current.push(clonePlanSnapshot(lastHistoryPlanRef.current));
+    currentPlanRef.current = clonePlanSnapshot(next);
+    lastHistoryPlanRef.current = clonePlanSnapshot(next);
+    setPlanState(clonePlanSnapshot(next));
+    setHistoryVersion((value) => value + 1);
+  }, []);
+
+  const resetPlanHistory = useCallback((nextPlan: TestStep[] = []) => {
+    undoStackRef.current = [];
+    redoStackRef.current = [];
+    currentPlanRef.current = clonePlanSnapshot(nextPlan);
+    lastHistoryPlanRef.current = clonePlanSnapshot(nextPlan);
+    setPlanState(clonePlanSnapshot(nextPlan));
+    setHistoryVersion((value) => value + 1);
+    setPropertiesPanelResetKey((value) => value + 1);
+  }, []);
+
+  useEffect(() => {
+    const handleHistoryShortcut = (event: KeyboardEvent) => {
+      if (!(event.ctrlKey || event.metaKey) || event.altKey) return;
+      const key = event.key.toLowerCase();
+      if (key === "z" && event.shiftKey) {
+        event.preventDefault();
+        redoPlanChange();
+      } else if (key === "z") {
+        event.preventDefault();
+        undoPlanChange();
+      } else if (key === "y") {
+        event.preventDefault();
+        redoPlanChange();
+      }
+    };
+    window.addEventListener("keydown", handleHistoryShortcut);
+    return () => window.removeEventListener("keydown", handleHistoryShortcut);
+  }, [redoPlanChange, undoPlanChange]);
   const canonicalTypeNameCacheRef = useRef<Map<string, string>>(new Map());
 
   const resolveCanonicalStepTypeName = (stepLike: any): string => {
@@ -277,7 +478,7 @@ export function useEditorController() {
     const resolved = await resolveCanonicalTypeFromSchema(requested);
     if (!resolved) return;
 
-    setPlan((prev) =>
+    setPlanWithoutHistory((prev) =>
       updateIn(prev, stepId, (step) => ({
         ...step,
         stepTypeName: resolved,
@@ -288,7 +489,53 @@ export function useEditorController() {
     );
   };
 
+  const normalizeInstrumentReference = useCallback((propertyName: string, value: any, prop: any = {}): any => {
+    const lowerName = String(propertyName ?? "").trim().toLowerCase();
+    if (!lowerName.includes("instrument") || value == null) return value;
+
+    const objectValue = value && typeof value === "object" && !Array.isArray(value) ? value : null;
+    if (objectValue) {
+      const next = { ...objectValue };
+      const name = String(next.Name ?? next.name ?? "").trim();
+      const visaAddress = String(next.VisaAddress ?? next.visaAddress ?? "").trim();
+      const typeHint = String(next.$type ?? next.type ?? next.fullTypeName ?? prop.typeName ?? prop.propertyType ?? "").trim();
+
+      if (name) next.Name = name;
+      if (visaAddress) next.VisaAddress = visaAddress;
+      if (typeHint && !next.$type) next.$type = typeHint;
+      return next;
+    }
+
+    if (typeof value !== "string") return value;
+    const text = value.trim();
+    if (!text) return value;
+
+    const match = text.match(/^(.+?)\s+\((.+)\)$/);
+    if (!match) return value;
+
+    const name = match[1].trim();
+    const visaAddress = match[2].trim();
+    if (!name) return value;
+
+    const next: Record<string, string> = { Name: name };
+    const typeHint = String(prop?.backendValue?.$type ?? prop?.typeName ?? prop?.propertyType ?? "").trim();
+    if (visaAddress) next.VisaAddress = visaAddress;
+    if (typeHint) next.$type = typeHint;
+    return next;
+  }, []);
+
   const formatStepForSave = useCallback((step: TestStep): any => {
+    const runtimePropertyNames = new Set([
+      "childteststeps",
+      "enabledchildsteps",
+      "parent",
+      "results",
+      "planrun",
+      "steprun",
+      "rules",
+      "error",
+    ]);
+
     const props = (step.properties || []).reduce((acc: Record<string, any>, prop: any) => {
       const schemaKey = String(prop.key ?? "").split("||")[0].trim();
       const propertyName = String(
@@ -297,13 +544,19 @@ export function useEditorController() {
         "",
       ).trim();
       if (!propertyName) return acc;
+      if (runtimePropertyNames.has(propertyName.toLowerCase())) return acc;
 
       const isUnchangedLoadedValue =
         Object.prototype.hasOwnProperty.call(prop, "backendValue") &&
         Object.is(prop.value, prop.loadedDisplayValue);
-      acc[propertyName] = isUnchangedLoadedValue ? prop.backendValue : prop.value;
+      const rawValue = isUnchangedLoadedValue ? prop.backendValue : prop.value;
+      acc[propertyName] = normalizeInstrumentReference(propertyName, rawValue, prop);
       return acc;
     }, {});
+
+    // The tree toggle is authoritative. Keeping this synchronized is especially
+    // important for nested steps because OpenTAP evaluates Enabled on each child.
+    props.Enabled = step.enabled !== false;
 
     const stepTypeName = resolveCanonicalStepTypeName(step);
 
@@ -340,68 +593,11 @@ export function useEditorController() {
   useEffect(() => { logEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [logs]);
   useEffect(() => { renameRef.current?.focus(); }, [renaming]);
   useEffect(() => {
-    setPlan((currentPlan) => {
+    setPlanWithoutHistory((currentPlan) => {
       const result = ensureUniqueStepIds(currentPlan);
       return result.changed ? result.steps : currentPlan;
     });
   }, [plan]);
-  useEffect(() => {
-    try {
-      const rawSnapshot = localStorage.getItem(PLAN_SNAPSHOT_STORAGE_KEY);
-      if (!rawSnapshot) return;
-
-      const parsed = JSON.parse(rawSnapshot) as Partial<PersistedPlanSnapshot>;
-      if (!parsed || parsed.hasPlan !== true || !Array.isArray(parsed.plan)) return;
-
-      const restoredPlan = parsed.plan;
-      const restoredMeta = parsed.planMeta;
-      if (!restoredMeta || typeof restoredMeta !== "object") return;
-
-      setPlan(restoredPlan);
-      setPlanMeta({
-        name: String(restoredMeta.name ?? "Untitled Test Plan"),
-        description: String(restoredMeta.description ?? ""),
-        author: String(restoredMeta.author ?? ""),
-        version: String(restoredMeta.version ?? "1.0.0"),
-        dutName: String(restoredMeta.dutName ?? ""),
-        dutSerial: String(restoredMeta.dutSerial ?? ""),
-        dutModel: String(restoredMeta.dutModel ?? ""),
-        dutFirmware: String(restoredMeta.dutFirmware ?? ""),
-      });
-      setHasPlan(true);
-
-      const validIds = new Set(flatAll(restoredPlan).map((step) => step.id));
-      const restoredSelectedId = String(parsed.selectedId ?? "");
-      setSelectedId(restoredSelectedId && validIds.has(restoredSelectedId) ? restoredSelectedId : null);
-
-      const expandedIds = Array.isArray(parsed.expandedIds)
-        ? parsed.expandedIds.filter((id): id is string => typeof id === "string" && validIds.has(id))
-        : [];
-      setExpanded(new Set(expandedIds));
-
-      const restoredLeftTab = parsed.leftTab;
-      if (restoredLeftTab === "plan" || restoredLeftTab === "library" || restoredLeftTab === "plugins" || restoredLeftTab === "instruments") {
-        setLeftTab(restoredLeftTab);
-      }
-
-      setOutputPath(typeof parsed.outputPath === "string" && parsed.outputPath.trim() ? parsed.outputPath : null);
-      setSavedPlanSignature(typeof parsed.savedPlanSignature === "string" ? parsed.savedPlanSignature : null);
-      setRunState("idle");
-      setActiveRunId(null);
-      setLogs((prev) => [
-        ...prev,
-        {
-          id: logId.current++,
-          timestamp: nowTs(),
-          level: "INFO",
-          source: "TestPlans",
-          message: "Restored previous plan from browser session.",
-        },
-      ]);
-    } catch {
-      // Ignore restore failures and fall back to default empty state.
-    }
-  }, []);
   useEffect(() => {
     if (!hasPlan || !savedPlanSignature) {
       setIsSaved(false);
@@ -529,7 +725,7 @@ export function useEditorController() {
     if (updates.length === 0) return;
 
     const normalize = (value: unknown) => String(value ?? "").trim().toLowerCase();
-    setPlan((currentPlan) => {
+    setPlanWithoutHistory((currentPlan) => {
       let changed = false;
 
       const applyToStep = (step: TestStep): TestStep => {
@@ -561,34 +757,6 @@ export function useEditorController() {
       return changed ? nextPlan : currentPlan;
     });
   }, []);
-
-  const formatMqttResultMessage = (data: any): string[] => {
-    if (!data || typeof data !== "object" || data.type !== "result-table") {
-      return [typeof data === "string" ? data : JSON.stringify(data)];
-    }
-
-    const columns = Array.isArray(data.columns) ? data.columns : [];
-
-    const lines: string[] = [];
-    columns.forEach((col: any) => {
-      const values = Array.isArray(col?.values) ? col.values : [col?.values];
-
-      values.forEach((rawValue: any) => {
-        // Try to parse stringified JSON bodies (e.g. REST.Body) for pretty display
-        if (typeof rawValue === "string") {
-          try {
-            const parsed = JSON.parse(rawValue);
-            lines.push(JSON.stringify(parsed, null, 2));
-            return;
-          } catch {
-            // not JSON, fall through to plain display
-          }
-        }
-      });
-    });
-
-    return lines;
-  };
 
   const mqttListener = useMqttResultListener(
     (topic, data) => {
@@ -894,20 +1062,48 @@ export function useEditorController() {
       return "INFO";
     };
 
-    const extractLogEntries = (payload: unknown): any[] => {
-      if (Array.isArray(payload)) return payload;
-      const rec = asRecord(payload);
-      if (!rec) return [];
+    const extractLogEntries = (payload: unknown): unknown[] => {
+      const entries: unknown[] = [];
+      const visited = new Set<object>();
+      const collectionKeys = [
+        "logs", "Logs", "entries", "Entries", "items", "Items", "data", "Data",
+        "events", "Events", "logEntries", "LogEntries", "stepLogs", "StepLogs", "runLogs", "RunLogs",
+        "steps", "Steps", "stepResults", "StepResults", "results", "Results",
+      ];
 
-      if (Array.isArray(rec.logs)) return rec.logs as any[];
-      if (Array.isArray(rec.entries)) return rec.entries as any[];
-      if (Array.isArray(rec.items)) return rec.items as any[];
-      if (Array.isArray(rec.data)) return rec.data as any[];
+      const visit = (value: unknown) => {
+        if (Array.isArray(value)) {
+          value.forEach(visit);
+          return;
+        }
 
-      return [rec];
+        const record = asRecord(value);
+        if (!record) {
+          if (value != null) entries.push(value);
+          return;
+        }
+        if (visited.has(record)) return;
+        visited.add(record);
+
+        const collections = collectionKeys
+          .map((key) => record[key])
+          .filter((collection) => Array.isArray(collection) || asRecord(collection));
+
+        collections.forEach(visit);
+
+        // A step status wrapper often contains nested logs but no message of its own.
+        // Preserve records that do carry a message, and retain unknown event shapes as
+        // JSON so that no backend log event is silently lost.
+        const hasMessage = ["message", "Message", "text", "Text", "line", "Line", "log", "Log"]
+          .some((key) => record[key] != null && stringify(record[key]) !== "");
+        if (hasMessage || collections.length === 0) entries.push(record);
+      };
+
+      visit(payload);
+      return entries;
     };
 
-    const appendEntries = (payload: unknown) => {
+    const appendEntries = (payload: unknown, deduplicate = true) => {
       const entries = extractLogEntries(payload);
       if (entries.length === 0) return;
 
@@ -917,23 +1113,29 @@ export function useEditorController() {
         const rec = asRecord(entry);
         applyStepRunUpdates(rec ?? entry);
         const message = rec
-          ? stringify(rec.message ?? rec.text ?? rec.line ?? rec.log)
+          ? stringify(rec.message ?? rec.Message ?? rec.text ?? rec.Text ?? rec.line ?? rec.Line ?? rec.log ?? rec.Log)
+          || stringify(rec)
           : stringify(entry);
         if (!message) return;
 
         const source = rec
-          ? stringify(rec.source ?? rec.logger ?? rec.category ?? rec.component)
+          ? stringify(rec.source ?? rec.Source ?? rec.logger ?? rec.Logger ?? rec.category ?? rec.Category ?? rec.component ?? rec.Component)
           : "Run";
         const level = rec
-          ? mapLogLevel(rec.level ?? rec.severity ?? rec.type)
+          ? mapLogLevel(rec.level ?? rec.Level ?? rec.severity ?? rec.Severity ?? rec.type ?? rec.Type)
           : "INFO";
         const externalId = rec
-          ? stringify(rec.id ?? rec.sequence ?? rec.index)
+          ? stringify(rec.id ?? rec.Id ?? rec.sequence ?? rec.Sequence ?? rec.index ?? rec.Index)
           : "";
-        const key = externalId || `${source}|${level}|${message}`;
+        const eventTime = rec
+          ? stringify(rec.timestamp ?? rec.Timestamp ?? rec.timestampUtc ?? rec.TimestampUtc ?? rec.createdAt ?? rec.CreatedAt)
+          : "";
+        const key = externalId || (eventTime ? `${eventTime}|${source}|${level}|${message}` : `${source}|${level}|${message}`);
 
-        if (seenRunLogKeysRef.current.has(key)) return;
-        seenRunLogKeysRef.current.add(key);
+        if (deduplicate) {
+          if (seenRunLogKeysRef.current.has(key)) return;
+          seenRunLogKeysRef.current.add(key);
+        }
 
         nextLogs.push({
           id: logId.current++,
@@ -1008,9 +1210,11 @@ export function useEditorController() {
         if (cancelled) return;
         if (!event.data) return;
         try {
-          appendEntries(JSON.parse(event.data));
+          // Stream events are already individual deliveries. Do not collapse identical
+          // messages: repeated step output is still meaningful output.
+          appendEntries(JSON.parse(event.data), false);
         } catch {
-          appendEntries({ message: event.data, source: "RunStream", level: "INFO" });
+          appendEntries({ message: event.data, source: "RunStream", level: "INFO" }, false);
         }
       };
 
@@ -1027,7 +1231,6 @@ export function useEditorController() {
 
           const statusRecord = asRecord(statusPayload) ?? {};
           const statusText = String(statusRecord.status ?? statusRecord.state ?? statusRecord.runState ?? "").toLowerCase();
-          const verdictText = String(statusRecord.verdict ?? "").toLowerCase();
           const completedFlag =
             statusRecord.completed === true ||
             statusRecord.isCompleted === true ||
@@ -1043,8 +1246,7 @@ export function useEditorController() {
             statusText.includes("cancel") ||
             statusText.includes("aborted") ||
             statusText.includes("failed") ||
-            statusText.includes("error") ||
-            (verdictText && verdictText !== "0" && verdictText !== "notset")
+            statusText.includes("error")
           ) {
             markRunLogsClosed("stream status sync");
             return;
@@ -1116,7 +1318,6 @@ export function useEditorController() {
 
     const getPhase = (payload: Record<string, unknown>) => {
       const statusText = String(payload.status ?? payload.state ?? payload.runState ?? "").toLowerCase();
-      const verdictText = String(payload.verdict ?? "").toLowerCase();
       const completedFlag =
         payload.completed === true ||
         payload.isCompleted === true ||
@@ -1135,10 +1336,6 @@ export function useEditorController() {
         statusText.includes("failed") ||
         statusText.includes("error")
       ) {
-        return "completed" as const;
-      }
-
-      if (verdictText && verdictText !== "0" && verdictText !== "notset") {
         return "completed" as const;
       }
 
@@ -1252,8 +1449,8 @@ export function useEditorController() {
   })();
 
   const handleCreatePlan = (meta: PlanMeta) => {
+    resetPlanHistory([]);
     setPlanMeta(meta);
-    setPlan([]);
     setSelectedId(null);
     setExpanded(new Set());
     setRunState("idle");
@@ -1422,7 +1619,7 @@ export function useEditorController() {
   const handleRun = async () => {
     if (runState === "running" || plan.length === 0 || !isSaved) return;
     runTimers.current.forEach(clearTimeout);
-    setPlan(resetAll);
+    setPlanWithoutHistory(resetAll);
     setLogs([]);
     setRunState("running");
     setActiveRunId(null);
@@ -1508,7 +1705,8 @@ export function useEditorController() {
       const shouldTrackAsActive =
         !failedToStart &&
         hasRunId &&
-        (hasExplicitActiveState || (isNotSetVerdict && !hasCompletedDuration && !hasExplicitCompleteState));
+        !hasExplicitCompleteState &&
+        (hasExplicitActiveState || (isNotSetVerdict && !hasCompletedDuration));
 
       if (shouldTrackAsActive) {
         setActiveRunId(runId);
@@ -1662,13 +1860,13 @@ export function useEditorController() {
   };
 
   const handleReset = () => {
+    resetPlanHistory([]);
     runTimers.current.forEach(clearTimeout);
     bufferMqttResultsRef.current = false;
     bufferedMqttResultLinesRef.current = [];
     setRunState("idle");
     setActiveRunId(null);
     setMqttCaptureEnabled(false);
-    setPlan([]);
     setExpanded(new Set());
     setSelectedId(null);
     setRenaming(null);
@@ -1827,7 +2025,8 @@ export function useEditorController() {
       steps: normalizedSteps,
     };
 
-console.log("Saving test plan to:", jsonData);
+    console.log("Saving test plan to:", jsonData);
+
 
     try {
       const response = await composeTestPlan(jsonData);
@@ -1961,7 +2160,7 @@ console.log("Saving test plan to:", jsonData);
 
     const importedSteps = tp.steps.map(convertImportedStep);
 
-    setPlan(importedSteps);
+    resetPlanHistory(importedSteps);
     setExpanded(collectExpandedIds(importedSteps));
 
     if (importedSteps.length > 0) {
@@ -2026,6 +2225,12 @@ console.log("Saving test plan to:", jsonData);
     dragOverSequenceId,
     setDragOverSequenceId,
     handleSeqDrop,
+    undoPlanChange,
+    redoPlanChange,
+    resetPlanHistory,
+    canUndoPlan: historyVersion >= 0 && undoStackRef.current.length > 0,
+    canRedoPlan: historyVersion >= 0 && redoStackRef.current.length > 0,
+    propertiesPanelResetKey,
     setPlan,
     setPlanMeta,
     setHasPlan,
