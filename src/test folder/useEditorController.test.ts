@@ -70,6 +70,8 @@ vi.mock("../api/testplans", () => ({
   fetchTestPlans: vi.fn(() => Promise.resolve([])),
   savePlan: vi.fn(() => Promise.resolve({})),
   deletePlan: vi.fn(() => Promise.resolve({})),
+  composeTestPlan: vi.fn(() => Promise.resolve({})),
+  getStepSchema: vi.fn(() => Promise.resolve({})),
 }));
 
 vi.mock("../app/hooks/usePackage", () => ({
@@ -121,6 +123,7 @@ import {
   formatMqttResultMessage,
   useEditorController,
 } from "../app/hooks/useEditorController";
+import { composeTestPlan } from "../api/testplans";
 
 describe("formatMqttResultMessage", () => {
   it("shows ordinary string and numeric result-table values with their names", () => {
@@ -224,6 +227,58 @@ describe("useEditorController", () => {
 
     act(() => result.current.undoPlanChange());
     expect(result.current.plan.map((item: any) => item.id)).toEqual(["saved-1", "saved-2"]);
+  });
+
+  it("serializes instrument selector values as a structured object for SCPI steps", async () => {
+    const step = {
+      id: "step-1",
+      name: "Test VISA Connect",
+      type: "instrument",
+      status: "pending",
+      enabled: true,
+      stepTypeName: "OpenTap.Plugins.BasicSteps.SCPIRegexStep",
+      properties: [
+        {
+          key: "Instrument || Instrument",
+          label: "Instrument",
+          type: "string",
+          value: "inst 2 (TCPIP::192.168.2.65::INSTR)",
+          group: "Schema Properties",
+          backendName: "Instrument",
+          backendValue: {
+            $type: "OpenTap.Plugins.BasicSteps.GenericScpiInstrument",
+            Name: "test1",
+            VisaAddress: "TCPIP::192.168.2.22::INSTR",
+          },
+          loadedDisplayValue: "test1 (TCPIP::192.168.2.22::INSTR)",
+        },
+      ],
+    };
+
+    const { result } = renderHook(() => useEditorController());
+    act(() => result.current.setPlan(() => [step as any]));
+    act(() => result.current.setOutputPath("D:\\plans\\Saved.TapPlan"));
+
+    await act(async () => {
+      await result.current.handleSave();
+    });
+
+    expect(composeTestPlan).toHaveBeenCalledWith(
+      expect.objectContaining({
+        outputPath: "D:\\plans\\Saved.TapPlan",
+        steps: [
+          expect.objectContaining({
+            properties: expect.objectContaining({
+              Instrument: {
+                $type: "OpenTap.Plugins.BasicSteps.GenericScpiInstrument",
+                Name: "test1",
+                VisaAddress: "TCPIP::192.168.2.22::INSTR",
+              },
+            }),
+          }),
+        ],
+      }),
+    );
   });
 
   it("localStorage mock should be functional", () => {

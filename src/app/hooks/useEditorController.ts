@@ -489,6 +489,41 @@ export function useEditorController() {
     );
   };
 
+  const normalizeInstrumentReference = useCallback((propertyName: string, value: any, prop: any = {}): any => {
+    const lowerName = String(propertyName ?? "").trim().toLowerCase();
+    if (!lowerName.includes("instrument") || value == null) return value;
+
+    const objectValue = value && typeof value === "object" && !Array.isArray(value) ? value : null;
+    if (objectValue) {
+      const next = { ...objectValue };
+      const name = String(next.Name ?? next.name ?? "").trim();
+      const visaAddress = String(next.VisaAddress ?? next.visaAddress ?? "").trim();
+      const typeHint = String(next.$type ?? next.type ?? next.fullTypeName ?? prop.typeName ?? prop.propertyType ?? "").trim();
+
+      if (name) next.Name = name;
+      if (visaAddress) next.VisaAddress = visaAddress;
+      if (typeHint && !next.$type) next.$type = typeHint;
+      return next;
+    }
+
+    if (typeof value !== "string") return value;
+    const text = value.trim();
+    if (!text) return value;
+
+    const match = text.match(/^(.+?)\s+\((.+)\)$/);
+    if (!match) return value;
+
+    const name = match[1].trim();
+    const visaAddress = match[2].trim();
+    if (!name) return value;
+
+    const next: Record<string, string> = { Name: name };
+    const typeHint = String(prop?.backendValue?.$type ?? prop?.typeName ?? prop?.propertyType ?? "").trim();
+    if (visaAddress) next.VisaAddress = visaAddress;
+    if (typeHint) next.$type = typeHint;
+    return next;
+  }, []);
+
   const formatStepForSave = useCallback((step: TestStep): any => {
     const runtimePropertyNames = new Set([
       "childteststeps",
@@ -514,7 +549,8 @@ export function useEditorController() {
       const isUnchangedLoadedValue =
         Object.prototype.hasOwnProperty.call(prop, "backendValue") &&
         Object.is(prop.value, prop.loadedDisplayValue);
-      acc[propertyName] = isUnchangedLoadedValue ? prop.backendValue : prop.value;
+      const rawValue = isUnchangedLoadedValue ? prop.backendValue : prop.value;
+      acc[propertyName] = normalizeInstrumentReference(propertyName, rawValue, prop);
       return acc;
     }, {});
 
