@@ -335,6 +335,7 @@ describe('PropertiesPanel — schema properties', () => {
     expect(savedProps.find((p: any) => p.label === 'Voltage')?.value).toBe(5)
   })
 
+
   it('saves OpenTap.Enabled string properties as Value/IsEnabled objects when type is supplied in schema.type', async () => {
     const user = userEvent.setup()
     const setPlan = vi.fn()
@@ -378,6 +379,7 @@ describe('PropertiesPanel — schema properties', () => {
       IsEnabled: true,
     })
   })
+
 
   it('saves the Enabled schema property to the step enabled flag', async () => {
     const user = userEvent.setup()
