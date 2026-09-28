@@ -22,7 +22,6 @@ interface PropertiesPanelProps {
   instruments: any[];
   resources?: any[];
   testSteps: any[];
-  resetKey?: number;
   setPlan: any;
   setSelectedId: any;
   setAddStepParentId: any;
@@ -38,7 +37,6 @@ export function PropertiesPanel({
   instruments,
   resources = [],
   testSteps,
-  resetKey = 0,
   setPlan,
   updateProperty,
 }: PropertiesPanelProps) {
@@ -62,8 +60,6 @@ export function PropertiesPanel({
     [prop.type, prop.propertyType, prop.fullTypeName].some((typeName) =>
       String(typeName ?? "").includes("OpenTap.Enabled"),
     );
-  const isDefaultCollapsedGroup = (group: string) =>
-    ["properties", "read only"].includes(group.trim().toLowerCase());
   const getEnabledWrapperValue = (value: any) => {
     if (value && typeof value === "object") {
       return {
@@ -415,7 +411,7 @@ export function PropertiesPanel({
     setSchemaCollapsed(false);
     setCollapsedGroups({});
     setSchemaSearch("");
-  }, [selectedStep?.id, resetKey]);
+  }, [selectedStep?.id]);
 
   useEffect(() => {
     if (!selectedStep) {
@@ -771,7 +767,7 @@ export function PropertiesPanel({
           )}
 
           {groups.map((group) => {
-            const isCollapsed = collapsedGroups[group] ?? isDefaultCollapsedGroup(group);
+            const isCollapsed = collapsedGroups[group] ?? false;
             return (
             <div key={group}>
               <button
