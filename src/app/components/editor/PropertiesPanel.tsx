@@ -62,8 +62,6 @@ export function PropertiesPanel({
     [prop.type, prop.propertyType, prop.fullTypeName].some((typeName) =>
       String(typeName ?? "").includes("OpenTap.Enabled"),
     );
-  const isDefaultCollapsedGroup = (group: string) =>
-    ["properties", "read only"].includes(group.trim().toLowerCase());
   const getEnabledWrapperValue = (value: any) => {
     if (value && typeof value === "object") {
       return {
