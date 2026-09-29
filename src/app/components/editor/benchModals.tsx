@@ -1000,7 +1000,7 @@ function GenericResourcePanel({
                       className="flex h-8 items-center gap-2 border border-border px-2 text-[10px] font-mono font-semibold text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
                       title="Back to resource instances"
                     >
-                      <X size={13} />
+                      <ArrowLeft size={13} />
                       Back to Instances
                     </button>
                   </div>

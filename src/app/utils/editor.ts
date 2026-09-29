@@ -18,6 +18,29 @@ export function parseFreq(s: string): number {
   return n || 0;
 }
 
+export function normalizeOpenTapEnabledValue(typeName: unknown, rawValue: any): any {
+  if (!String(typeName ?? "").includes("OpenTap.Enabled")) return rawValue;
+
+  if (rawValue && typeof rawValue === "object" && !Array.isArray(rawValue)) {
+    return {
+      Value: rawValue.Value ?? rawValue.value ?? "",
+      IsEnabled: Boolean(rawValue.IsEnabled ?? rawValue.isEnabled),
+    };
+  }
+
+  const displayValue = String(rawValue ?? "");
+  const displayMatch = displayValue.match(
+    /^([\s\S]*?)\s+\((disabled|enabled|true|false)\)$/i,
+  );
+
+  return {
+    Value: displayMatch ? displayMatch[1] : displayValue,
+    IsEnabled: displayMatch
+      ? /^(?:enabled|true)$/i.test(displayMatch[2])
+      : displayValue.trim() !== "",
+  };
+}
+
 export function flatAll(steps: TestStep[]): TestStep[] {
   return steps.flatMap(s => [s, ...(s.children ? flatAll(s.children) : [])]);
 }

@@ -29,7 +29,7 @@ import {
   resumeRun,
 } from "../api/plugin";
 
-import { composeTestPlan,getStepSchema,runTestPlan } from "../api/testplans";
+import { composeTestPlan, getStepSchema, runTestPlan } from "../api/testplans";
 
 const PLAN_SNAPSHOT_STORAGE_KEY = "edgex.editor.planSnapshot.v1";
 const THEME_STORAGE_KEY = "edgex.editor.theme";
@@ -40,6 +40,33 @@ type StepRunUpdate = {
   names: string[];
   paths: string[];
   status: StepStatus;
+};
+
+export const formatMqttResultMessage = (data: any): string[] => {
+  // OpenTAP publishes its raw measurements as result-table objects. Calculators
+  // consume those objects and publish the final formatted table. Show only the
+  // raw values here, without creating another table in the controller.
+  if (data && typeof data === "object" && data.type === "result-table") {
+    const tableName = String(
+      data.table ?? data.Table ?? data.name ?? data.Name ??
+      data.tableName ?? data.TableName ?? data.resultName ?? data.ResultName ?? "Result",
+    ).trim() || "Result";
+    const columns = Array.isArray(data.columns)
+      ? data.columns
+      : Array.isArray(data.Columns)
+        ? data.Columns
+        : [];
+
+    return columns.flatMap((column: any) => {
+      const values = column?.values ?? column?.Values;
+      return (Array.isArray(values) ? values : [values])
+        .filter((value: any) => value !== undefined)
+        .map((value: any) => `${tableName}: ${String(value ?? "")}`);
+    });
+  }
+
+  // Python calculators own all table formatting. Preserve their text exactly.
+  return [typeof data === "string" ? data : JSON.stringify(data)];
 };
 
 const getStepRunStatus = (record: Record<string, any>): StepStatus | null => {
@@ -139,7 +166,12 @@ export function useEditorController() {
     refetch: refetchAvailablePackages,
     isFetching: isAvailablePackagesFetching,
   } = useAvailablePackages(debouncedBrowseSearch);
-  const [plan, setPlan] = useState<TestStep[]>([]);
+  const [plan, setPlanState] = useState<TestStep[]>([]);
+  const currentPlanRef = useRef<TestStep[]>([]);
+  const undoStackRef = useRef<TestStep[][]>([]);
+  const redoStackRef = useRef<TestStep[][]>([]);
+  const lastHistoryPlanRef = useRef<TestStep[]>([]);
+  const [historyVersion, setHistoryVersion] = useState(0);
   const [planMeta, setPlanMeta] = useState<PlanMeta>({ name: "Untitled Test Plan", description: "", author: "", version: "1.0.0", dutName: "", dutSerial: "", dutModel: "", dutFirmware: "" });
   const [hasPlan, setHasPlan] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -206,6 +238,83 @@ export function useEditorController() {
   const mqttSubscribedRef = useRef(false);
   const bufferMqttResultsRef = useRef(false);
   const bufferedMqttResultLinesRef = useRef<string[]>([]);
+
+  const clonePlanSnapshot = (value: TestStep[]) => structuredClone(value);
+  const persistentPlanSignature = (value: TestStep[]) => JSON.stringify(value, (key, entry) =>
+    key === "status" ? undefined : entry,
+  );
+
+  const setPlan = useCallback((action: TestStep[] | ((previous: TestStep[]) => TestStep[])) => {
+    const previous = currentPlanRef.current;
+    const next = typeof action === "function" ? action(previous) : action;
+    if (next === previous) return;
+    if (persistentPlanSignature(previous) !== persistentPlanSignature(next)) {
+      undoStackRef.current.push(clonePlanSnapshot(previous));
+      if (undoStackRef.current.length > 100) undoStackRef.current.shift();
+      redoStackRef.current = [];
+      setHistoryVersion((value) => value + 1);
+    }
+    currentPlanRef.current = clonePlanSnapshot(next);
+    lastHistoryPlanRef.current = clonePlanSnapshot(next);
+    setPlanState(next);
+  }, []);
+
+  const setPlanWithoutHistory = useCallback((action: TestStep[] | ((previous: TestStep[]) => TestStep[])) => {
+    const previous = currentPlanRef.current;
+    const next = typeof action === "function" ? action(previous) : action;
+    if (next === previous) return;
+    currentPlanRef.current = clonePlanSnapshot(next);
+    lastHistoryPlanRef.current = clonePlanSnapshot(next);
+    setPlanState(next);
+  }, []);
+
+  const undoPlanChange = useCallback(() => {
+    const previous = undoStackRef.current.pop();
+    if (!previous) return;
+    redoStackRef.current.push(clonePlanSnapshot(lastHistoryPlanRef.current));
+    currentPlanRef.current = clonePlanSnapshot(previous);
+    lastHistoryPlanRef.current = clonePlanSnapshot(previous);
+    setPlanState(clonePlanSnapshot(previous));
+    setHistoryVersion((value) => value + 1);
+  }, []);
+
+  const redoPlanChange = useCallback(() => {
+    const next = redoStackRef.current.pop();
+    if (!next) return;
+    undoStackRef.current.push(clonePlanSnapshot(lastHistoryPlanRef.current));
+    currentPlanRef.current = clonePlanSnapshot(next);
+    lastHistoryPlanRef.current = clonePlanSnapshot(next);
+    setPlanState(clonePlanSnapshot(next));
+    setHistoryVersion((value) => value + 1);
+  }, []);
+
+  const resetPlanHistory = useCallback((nextPlan: TestStep[] = []) => {
+    undoStackRef.current = [];
+    redoStackRef.current = [];
+    currentPlanRef.current = clonePlanSnapshot(nextPlan);
+    lastHistoryPlanRef.current = clonePlanSnapshot(nextPlan);
+    setPlanState(clonePlanSnapshot(nextPlan));
+    setHistoryVersion((value) => value + 1);
+  }, []);
+
+  useEffect(() => {
+    const handleHistoryShortcut = (event: KeyboardEvent) => {
+      if (!(event.ctrlKey || event.metaKey) || event.altKey) return;
+      const key = event.key.toLowerCase();
+      if (key === "z" && event.shiftKey) {
+        event.preventDefault();
+        redoPlanChange();
+      } else if (key === "z") {
+        event.preventDefault();
+        undoPlanChange();
+      } else if (key === "y") {
+        event.preventDefault();
+        redoPlanChange();
+      }
+    };
+    window.addEventListener("keydown", handleHistoryShortcut);
+    return () => window.removeEventListener("keydown", handleHistoryShortcut);
+  }, [redoPlanChange, undoPlanChange]);
   const canonicalTypeNameCacheRef = useRef<Map<string, string>>(new Map());
 
   const resolveCanonicalStepTypeName = (stepLike: any): string => {
@@ -277,7 +386,7 @@ export function useEditorController() {
     const resolved = await resolveCanonicalTypeFromSchema(requested);
     if (!resolved) return;
 
-    setPlan((prev) =>
+    setPlanWithoutHistory((prev) =>
       updateIn(prev, stepId, (step) => ({
         ...step,
         stepTypeName: resolved,
@@ -356,7 +465,7 @@ export function useEditorController() {
   useEffect(() => { logEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [logs]);
   useEffect(() => { renameRef.current?.focus(); }, [renaming]);
   useEffect(() => {
-    setPlan((currentPlan) => {
+    setPlanWithoutHistory((currentPlan) => {
       const result = ensureUniqueStepIds(currentPlan);
       return result.changed ? result.steps : currentPlan;
     });
@@ -369,11 +478,11 @@ export function useEditorController() {
       const parsed = JSON.parse(rawSnapshot) as Partial<PersistedPlanSnapshot>;
       if (!parsed || parsed.hasPlan !== true || !Array.isArray(parsed.plan)) return;
 
-      const restoredPlan = parsed.plan;
+      const restoredPlan = ensureUniqueStepIds(parsed.plan).steps;
       const restoredMeta = parsed.planMeta;
       if (!restoredMeta || typeof restoredMeta !== "object") return;
 
-      setPlan(restoredPlan);
+      resetPlanHistory(restoredPlan);
       setPlanMeta({
         name: String(restoredMeta.name ?? "Untitled Test Plan"),
         description: String(restoredMeta.description ?? ""),
@@ -545,7 +654,7 @@ export function useEditorController() {
     if (updates.length === 0) return;
 
     const normalize = (value: unknown) => String(value ?? "").trim().toLowerCase();
-    setPlan((currentPlan) => {
+    setPlanWithoutHistory((currentPlan) => {
       let changed = false;
 
       const applyToStep = (step: TestStep): TestStep => {
@@ -577,34 +686,6 @@ export function useEditorController() {
       return changed ? nextPlan : currentPlan;
     });
   }, []);
-
-  const formatMqttResultMessage = (data: any): string[] => {
-    if (!data || typeof data !== "object" || data.type !== "result-table") {
-      return [typeof data === "string" ? data : JSON.stringify(data)];
-    }
-
-    const columns = Array.isArray(data.columns) ? data.columns : [];
-
-    const lines: string[] = [];
-    columns.forEach((col: any) => {
-      const values = Array.isArray(col?.values) ? col.values : [col?.values];
-
-      values.forEach((rawValue: any) => {
-        // Try to parse stringified JSON bodies (e.g. REST.Body) for pretty display
-        if (typeof rawValue === "string") {
-          try {
-            const parsed = JSON.parse(rawValue);
-            lines.push(JSON.stringify(parsed, null, 2));
-            return;
-          } catch {
-            // not JSON, fall through to plain display
-          }
-        }
-      });
-    });
-
-    return lines;
-  };
 
   const mqttListener = useMqttResultListener(
     (topic, data) => {
@@ -962,7 +1043,7 @@ export function useEditorController() {
         applyStepRunUpdates(rec ?? entry);
         const message = rec
           ? stringify(rec.message ?? rec.Message ?? rec.text ?? rec.Text ?? rec.line ?? rec.Line ?? rec.log ?? rec.Log)
-            || stringify(rec)
+          || stringify(rec)
           : stringify(entry);
         if (!message) return;
 
@@ -1297,8 +1378,8 @@ export function useEditorController() {
   })();
 
   const handleCreatePlan = (meta: PlanMeta) => {
+    resetPlanHistory([]);
     setPlanMeta(meta);
-    setPlan([]);
     setSelectedId(null);
     setExpanded(new Set());
     setRunState("idle");
@@ -1467,7 +1548,7 @@ export function useEditorController() {
   const handleRun = async () => {
     if (runState === "running" || plan.length === 0 || !isSaved) return;
     runTimers.current.forEach(clearTimeout);
-    setPlan(resetAll);
+    setPlanWithoutHistory(resetAll);
     setLogs([]);
     setRunState("running");
     setActiveRunId(null);
@@ -1708,13 +1789,13 @@ export function useEditorController() {
   };
 
   const handleReset = () => {
+    resetPlanHistory([]);
     runTimers.current.forEach(clearTimeout);
     bufferMqttResultsRef.current = false;
     bufferedMqttResultLinesRef.current = [];
     setRunState("idle");
     setActiveRunId(null);
     setMqttCaptureEnabled(false);
-    setPlan([]);
     setExpanded(new Set());
     setSelectedId(null);
     setRenaming(null);
@@ -1873,7 +1954,7 @@ export function useEditorController() {
       steps: normalizedSteps,
     };
 
-console.log("Saving test plan to:", jsonData);
+    console.log("Saving test plan to:", jsonData);
 
     try {
       const response = await composeTestPlan(jsonData);
@@ -2007,7 +2088,7 @@ console.log("Saving test plan to:", jsonData);
 
     const importedSteps = tp.steps.map(convertImportedStep);
 
-    setPlan(importedSteps);
+    resetPlanHistory(importedSteps);
     setExpanded(collectExpandedIds(importedSteps));
 
     if (importedSteps.length > 0) {
@@ -2072,6 +2153,11 @@ console.log("Saving test plan to:", jsonData);
     dragOverSequenceId,
     setDragOverSequenceId,
     handleSeqDrop,
+    undoPlanChange,
+    redoPlanChange,
+    resetPlanHistory,
+    canUndoPlan: historyVersion >= 0 && undoStackRef.current.length > 0,
+    canRedoPlan: historyVersion >= 0 && redoStackRef.current.length > 0,
     setPlan,
     setPlanMeta,
     setHasPlan,

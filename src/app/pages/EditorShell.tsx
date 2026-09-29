@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ChevronLeft, PanelLeftOpen, PanelRightOpen } from "lucide-react";
-import { getTestPlanEditorModel, importRemoteTestPlan, uploadTapPlan } from "../api/testplans";
+import { composeTestPlan, getTestPlanEditorModel, importRemoteTestPlan, uploadTapPlan } from "../api/testplans";
 import { getResources, getResourceSchema } from "../api/resources";
 import { Toggle } from "../components/editor/atoms";
 import { ConsolePanel } from "../components/editor/ConsolePanel";
@@ -40,7 +40,7 @@ import {
 } from "../config/serverSettings";
 import { useTestPlans } from "../hooks/usePlugin";
 import type { Property, TestStep } from "../types/editor";
-import { flatAll } from "../utils/editor";
+import { flatAll, normalizeOpenTapEnabledValue } from "../utils/editor";
 import { toast } from "sonner";
 
 interface EditorShellProps {
@@ -66,6 +66,11 @@ interface EditorShellProps {
   dragOverSequenceId: string | null;
   setDragOverSequenceId: any;
   handleSeqDrop: any;
+  undoPlanChange: () => void;
+  redoPlanChange: () => void;
+  canUndoPlan: boolean;
+  canRedoPlan: boolean;
+  resetPlanHistory: (plan?: TestStep[]) => void;
   setPlan: any;
   setPlanMeta: any;
   setHasPlan: any;
@@ -194,6 +199,11 @@ export function EditorShell(props: EditorShellProps) {
     dragOverSequenceId,
     setDragOverSequenceId,
     handleSeqDrop,
+    undoPlanChange,
+    redoPlanChange,
+    canUndoPlan,
+    canRedoPlan,
+    resetPlanHistory,
     setPlan,
     setPlanMeta,
     setHasPlan,
@@ -315,10 +325,18 @@ export function EditorShell(props: EditorShellProps) {
     return rawTypeText.includes("dialog");
   };
 
-  const handleRunRequested = () => {
+ const handleRunRequested = () => {
     if (runState === "running" || plan.length === 0 || !isSaved) return;
-    if (selectedStep && isDialogStep(selectedStep)) {
+    if (selectedStep && isDialogStep(selectedStep) && selectedStep.enabled !== false) {
       setPendingRunStepId(selectedStep.id);
+      setShowRunConfirm(true);
+      return;
+    }
+
+  
+    const enabledDialogStep = flatAll(plan).find((s: TestStep) => isDialogStep(s) && s.enabled !== false);
+    if (!isDialogStep(selectedStep) && enabledDialogStep) {
+      setPendingRunStepId(enabledDialogStep.id);
       setShowRunConfirm(true);
       return;
     }
@@ -415,6 +433,8 @@ export function EditorShell(props: EditorShellProps) {
   const [submittedTestPlanQuery, setSubmittedTestPlanQuery] = useState("");
   const [hasSearchedTestPlans, setHasSearchedTestPlans] = useState(false);
   const [testPlanSearchNonce, setTestPlanSearchNonce] = useState(0);
+  const [isStartingTestPlanSearch, setIsStartingTestPlanSearch] = useState(false);
+  const [isSilentTestPlansRefresh, setIsSilentTestPlansRefresh] = useState(false);
   const [openingTestPlanPath, setOpeningTestPlanPath] = useState<string | null>(
     null,
   );
@@ -427,6 +447,23 @@ export function EditorShell(props: EditorShellProps) {
   const [isInitialServerSetup, setIsInitialServerSetup] = useState(false);
   const [activeServerLabel, setActiveServerLabel] = useState("");
   const [activeServerHealth, setActiveServerHealth] = useState<"healthy" | "error" | "stale" | "untested">("untested");
+
+  const handleTestPlansPanelVisibility = (show: boolean) => {
+    if (!show) {
+      setShowTestPlansPanel(false);
+      return;
+    }
+    setTestPlanQuery("D:\\");
+    setSubmittedTestPlanQuery("");
+    setHasSearchedTestPlans(false);
+    setIsStartingTestPlanSearch(false);
+    setOpenTestPlanError("");
+    setOpeningTestPlanPath(null);
+    setPendingTestPlan(null);
+    setShowUnsavedPlanWarning(false);
+    setShowTestPlansPanel(true);
+  };
+
   const displayLibrary = useMemo(() => {
     if (Array.isArray(data) && data.length > 0) return data;
     if (Array.isArray(library)) return library;
@@ -897,18 +934,26 @@ export function EditorShell(props: EditorShellProps) {
 
   const {
     data: testPlans = [],
-    isFetching: isTestPlansLoading,
+    isFetching: isTestPlansFetching,
     isError: isTestPlansError,
     refetch: searchTestPlans,
   } = useTestPlans(submittedTestPlanQuery || undefined, false);
+  const isTestPlansLoading = (isStartingTestPlanSearch || isTestPlansFetching) && !isSilentTestPlansRefresh;
 
   useEffect(() => {
     if (!hasSearchedTestPlans) return;
-    searchTestPlans();
+    void searchTestPlans().finally(() => setIsStartingTestPlanSearch(false));
   }, [hasSearchedTestPlans, searchTestPlans, testPlanSearchNonce]);
 
   const handleSearchTestPlans = () => {
-    setSubmittedTestPlanQuery(testPlanQuery.trim());
+    const nextQuery = testPlanQuery.trim();
+    setIsStartingTestPlanSearch(true);
+    if (hasSearchedTestPlans && nextQuery === submittedTestPlanQuery) {
+      setOpenTestPlanError("");
+      void searchTestPlans().finally(() => setIsStartingTestPlanSearch(false));
+      return;
+    }
+    setSubmittedTestPlanQuery(nextQuery);
     setHasSearchedTestPlans(true);
     setOpenTestPlanError("");
     setTestPlanSearchNonce((value) => value + 1);
@@ -1004,7 +1049,7 @@ export function EditorShell(props: EditorShellProps) {
     const enumValues = Array.isArray(property.enumValues)
       ? property.enumValues.map(String)
       : [];
-    const rawValue = property.value;
+    const rawValue = normalizeOpenTapEnabledValue(property.type, property.value);
     const hasEnum = enumValues.length > 0;
     const isBoolean =
       typeof rawValue === "boolean" ||
@@ -1129,7 +1174,7 @@ export function EditorShell(props: EditorShellProps) {
       };
 
       setPlanMeta(meta);
-      setPlan(steps);
+      resetPlanHistory(steps);
       setOutputPath(path);
       setSavedPlanSignature(getPlanSignature(steps, meta));
       setShowUnsavedPlanWarning(false);
@@ -1153,6 +1198,81 @@ export function EditorShell(props: EditorShellProps) {
     } finally {
       setOpeningTestPlanPath(null);
     }
+  };
+
+  const replacePlanFileName = (path: string, name: string) => {
+    const separatorIndex = Math.max(path.lastIndexOf("/"), path.lastIndexOf("\\"));
+    const directory = separatorIndex >= 0 ? path.slice(0, separatorIndex + 1) : "";
+    const currentFile = separatorIndex >= 0 ? path.slice(separatorIndex + 1) : path;
+    const extensionMatch = currentFile.match(/(\.[^.]+)$/);
+    const extension = extensionMatch?.[1] ?? ".TapPlan";
+    const cleanName = name.replace(/[\\/:*?"<>|]/g, "").trim();
+    const fileName = cleanName.toLowerCase().endsWith(extension.toLowerCase())
+      ? cleanName
+      : `${cleanName}${extension}`;
+    return `${directory}${fileName}`;
+  };
+
+  const savePlanCopy = async (testPlan: any, outputPath: string) => {
+    const editorModel = await getTestPlanEditorModel(String(testPlan.path ?? ""));
+    const runtimePropertyNames = new Set([
+      "childteststeps",
+      "enabledchildsteps",
+      "parent",
+      "results",
+      "planrun",
+      "steprun",
+      "rules",
+      "error",
+    ]);
+    const formatLoadedStepForSave = (step: TestStep): any => {
+      const properties = (step.properties ?? []).reduce((result: Record<string, unknown>, property: Property) => {
+        const propertyName = String(property.backendName ?? property.label ?? property.key ?? "").trim();
+        if (!propertyName || runtimePropertyNames.has(propertyName.toLowerCase())) return result;
+        result[propertyName] = property.backendValue ?? property.value;
+        return result;
+      }, {});
+      properties.Enabled = step.enabled !== false;
+
+      return {
+        stepTypeName: String(
+          step.fullName ?? step.typeName ?? step.className ?? step.stepTypeName ?? step.type ?? "unknown",
+        ),
+        ...(step.name ? { name: step.name } : {}),
+        properties,
+        ...(step.children?.length
+          ? { children: step.children.map(formatLoadedStepForSave) }
+          : {}),
+      };
+    };
+    const loadedSteps = Array.isArray(editorModel.steps)
+      ? editorModel.steps.map(toEditorStep)
+      : [];
+    await composeTestPlan({
+      outputPath,
+      overwrite: true,
+      steps: loadedSteps.map(formatLoadedStepForSave),
+    });
+  };
+
+  const handleDuplicateTestPlan = async (testPlan: any) => {
+    const sourceName = String(testPlan.name ?? "Test Plan").replace(/\.tapplan$/i, "");
+    const existingNames = new Set(testPlans.map((plan: any) => String(plan.name ?? "").toLowerCase()));
+    let duplicateName = `${sourceName} (copy)`;
+    let copyNumber = 2;
+    while (existingNames.has(duplicateName.toLowerCase())) {
+      duplicateName = `${sourceName} (copy ${copyNumber})`;
+      copyNumber += 1;
+    }
+    const outputPath = replacePlanFileName(String(testPlan.path ?? ""), duplicateName);
+    await savePlanCopy(testPlan, outputPath);
+    setIsSilentTestPlansRefresh(true);
+    try {
+      await searchTestPlans();
+    } finally {
+      setIsSilentTestPlansRefresh(false);
+    }
+    toast.success(`Duplicated ${testPlan.name}.`);
   };
 
   const filteredLogs = useMemo(
@@ -1321,7 +1441,7 @@ export function EditorShell(props: EditorShellProps) {
         setShowNewPlan={setShowNewPlan}
         setShowPluginMgr={setShowPluginMgr}
         setShowResourcesPanel={setShowResourcesPanel}
-        setShowTestPlansPanel={setShowTestPlansPanel}
+        setShowTestPlansPanel={handleTestPlansPanelVisibility}
         showSystemKpis={showSystemKpis}
         setShowSystemKpis={setShowSystemKpis}
         setAddStepParentId={setAddStepParentId}
@@ -1412,7 +1532,11 @@ export function EditorShell(props: EditorShellProps) {
             setShowAddStep={setShowAddStep}
             sequenceStepProps={sequenceStepProps}
             draggedStepId={draggedStepId}
-            handleStepReorder={handleStepReorder}
+      handleStepReorder={handleStepReorder}
+      onUndo={undoPlanChange}
+      onRedo={redoPlanChange}
+      canUndo={canUndoPlan}
+      canRedo={canRedoPlan}
           />
 
           {rightOpen ? (
@@ -1543,6 +1667,7 @@ export function EditorShell(props: EditorShellProps) {
           pendingTestPlan={pendingTestPlan}
           onSearch={handleSearchTestPlans}
           onOpen={handleOpenTestPlan}
+          onDuplicate={handleDuplicateTestPlan}
           onClose={() => setShowTestPlansPanel(false)}
           onCancelUnsavedWarning={() => {
             setShowUnsavedPlanWarning(false);
