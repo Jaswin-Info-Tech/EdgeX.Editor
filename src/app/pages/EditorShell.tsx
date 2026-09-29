@@ -429,6 +429,7 @@ export function EditorShell(props: EditorShellProps) {
   const [resourcePlans, setResourcePlans] = useState<any[]>([]);
   const [isResourcesLoading, setIsResourcesLoading] = useState(false);
   const [isResourcesError, setIsResourcesError] = useState(false);
+  const [propertiesPanelResetKey, setPropertiesPanelResetKey] = useState(0);
   const [testPlanQuery, setTestPlanQuery] = useState("D:\\");
   const [submittedTestPlanQuery, setSubmittedTestPlanQuery] = useState("");
   const [hasSearchedTestPlans, setHasSearchedTestPlans] = useState(false);
@@ -1180,6 +1181,7 @@ export function EditorShell(props: EditorShellProps) {
       setShowUnsavedPlanWarning(false);
       setHasPlan(true);
       setSelectedId(allSteps[0]?.id ?? null);
+      setPropertiesPanelResetKey((key) => key + 1);
       setExpanded(
         new Set(
           allSteps
