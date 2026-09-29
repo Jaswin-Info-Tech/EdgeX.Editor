@@ -22,6 +22,7 @@ interface PropertiesPanelProps {
   instruments: any[];
   resources?: any[];
   testSteps: any[];
+  resetKey?: number;
   setPlan: any;
   setSelectedId: any;
   setAddStepParentId: any;
@@ -37,6 +38,7 @@ export function PropertiesPanel({
   instruments,
   resources = [],
   testSteps,
+  resetKey = 0,
   setPlan,
   updateProperty,
 }: PropertiesPanelProps) {
@@ -411,7 +413,7 @@ export function PropertiesPanel({
     setSchemaCollapsed(false);
     setCollapsedGroups({});
     setSchemaSearch("");
-  }, [selectedStep?.id]);
+  }, [selectedStep?.id, resetKey]);
 
   useEffect(() => {
     if (!selectedStep) {
@@ -767,7 +769,7 @@ export function PropertiesPanel({
           )}
 
           {groups.map((group) => {
-            const isCollapsed = collapsedGroups[group] ?? false;
+            const isCollapsed = collapsedGroups[group] ?? isDefaultCollapsedGroup(group);
             return (
             <div key={group}>
               <button

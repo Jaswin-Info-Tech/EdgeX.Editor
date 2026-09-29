@@ -16,6 +16,7 @@ const defaultProps = {
     pendingTestPlan: null,
     onSearch: vi.fn(),
     onOpen: vi.fn(),
+    onDuplicate: vi.fn(),
     onClose: vi.fn(),
     onCancelUnsavedWarning: vi.fn(),
     onSaveUnsavedChanges: vi.fn(),

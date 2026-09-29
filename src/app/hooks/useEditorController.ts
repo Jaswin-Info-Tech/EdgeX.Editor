@@ -136,6 +136,71 @@ type PersistedPlanSnapshot = {
   outputPath: string | null;
 };
 
+const isPersistedLeftTab = (
+  value: unknown,
+): value is PersistedPlanSnapshot["leftTab"] =>
+  value === "plan" ||
+  value === "library" ||
+  value === "plugins" ||
+  value === "instruments";
+
+const readPersistedPlanSnapshot = (): PersistedPlanSnapshot | null => {
+  if (typeof window === "undefined") return null;
+
+  try {
+    const rawSnapshot = window.localStorage.getItem(PLAN_SNAPSHOT_STORAGE_KEY);
+    if (!rawSnapshot) return null;
+
+    const parsed = JSON.parse(rawSnapshot) as Partial<PersistedPlanSnapshot>;
+    if (!parsed || parsed.hasPlan !== true || !Array.isArray(parsed.plan)) {
+      return null;
+    }
+
+    const restoredPlan = ensureUniqueStepIds(parsed.plan).steps;
+    const restoredMeta = parsed.planMeta;
+    if (!restoredMeta || typeof restoredMeta !== "object") return null;
+
+    const validIds = new Set(flatAll(restoredPlan).map((step) => step.id));
+    const restoredSelectedId = String(parsed.selectedId ?? "");
+    const expandedIds = Array.isArray(parsed.expandedIds)
+      ? parsed.expandedIds.filter(
+          (id): id is string => typeof id === "string" && validIds.has(id),
+        )
+      : [];
+
+    return {
+      hasPlan: true,
+      plan: restoredPlan,
+      planMeta: {
+        name: String(restoredMeta.name ?? "Untitled Test Plan"),
+        description: String(restoredMeta.description ?? ""),
+        author: String(restoredMeta.author ?? ""),
+        version: String(restoredMeta.version ?? "1.0.0"),
+        dutName: String(restoredMeta.dutName ?? ""),
+        dutSerial: String(restoredMeta.dutSerial ?? ""),
+        dutModel: String(restoredMeta.dutModel ?? ""),
+        dutFirmware: String(restoredMeta.dutFirmware ?? ""),
+      },
+      selectedId:
+        restoredSelectedId && validIds.has(restoredSelectedId)
+          ? restoredSelectedId
+          : null,
+      expandedIds,
+      leftTab: isPersistedLeftTab(parsed.leftTab) ? parsed.leftTab : "library",
+      savedPlanSignature:
+        typeof parsed.savedPlanSignature === "string"
+          ? parsed.savedPlanSignature
+          : null,
+      outputPath:
+        typeof parsed.outputPath === "string" && parsed.outputPath.trim()
+          ? parsed.outputPath
+          : null,
+    };
+  } catch {
+    return null;
+  }
+};
+
 const joinOutputPath = (folderPath: string, planName: string) => {
   const separator = folderPath.includes("/") && !folderPath.includes("\\") ? "/" : "\\";
   const normalizedFolder = folderPath.trim().replace(/[\\/]+$/, "");
@@ -148,6 +213,7 @@ const joinOutputPath = (folderPath: string, planName: string) => {
 
 
 export function useEditorController() {
+  const [initialSnapshot] = useState(() => readPersistedPlanSnapshot());
   const winW = useWindowWidth();
   const isDesktop = winW >= 1280;
   const isTablet = winW >= 768 && winW < 1024;
@@ -197,8 +263,12 @@ export function useEditorController() {
     return window.localStorage.getItem(THEME_STORAGE_KEY) === "dark";
   });
   const [isSaved, setIsSaved] = useState(false);
-  const [savedPlanSignature, setSavedPlanSignature] = useState<string | null>(null);
-  const [outputPath, setOutputPath] = useState<string | null>(null);
+  const [savedPlanSignature, setSavedPlanSignature] = useState<string | null>(
+    () => initialSnapshot?.savedPlanSignature ?? null,
+  );
+  const [outputPath, setOutputPath] = useState<string | null>(
+    () => initialSnapshot?.outputPath ?? null,
+  );
   const [showSaveDestination, setShowSaveDestination] = useState(false);
   const [activeRunId, setActiveRunId] = useState<string | null>(null);
   const [mqttCaptureEnabled, setMqttCaptureEnabled] = useState(false);
@@ -397,6 +467,41 @@ export function useEditorController() {
     );
   };
 
+  const normalizeInstrumentReference = useCallback((propertyName: string, value: any, prop: any = {}): any => {
+    const lowerName = String(propertyName ?? "").trim().toLowerCase();
+    if (!lowerName.includes("instrument") || value == null) return value;
+
+    const objectValue = value && typeof value === "object" && !Array.isArray(value) ? value : null;
+    if (objectValue) {
+      const next = { ...objectValue };
+      const name = String(next.Name ?? next.name ?? "").trim();
+      const visaAddress = String(next.VisaAddress ?? next.visaAddress ?? "").trim();
+      const typeHint = String(next.$type ?? next.type ?? next.fullTypeName ?? prop.typeName ?? prop.propertyType ?? "").trim();
+
+      if (name) next.Name = name;
+      if (visaAddress) next.VisaAddress = visaAddress;
+      if (typeHint && !next.$type) next.$type = typeHint;
+      return next;
+    }
+
+    if (typeof value !== "string") return value;
+    const text = value.trim();
+    if (!text) return value;
+
+    const match = text.match(/^(.+?)\s+\((.+)\)$/);
+    if (!match) return value;
+
+    const name = match[1].trim();
+    const visaAddress = match[2].trim();
+    if (!name) return value;
+
+    const next: Record<string, string> = { Name: name };
+    const typeHint = String(prop?.backendValue?.$type ?? prop?.typeName ?? prop?.propertyType ?? "").trim();
+    if (visaAddress) next.VisaAddress = visaAddress;
+    if (typeHint) next.$type = typeHint;
+    return next;
+  }, []);
+
   const formatStepForSave = useCallback((step: TestStep): any => {
     const runtimePropertyNames = new Set([
       "childteststeps",
@@ -422,7 +527,8 @@ export function useEditorController() {
       const isUnchangedLoadedValue =
         Object.prototype.hasOwnProperty.call(prop, "backendValue") &&
         Object.is(prop.value, prop.loadedDisplayValue);
-      acc[propertyName] = isUnchangedLoadedValue ? prop.backendValue : prop.value;
+      const rawValue = isUnchangedLoadedValue ? prop.backendValue : prop.value;
+      acc[propertyName] = normalizeInstrumentReference(propertyName, rawValue, prop);
       return acc;
     }, {});
 

@@ -1291,6 +1291,7 @@ export function EditorShell(props: EditorShellProps) {
       instruments={instruments}
       resources={resourcePlans}
       testSteps={displayLibrary}
+      resetKey={propertiesPanelResetKey}
       setPlan={setPlan}
       setSelectedId={setSelectedId}
       setAddStepParentId={setAddStepParentId}
