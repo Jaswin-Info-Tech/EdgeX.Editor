@@ -52,6 +52,11 @@ export function PropertiesPanel({
   const schemaCache = useAppSelector((state: any) => state.properties.cache);
   const errorsByTypeName = useAppSelector((state: any) => state.properties.errorsByTypeName);
 
+  const isDefaultCollapsedGroup = useCallback((group: string) => {
+    const normalized = String(group ?? "").trim().toLowerCase();
+    return normalized === "advanced" || normalized === "debug" || normalized === "diagnostics";
+  }, []);
+
   const getSchemaPropertyKey = (prop: any) => `${prop.name || prop.displayName} || ${prop.name}`;
   const isNameSchemaProperty = (prop: any) =>
     String(prop.name || prop.displayName || "").trim().toLowerCase() === "name";
