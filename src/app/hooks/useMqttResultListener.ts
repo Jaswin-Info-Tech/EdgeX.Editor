@@ -43,7 +43,7 @@ const extractMqttConfig = (
   };
 };
 
-const FRONTEND_CLIENT_ID = `edgex-frontend-${Math.random().toString(16).slice(2, 10)}`;
+
 
 const buildCandidateUrls = (config: MqttResourceConfig, override?: { port?: number; path?: string }) => {
   const protocol = config.useTls ? "wss" : "ws";
@@ -67,6 +67,7 @@ export const useMqttResultListener = (
   options?: { enabled?: boolean; wsPort?: number; wsPath?: string },
 ) => {
   const enabled = options?.enabled ?? true;
+  const clientIdRef = useRef(`edgex-frontend-${crypto.randomUUID()}`);
   const onMessageRef = useRef(onMessage);
   const onStatusRef = useRef(onStatus);
   onMessageRef.current = onMessage;
@@ -125,11 +126,11 @@ export const useMqttResultListener = (
       : buildCandidateUrls(config, { port: options?.wsPort, path: options?.wsPath });
 
     const connectOpts = {
-      clientId: FRONTEND_CLIENT_ID || config.clientId,
+      clientId: clientIdRef.current,
       username: config.username || undefined,
       password: config.password || undefined,
       connectTimeout: 4000,
-      reconnectPeriod: 0, // never auto-reconnect, on first connect or after disconnect
+      reconnectPeriod: 2000, // Recover the subscription after a broker or network interruption.
     };
 
     // Add this validator
@@ -204,7 +205,7 @@ export const useMqttResultListener = (
         onMessageRef.current?.(topic, parsePayload(payload));
       });
 
-      client.on("error", () => { });
+      client.on("error", (error) => { onStatusRef.current?.("ERROR", `MQTT connection error: ${error.message}`); });
 
       client.on("close", () => {
         if (!settled && !cancelled) {
@@ -216,7 +217,7 @@ export const useMqttResultListener = (
         if (!cancelled && settled && activeClient === client) {
           onStatusRef.current?.("INFO", `MQTT connection closed (${brokerUrl}).`);
           setIsSubscribed(false);
-          activeClient = null;
+          // Retain the client so cleanup can stop its reconnection timer.
         }
       });
     };

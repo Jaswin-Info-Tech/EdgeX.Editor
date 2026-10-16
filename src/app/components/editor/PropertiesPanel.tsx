@@ -22,7 +22,6 @@ interface PropertiesPanelProps {
   instruments: any[];
   resources?: any[];
   testSteps: any[];
-  resetKey?: number;
   setPlan: any;
   setSelectedId: any;
   setAddStepParentId: any;
@@ -38,7 +37,6 @@ export function PropertiesPanel({
   instruments,
   resources = [],
   testSteps,
-  resetKey = 0,
   setPlan,
   updateProperty,
 }: PropertiesPanelProps) {
@@ -230,7 +228,7 @@ export function PropertiesPanel({
       return "rest";
     }
 
-    if (stepText.includes("scpi")) {
+    if (stepText.includes("scpi") || stepText.includes("instrumentcapture.capturescreenstep")) {
       return "scpi";
     }
 
@@ -353,7 +351,12 @@ export function PropertiesPanel({
   }, []);
 
   const schemaRecords = useMemo(() => getSchemaRecords(schemaResponse), [schemaResponse]);
-  const schemaProperties = useMemo(() => schemaRecords[0]?.properties ?? [], [schemaRecords]);
+  const schemaProperties = useMemo(() => (schemaRecords[0]?.properties ?? []).map((prop: any) => {
+    const isScpiInstrument = [prop.propertyType, prop.type, prop.fullTypeName].some(
+      (typeName) => /\b(?:IScpiInstrument|ScpiInstrument)\b/i.test(String(typeName ?? "")),
+    );
+    return isScpiInstrument ? { ...prop, editorType: "instrument-selector" } : prop;
+  }), [schemaRecords]);
   const filteredSchemaProperties = useMemo(() => {
     const query = schemaSearch.trim().toLowerCase();
     if (!query) return schemaProperties;
@@ -413,7 +416,7 @@ export function PropertiesPanel({
     setSchemaCollapsed(false);
     setCollapsedGroups({});
     setSchemaSearch("");
-  }, [selectedStep?.id, resetKey]);
+  }, [selectedStep?.id]);
 
   useEffect(() => {
     if (!selectedStep) {
@@ -769,7 +772,7 @@ export function PropertiesPanel({
           )}
 
           {groups.map((group) => {
-            const isCollapsed = collapsedGroups[group] ?? isDefaultCollapsedGroup(group);
+            const isCollapsed = collapsedGroups[group] ?? false;
             return (
             <div key={group}>
               <button
