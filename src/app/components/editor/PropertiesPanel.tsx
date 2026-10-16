@@ -228,7 +228,7 @@ export function PropertiesPanel({
       return "rest";
     }
 
-    if (stepText.includes("scpi")) {
+    if (stepText.includes("scpi") || stepText.includes("instrumentcapture.capturescreenstep")) {
       return "scpi";
     }
 
@@ -351,7 +351,12 @@ export function PropertiesPanel({
   }, []);
 
   const schemaRecords = useMemo(() => getSchemaRecords(schemaResponse), [schemaResponse]);
-  const schemaProperties = useMemo(() => schemaRecords[0]?.properties ?? [], [schemaRecords]);
+  const schemaProperties = useMemo(() => (schemaRecords[0]?.properties ?? []).map((prop: any) => {
+    const isScpiInstrument = [prop.propertyType, prop.type, prop.fullTypeName].some(
+      (typeName) => /\b(?:IScpiInstrument|ScpiInstrument)\b/i.test(String(typeName ?? "")),
+    );
+    return isScpiInstrument ? { ...prop, editorType: "instrument-selector" } : prop;
+  }), [schemaRecords]);
   const filteredSchemaProperties = useMemo(() => {
     const query = schemaSearch.trim().toLowerCase();
     if (!query) return schemaProperties;

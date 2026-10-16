@@ -239,6 +239,7 @@ export function useEditorController() {
   const runLogsStreamErrorNotifiedRef = useRef(false);
   const runLogsClosedNotifiedRef = useRef(false);
   const mqttSubscribedRef = useRef(false);
+  const mqttStatusLoggedRef = useRef(new Set<string>());
   const bufferMqttResultsRef = useRef(false);
   const bufferedMqttResultLinesRef = useRef<string[]>([]);
 
@@ -701,9 +702,19 @@ export function useEditorController() {
       lines.forEach((line) => addLog("INFO", "MQTT", line));
     },
     (level, message) => {
-      addLog(level, "MQTT", message);
+      if (level !== "INFO") {
+        addLog(level, "MQTT", message);
+        return;
+      }
+      const status = message.startsWith("Connected to MQTT")
+        ? "connected"
+        : message.startsWith("Subscribed to ") ? "subscribed" : null;
+      if (status && !mqttStatusLoggedRef.current.has(status)) {
+        mqttStatusLoggedRef.current.add(status);
+        addLog(level, "MQTT", message);
+      }
     },
-    { enabled: true },
+    { enabled: mqttCaptureEnabled },
   );
 
   useEffect(() => {
@@ -1555,6 +1566,7 @@ export function useEditorController() {
     setLogs([]);
     setRunState("running");
     setActiveRunId(null);
+    mqttStatusLoggedRef.current.clear();
     setMqttCaptureEnabled(true);
     bufferMqttResultsRef.current = true;
     bufferedMqttResultLinesRef.current = [];
@@ -1565,7 +1577,12 @@ export function useEditorController() {
     addLog("INFO", "TestPlans", `Run request: ${runPath}`);
 
     try {
-      await waitForMqttSubscription();
+      const mqttReady = await waitForMqttSubscription(6000);
+      if (mqttReady) {
+        addLog("INFO", "MQTT", "Result subscription is ready.");
+      } else {
+        addLog("WARN", "MQTT", "Result subscription is not ready. Live results may be missing. Check the MQTT listener settings and broker WebSocket endpoint.");
+      }
       const runResponse = await runTestPlan({
         path: runPath,
         cacheXml: true,
