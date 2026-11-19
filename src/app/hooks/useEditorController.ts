@@ -375,9 +375,23 @@ export function useEditorController() {
     const normalizedChildren = Array.isArray(step?.children) && step.children.length > 0
       ? await Promise.all(step.children.map((child: any) => normalizeFormattedStepTypeNames(child)))
       : undefined;
+    const normalizedProperties = Object.fromEntries(
+      Object.entries(step?.properties ?? {}).map(([name, value]) => {
+        if (typeof value !== "string" || !/^.+\s+\((?:TCPIP|GPIB|USB|ASRL|COM\d*::).+\)$/i.test(value.trim())) {
+          return [name, value];
+        }
+        const match = value.trim().match(/^(.+?)\s+\((.+)\)$/)!;
+        return [name, {
+          $type: "OpenTap.Plugins.BasicSteps.GenericScpiInstrument",
+          Name: match[1].trim(),
+          VisaAddress: match[2].trim(),
+        }];
+      }),
+    );
 
     return {
       ...step,
+      properties: normalizedProperties,
       stepTypeName: resolvedTypeName,
       ...(normalizedChildren ? { children: normalizedChildren } : {}),
     };
@@ -413,6 +427,48 @@ export function useEditorController() {
       "error",
     ]);
 
+    const normalizeInstrumentReference = (propertyName: string, value: any, prop: any) => {
+      const backendValue = prop.backendValue;
+      const isTypedResource = (candidate: any) => candidate && typeof candidate === "object" && !Array.isArray(candidate)
+        && Boolean(candidate.$type || candidate.type || candidate.fullTypeName);
+      const isVisaReference = typeof value === "string"
+        && /^.+\s+\((?:TCPIP|GPIB|USB|ASRL|COM\d*::).+\)$/i.test(value.trim());
+      const isInstrument = propertyName.toLowerCase().includes("instrument")
+        || isTypedResource(value)
+        || isTypedResource(backendValue)
+        || isVisaReference;
+      if (!isInstrument || value == null) return value;
+
+      let currentValue = value;
+      if (typeof currentValue === "string" && currentValue.trim().startsWith("{")) {
+        try { currentValue = JSON.parse(currentValue); } catch { /* keep the display string */ }
+      }
+      if (currentValue && typeof currentValue === "object" && !Array.isArray(currentValue)) {
+        const normalized = { ...currentValue };
+        const name = String(normalized.Name ?? normalized.name ?? "").trim();
+        const visaAddress = String(normalized.VisaAddress ?? normalized.visaAddress ?? "").trim();
+        const type = String(normalized.$type ?? normalized.type ?? normalized.fullTypeName
+          ?? backendValue?.$type ?? backendValue?.type ?? backendValue?.fullTypeName ?? "").trim();
+        if (name) normalized.Name = name;
+        if (visaAddress) normalized.VisaAddress = visaAddress;
+        if (type && !normalized.$type) normalized.$type = type;
+        return normalized;
+      }
+
+      const display = String(currentValue).trim();
+      const parsed = display.match(/^(.+?)\s+\((.+)\)$/);
+      if (!parsed && !isTypedResource(backendValue)) return value;
+      const name = (parsed?.[1] ?? display).trim();
+      const visaAddress = (parsed?.[2] ?? backendValue?.VisaAddress ?? backendValue?.visaAddress ?? "").trim();
+      const type = String(backendValue?.$type ?? backendValue?.type ?? backendValue?.fullTypeName
+        ?? (visaAddress ? "OpenTap.Plugins.BasicSteps.GenericScpiInstrument" : "")).trim();
+      return {
+        ...(type ? { $type: type } : {}),
+        Name: name || String(backendValue?.Name ?? backendValue?.name ?? "").trim(),
+        ...(visaAddress ? { VisaAddress: visaAddress } : {}),
+      };
+    };
+
     const props = (step.properties || []).reduce((acc: Record<string, any>, prop: any) => {
       const schemaKey = String(prop.key ?? "").split("||")[0].trim();
       const propertyName = String(
@@ -426,7 +482,8 @@ export function useEditorController() {
       const isUnchangedLoadedValue =
         Object.prototype.hasOwnProperty.call(prop, "backendValue") &&
         Object.is(prop.value, prop.loadedDisplayValue);
-      acc[propertyName] = isUnchangedLoadedValue ? prop.backendValue : prop.value;
+      const value = isUnchangedLoadedValue ? prop.backendValue : prop.value;
+      acc[propertyName] = normalizeInstrumentReference(propertyName, value, prop);
       return acc;
     }, {});
 
